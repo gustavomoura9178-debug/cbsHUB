@@ -75,7 +75,7 @@ Pendências para a outra IA: ler KNOWN_ISSUES; começar por K01/R1; preservar co
 
 ## 05/11/2026 — CHAT-002 — Codex/OpenAI
 
-- Branch feat/chat-v2-2026-11-05; base 206dc46; tag recovery/pre-chat-v2-2026-11-05; commit CHAT_CONTENT_COMMIT.
+- Branch feat/chat-v2-2026-11-05; base 206dc46; tag recovery/pre-chat-v2-2026-11-05; commit b74272e.
 - Preflight: checkout limpo, docs/fluxo de mensagens revisados; main atualizada com PR #3 por fast-forward. Escopo P2P anterior preservado, backend não criado.
 - Arquivos: novos módulos src/chat/model, ledger, ChatPanel, MessageRow, SafeMarkdown; wrapper TextChatSection; protocolo cbshub.d.ts; handlers e métodos de chat no webrtcEngine; persistência/ordem em storageDb e useHubStore; CSS. Testes chat-model/chat-smoke/chat-drafts, readiness do probe de perfis, README de testes e documentação compartilhada.
 - Funcionalidades: edição/exclusão/resposta/pin, reação set/unset, menção/digitação/não lidas, copy/context menus, Markdown/código/link local seguro, rascunhos por sala, estados de persistência/ACK/erro, busca e janela de 100/retention500. Soundboard normal/compacto/atividade sem remover áudio.

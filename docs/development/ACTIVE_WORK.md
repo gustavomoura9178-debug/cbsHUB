@@ -66,4 +66,4 @@ PROFILE-001 concluído para revisão; reserva liberada. Branch feat/user-profile
 
 ## Atualização — CHAT-002 — 05/11/2026
 
-CHAT-002 concluído para revisão; reserva liberada. feat/chat-v2-2026-11-05, base 206dc46, commit CHAT_CONTENT_COMMIT. Ver CHAT_2.md. Sem push/merge nesta tarefa.
+CHAT-002 concluído para revisão; reserva liberada. feat/chat-v2-2026-11-05, base 206dc46, commit b74272e. Ver CHAT_2.md. Sem push/merge nesta tarefa.

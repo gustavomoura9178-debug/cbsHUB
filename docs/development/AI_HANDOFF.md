@@ -87,4 +87,4 @@ PROFILE-001 · feat/user-profiles-2026-11-05 · 7a88783 · base 03217b8. Ler PRO
 
 ## Atualização — CHAT-002 — 05/11/2026
 
-CHAT-002 · feat/chat-v2-2026-11-05 · CHAT_CONTENT_COMMIT · base 206dc46. Ler CHAT_2.md antes de alterar journal, tombstones, ACK e sync. Banco novo de operações não substitui dados antigos. Não trocar estados explícitos por toggles em v2. Backend ausente; recuperação de operações depende do ator disponível ou journal já local. Sem garantia global/servidor. Soundboard preservado.
+CHAT-002 · feat/chat-v2-2026-11-05 · b74272e · base 206dc46. Ler CHAT_2.md antes de alterar journal, tombstones, ACK e sync. Banco novo de operações não substitui dados antigos. Não trocar estados explícitos por toggles em v2. Backend ausente; recuperação de operações depende do ator disponível ou journal já local. Sem garantia global/servidor. Soundboard preservado.
