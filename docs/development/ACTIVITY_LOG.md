@@ -190,3 +190,6 @@ Branch feat/desktop-refinement-2026-11-05. Electron usa single-instance lock, ba
 
 ## DESKTOP-004 — identidade local antes de open — 05/11/2026
 Codex/OpenAI · feat/desktop-refinement-2026-11-05. O teste do palco detectou captura ativa com cards vazios antes de Peer.id ser confirmado. Atualizações do participante local agora resolvem a identidade já registrada na sala, sem aguardar sinalização externa. Corrige presença de voz/mute/câmera/fala no estado local pendente, sem falsificar abertura da rede. tsc/build e desktop-refinement passaram após correção; transporte remoto continua não verificado. Arquivo webrtcEngine.ts.
+
+## DESKTOP-004 — cards proporcionais — 05/11/2026
+Codex/OpenAI · feat/desktop-refinement-2026-11-05. callGrid calcula colunas/linhas e dimensões 16:9 pela área disponível; ResizeObserver acompanha palco/janela com cleanup. Cards/avatar acompanham altura em vez de mínimo fixo de 140px; palco muito pequeno mantém rolagem. Spotlight/webcam/tela e controles preservados; overlay de transmissão agora aparece em hover/foco em vez de ocultar vídeo permanentemente. Arquivos CallStagePanel/UserCallCard, useElementSize, callGrid e tokens CSS. desktop-refinement passou tamanhos 220/360/490 e atribuição de qualidade por peer; build/tsc passaram. Vídeo/tela entre computadores continuam pendentes.

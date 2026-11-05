@@ -1,3 +1,5 @@
+import { useElementSize } from "../hooks/useElementSize";
+import { callGrid } from "../lib/callGrid";
 import { useShallow } from "zustand/react/shallow";
 import { useMediaOutput } from "../hooks/useMediaOutput";
 import React, { useRef, useState, useEffect } from "react";
@@ -26,6 +28,8 @@ import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import type { Participant } from "../types/cbshub";
 
 export const CallStagePanel: React.FC = () => {
+  const gridBounds = useElementSize();
+
   const {
     inVoiceCall,
     callStageMode,
@@ -458,14 +462,7 @@ export const CallStagePanel: React.FC = () => {
   /* ========================================================================= */
   const totalTiles = participantsInVoice.length + screenSharers.length;
 
-  const getGridColsClass = () => {
-    if (totalTiles <= 1) return "grid-cols-1 max-w-xl";
-    if (totalTiles === 2) return "grid-cols-1 sm:grid-cols-2 max-w-4xl";
-    if (totalTiles <= 4) return "grid-cols-1 sm:grid-cols-2 max-w-4xl";
-    if (totalTiles <= 6)
-      return "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-6xl";
-    return "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-6xl";
-  };
+  const geometry = callGrid(gridBounds.width, gridBounds.height, totalTiles);
 
   return (
     <div
@@ -493,7 +490,11 @@ export const CallStagePanel: React.FC = () => {
             aria-pressed={expanded}
             onClick={() => setExpanded(!expanded)}
           >
-            {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+            {expanded ? (
+              <Minimize2 className="size-3.5" />
+            ) : (
+              <Maximize2 className="size-3.5" />
+            )}
           </Button>
           <Button
             size="icon-sm"
@@ -508,9 +509,18 @@ export const CallStagePanel: React.FC = () => {
         </div>
       </div>
       {/* Grade de Cards Responsiva */}
-      <div className="flex-1 overflow-y-auto p-4 flex items-center justify-center">
+      <div
+        ref={gridBounds.ref}
+        className="call-grid-area min-h-0 flex-1 overflow-auto p-3"
+      >
         <div
-          className={`grid gap-3 w-full mx-auto items-center justify-center ${getGridColsClass()}`}
+          className="call-responsive-grid grid gap-3 mx-auto"
+          style={{
+            gridTemplateColumns: `repeat(${geometry.columns},minmax(0,1fr))`,
+            gridAutoRows: `${geometry.height}px`,
+            width:
+              geometry.width * geometry.columns + 12 * (geometry.columns - 1),
+          }}
         >
           {/* Tiles de Transmissão de Tela */}
           {screenSharers.map(({ participant, stream, key }) => (

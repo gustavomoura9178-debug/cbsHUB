@@ -494,3 +494,9 @@ html[data-studio-motion="reduced"] *, html[data-studio-motion="reduced"] *::befo
 .room-unread { border-radius: var(--radius); padding: .125rem .375rem; background: var(--primary); color: var(--primary-foreground); font-size: var(--text-caption); font-weight: 600; }
 .local-user-panel .text-sm { font-size: var(--text-caption); }
 .local-user-panel .text-caption { font-size: var(--text-micro); }
+
+.call-participant-card { container-type:size; }
+.call-card-avatar { width:clamp(28px,35cqh,72px); height:clamp(28px,35cqh,72px); }
+.call-grid-area { align-content:center; }
+.call-responsive-grid { max-width:100%; }
+
