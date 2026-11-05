@@ -161,3 +161,8 @@ Limitações: instalador/ícone do Windows, bandeja e arraste físico não testa
 ## WORKSPACE-3 A/B/F — 05/11/2026 — Codex/OpenAI
 
 Branch feat/workspace-3-2026-11-05, base 8cd3dff. Diagnóstico estruturado local e limitado, relatório sem conteúdo/IDs/endereço, recuperação limitada/cancelável e preservação da voz durante perda isolada do DataConnection. Correções baseadas em caminho reproduzível, sem afirmar causa das quedas do usuário. Push-to-talk opcional com foco (F8/F9/F10), teste local de microfone e limpeza de recursos; stack/mixagem/Soundboard preservados. Arquivos/limites e critérios em VOICE_RECOVERY.md. Testes call-recovery, audio-tools, media-engine e build/tsc passaram nas execuções iniciais; suíte final ainda em execução ao registrar esta fase. Hardware/ICE/TURN e atalho global não aprovados. Sem backend ou mudança de versão; commit de conteúdo será registrado no fechamento.
+
+
+## WORKSPACE-3 C/D/E — 05/11/2026 — Codex/OpenAI
+
+Branch feat/workspace-3-2026-11-05, sobre ac501cc. Sidebar existente refinada, sem recriar aplicativo: pesquisa, favoritas locais/recentes separados, indicador real de não lidas da sala ativa, painel compacto de voz e rodapé de perfil em uma linha com tooltips/estados reais. Resize/collapse/Sheets, temas e opções detalhadas do dock preservados. useShallow evita subscrição do sidebar a micLevel e outros estados sem uso. Arquivos: LeftSidebar.tsx, index.css e workspace-sidebar.cjs; documentação em WORKSPACE_3_STATUS.md. workspace-sidebar passou localmente, incluindo teclado/mobile/persistência/temas. Sem contadores de outras salas ou DM falsos. Demais dependências externas estão explicitadas no status.
