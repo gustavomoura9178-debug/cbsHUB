@@ -12,6 +12,8 @@ interface MediaState {
   cameraBusy: boolean;
   screenBusy: boolean;
   reconnecting: boolean;
+  signaling: "idle" | "connecting" | "online" | "offline" | "failed";
+  recoveryAttempt: number;
   quality: Record<string, CallQuality>;
 }
 export const useMediaState = create<MediaState>(() => ({
@@ -20,6 +22,8 @@ export const useMediaState = create<MediaState>(() => ({
   cameraBusy: false,
   screenBusy: false,
   reconnecting: false,
+  signaling: "idle",
+  recoveryAttempt: 0,
   quality: {},
 }));
 export function mediaError(action: string, error: unknown) {

@@ -35,6 +35,7 @@ const assert = require("node:assert/strict");
       e.localPeer = {
         id: "a-local",
         destroyed: false,
+        open: true,
         disconnected: false,
         destroy() {},
         connect() {
@@ -218,6 +219,46 @@ const assert = require("node:assert/strict");
       true,
       "cancel clears pending retry work",
     );
+    await page.evaluate(() => {
+      window.savedPeer = e.localPeer;
+      window.originalOpen = e.openRoomPeer;
+      window.stalledRebuilds = 0;
+      savedPeer.open = false;
+      savedPeer.disconnected = true;
+      savedPeer.reconnect = function () {
+        this.disconnected = false;
+      };
+      e.openRoomPeer = () => {
+        stalledRebuilds++;
+        e.signalingPendingAt = Date.now();
+        e.localPeer = { ...savedPeer, open: false, disconnected: false };
+      };
+      e.retryConnection();
+    });
+    await page.clock.runFor(5000);
+    assert.equal(
+      await page.evaluate(() => m.getState().reconnecting),
+      true,
+      "reconnect() is not proof of an open signaling socket",
+    );
+    await page.clock.runFor(25000);
+    assert.equal(
+      await page.evaluate(
+        () =>
+          stalledRebuilds > 0 &&
+          s.getState().inVoiceCall &&
+          e.rawMicStream.active,
+      ),
+      true,
+      "stalled handshake is rebuilt without losing local capture",
+    );
+    await page.evaluate(() => {
+      e.cancelRecovery();
+      e.openRoomPeer = originalOpen;
+      e.localPeer = savedPeer;
+      savedPeer.open = true;
+      savedPeer.disconnected = false;
+    });
     await page.evaluate(() => {
       e.recoveryCancelled = false;
       e.localPeer = null;

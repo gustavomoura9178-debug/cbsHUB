@@ -210,6 +210,8 @@ class WebRTCEngine {
     useHubStore.getState().setParticipants({ [localPeerId]: localParticipant });
 
     // Inicializa localPeer
+    useMediaState.setState({ signaling: "connecting" });
+    this.signalingPendingAt = Date.now();
     this.localPeer = new Peer(localPeerId, PEER_CONFIG);
 
     const peer = this.localPeer;
@@ -219,7 +221,13 @@ class WebRTCEngine {
       if (this.localPeer !== peer) return;
       this.recoveryAttempts = 0;
       callEvent("signaling_open");
-      useMediaState.setState({ reconnecting: false });
+      this.signalingPendingAt = 0;
+      useMediaState.setState({
+        reconnecting: false,
+        signaling: "online",
+        recoveryAttempt: 0,
+        error: null,
+      });
       useHubStore
         .getState()
         .setConnectionStatus(
@@ -270,6 +278,8 @@ class WebRTCEngine {
 
     this.localPeer.on("disconnected", () => {
       if (this.localPeer === peer) {
+        useMediaState.setState({ signaling: "offline" });
+        useHubStore.setState({ isConnected: false });
         callEvent("signaling_disconnected");
         this.scheduleRecovery();
       }
@@ -278,12 +288,16 @@ class WebRTCEngine {
     this.localPeer.on("close", () => {
       // Fechamento inesperado recupera sinalização; leaveRoom invalida a identidade antes de destroy.
       if (this.localPeer === peer && this.currentRoomSlug) {
+        useMediaState.setState({ signaling: "offline" });
+        useHubStore.setState({ isConnected: false });
         callEvent("signaling_closed", { reason: "peer_closed" });
         this.localPeer = null;
         this.scheduleRecovery();
       }
     });
   }
+
+  private signalingPendingAt = 0;
 
   private scheduleRecovery(): void {
     if (
@@ -299,6 +313,7 @@ class WebRTCEngine {
       });
       useMediaState.setState({
         reconnecting: false,
+        signaling: this.localPeer?.open ? "online" : "failed",
         error:
           "Não foi possível reconectar à sala. A voz ativa foi preservada quando possível. Tente novamente.",
       });
@@ -310,7 +325,7 @@ class WebRTCEngine {
         (0.8 + Math.random() * 0.4),
     );
     callEvent("retry_scheduled", { attempt, delayMs });
-    useMediaState.setState({ reconnecting: true });
+    useMediaState.setState({ reconnecting: true, recoveryAttempt: attempt });
     useHubStore
       .getState()
       .setStatusText("Reconectando sinalização e participantes...");
@@ -324,7 +339,18 @@ class WebRTCEngine {
       )
         return;
       if (navigator.onLine) {
-        if (!this.localPeer || this.localPeer.destroyed) {
+        const stalled =
+          this.localPeer &&
+          !this.localPeer.open &&
+          !this.localPeer.disconnected &&
+          this.signalingPendingAt > 0 &&
+          Date.now() - this.signalingPendingAt > 12000;
+        if (!this.localPeer || this.localPeer.destroyed || stalled) {
+          const obsolete = this.localPeer;
+          this.localPeer = null;
+          try {
+            obsolete?.destroy();
+          } catch {}
           const old = [...this.sessions.values()];
           this.sessions.clear();
           for (const session of old) {
@@ -349,11 +375,14 @@ class WebRTCEngine {
           }
         } else if (this.localPeer.disconnected) {
           try {
+            this.signalingPendingAt = Date.now();
+            useMediaState.setState({ signaling: "connecting" });
             this.localPeer.reconnect();
           } catch {
             callEvent("signaling_error", { reason: "unknown" });
           }
-        } else {
+        } else if (this.localPeer.open) {
+          this.signalingPendingAt = 0;
           this.queryBeaconDirectory(`cbshub-v2-${this.currentRoomSlug}-beacon`);
           let pending = false;
           for (const session of this.sessions.values())
@@ -364,7 +393,11 @@ class WebRTCEngine {
           this.broadcastLocalState();
           if (!pending) {
             this.recoveryAttempts = 0;
-            useMediaState.setState({ reconnecting: false });
+            useMediaState.setState({
+              reconnecting: false,
+              signaling: "online",
+              recoveryAttempt: 0,
+            });
             return;
           }
         }
@@ -389,7 +422,11 @@ class WebRTCEngine {
 
   public notifyNetwork(online: boolean): void {
     callEvent(online ? "network_online" : "network_offline");
-    if (online && !this.recoveryCancelled) this.recoveryAttempts = 0;
+    if (!online) useMediaState.setState({ signaling: "offline" });
+    if (online && !this.recoveryCancelled) {
+      this.retryConnection();
+      return;
+    }
     this.scheduleRecovery();
   }
 
@@ -3039,6 +3076,8 @@ class WebRTCEngine {
       cameraBusy: false,
       screenBusy: false,
       reconnecting: false,
+      signaling: "idle",
+      recoveryAttempt: 0,
       quality: {},
     });
     const leavingPeer = this.localPeer;

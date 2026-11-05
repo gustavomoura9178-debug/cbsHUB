@@ -154,3 +154,6 @@ BRAND-003 — nova logo oficial integrada e verificada conforme OFFICIAL_LOGO.md
 ## WORKSPACE-3 / CHAT-UI-003 / BRAND-003 — 05/11/2026 — fechamento
 
 Codex/OpenAI · feat/workspace-3-2026-11-05 · commits eb8f1fc, 8cd3dff, ac501cc, bed3859 e fechamento documental posterior. Todas as reservas desta sessão liberadas. Build/tsc e pacote Linux passaram; suíte final 22 PASSED/1 BLOCKED (ICE), sem falhas restantes. Ler WORKSPACE_3_STATUS.md e VOICE_RECOVERY.md antes de novos ajustes. Mídia física, Windows e backend permanecem pendentes. Main preservada, nenhum push/merge.
+
+## DESKTOP-004 — ativo — 05/11/2026
+Codex/OpenAI · feat/desktop-refinement-2026-11-05 · base 29e60c1. PR #11 integrado, árvore limpa. Reserva: recuperação de sinalização/qualidade, Electron Tray, cards responsivos, editores embutidos, temas, animação de marca e corte de áudio, testes/docs. Plano em DESKTOP_REFINEMENT_PLAN.md. Logo nova e mensagem numérica legítima preservadas conforme instruções recentes. Sem substituição da stack/servidor ou merge automático.
