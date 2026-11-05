@@ -1,0 +1,38 @@
+# Registro de atividades
+
+## 05/11/2026 — AUDIT-001 — Codex/OpenAI
+
+- Branch: `audit/cbshub-v2-2026-11-05`.
+- Base/recuperação: `5deab40aa1629a975dc72588b658569b21494c23`; tag `recovery/pre-audit-2026-11-05`; bundle completo verificado em `/workspace/cbshub-onboarding/pre-audit-2026-11-05.bundle`.
+- Git inicial: branch `work`, sem mudanças tracked/untracked; consulta remota mostrou somente main, no mesmo commit. Nenhum push/force push/alteração direta em main.
+- Commit de conteúdo da entrega: `PENDING_CONTENT_COMMIT`. Commit posterior de passagem registra esse hash; consultar `git log` para o HEAD final.
+- Arquivos criados: `docs/PROJECT_AUDIT.md`; `docs/development/PROJECT_STATUS.md`, `ACTIVITY_LOG.md`, `CHANGELOG.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `KNOWN_ISSUES.md`, `AI_HANDOFF.md`, `ACTIVE_WORK.md`.
+- Funcionalidades implementadas: nenhuma. Auditoria/documentação/protocolo e preparação de ambiente; bibliotecas, estilos, chamadas, mensagens e Soundboard não foram editados.
+- Setup externo ao Git: dependências ignoradas, builds ignorados, helper dev, install.sh, probes/resultados/perfis e backup em `/workspace/cbshub-onboarding`.
+
+### Testes e diagnósticos executados
+
+| Comando/cenário | Resultado |
+| --- | --- |
+| git status/branch/log/ls-remote | Base limpa; branches remotas verificadas, sem comparação com PRs não disponíveis |
+| git bundle create/verify | Backup íntegro do histórico disponível |
+| npm ci | Falhou por resolução de peer dependencies do lockfile |
+| npm ci --legacy-peer-deps | Primeira tentativa falhou no download Electron sem proxy; com ELECTRON_GET_USE_PROXY=1 passou (515 pacotes) |
+| npm run build | Passou duas vezes; TypeScript/renderer/main/preload; chunk ~610kB e dupla emissão preload observados |
+| npm run dev no cloud | Falha do Electron por DISPLAY ausente apesar de exit 0 do comando |
+| Electron headless com output dev | Falha de sintaxe ES em preload.cjs reproduzida |
+| resolveViteConfig/mergeConfig | Confirma formatos [es,cjs] colidindo no mesmo caminho |
+| Smoke Chromium local | 6 grupos funcionais passaram: renderer/8 sons, compositor+persistence, modal Escape, reações, CRUD/favorito custom WAV, mixagem com mic mudo/stopAll |
+| Diagnóstico inicial smoke | 2 tentativas expiraram esperando feed offline; mensagem existia no estado/DB. Teste ajustado para observar persistência, sem simular rede conectada |
+| Dois probes de defeitos | Favorito nativo inoperante e sendData(peer_state_sync) ignorado reproduzidos |
+| Electron produção headless | Renderer e API preload presentes após nova build; title cbsHUB |
+| Electron com helper dev | Renderer em Vite e os seis métodos da API presentes |
+| node --check preload.cjs | Passou para artefato final de produção desta execução |
+| npm audit --json | Exit 1; 19 dependências (1 crítica, 13 altas, 5 moderadas), sem atualização automática |
+| curl HTTPS PeerJS | CONNECT 403; bloqueio de rede observado |
+
+Não executados: chamadas entre máquinas, matriz 3–6 pares, beacon failover, mídia física, 4K60/loopback, empacotamento/instalação Windows, auditoria completa de acessibilidade, suite automatizada do repositório (inexistente). Não houve avaliação auditiva dos sinais sintéticos.
+
+Configuração cloud: rascunho confirmado como salvo com install_script, start_skill e domínio 0.peerjs.com; publicação exigida e não executada. Não há segredos novos solicitados. Não há alegação de restauração em nova tarefa.
+
+Pendências para a outra IA: ler KNOWN_ISSUES; começar por K01/R1; preservar contratos/dados; configurar rede para R3; usar ACTIVE_WORK antes de reservar arquivos. Pronto para planejamento visual, ainda sem gate funcional para implementar redesign.

@@ -1,0 +1,21 @@
+# Changelog
+
+## Não lançado — 05/11/2026
+
+Responsável: Codex/OpenAI. Branch `audit/cbshub-v2-2026-11-05`.
+Base: `5deab40aa1629a975dc72588b658569b21494c23`. Commit de documentação: `PENDING_CONTENT_COMMIT`.
+
+### Adicionado
+
+- Auditoria técnica de arquitetura, tecnologias, shadcn/ui, estilos, funcionalidades, Git e dependências.
+- Oito documentos de desenvolvimento para estado, atividades, mudanças, roadmap, arquitetura, problemas, passagem entre IAs e reserva de tarefas.
+- Branch e tag de recuperação locais; backup Git externo verificado.
+- Instruções reutilizáveis de instalação e startup headless salvas na configuração cloud, com domínio PeerJS no rascunho.
+
+### Verificado
+
+Build e comportamento local de renderer, chat/IndexedDB, reações, Dialog e Soundboard com sinal sintético. Electron abriu em produção e com helper dev; colisão de outputs do preload no fluxo padrão foi diagnosticada. Npm audit retornou 19 dependências sinalizadas. Detalhes e falhas em ACTIVITY_LOG/PROJECT_AUDIT.
+
+### Limitações
+
+Sem alterações de funcionalidade ou visual; sem substituição/atualização de bibliotecas. Redesign e correções permanecem pendentes de tarefas próprias. Chamadas reais, 4K60, beacon failover e release Windows não foram validados. Documentação anterior preservada. Nenhum release ou push publicado.
