@@ -100,3 +100,10 @@ Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px
 - Favoritos e remoção/restauração de recentes são locais. Unread da sidebar só representa a sala ativa; não simula múltiplas salas conectadas em segundo plano.
 - Diagnóstico é memória limitada e não sobrevive a restart; deve ser copiado antes de fechar o app. Logs de console antigos do motor não são o relatório sanitizado; não compartilhá-los como se tivessem a mesma política de campos.
 - Permanecem ABR/stats de tela por par, avisos Vite/bundle, suspensão real e testes prolongados. Ver WORKSPACE_3_STATUS.md para dependências e evidências.
+
+
+## DESKTOP-004 — 05/11/2026
+
+Corrigidos: espera de Peer.open/reconstrução travada, identidade local antes do ID remoto, cards fixos, editores encadeados, nome que sobrevivia ao Cancelar, defaults fictícios FPS/RTT e atribuição errada de snapshot de tela/foco. Telemetria de recepção acompanha foco e ignora resultados antigos; ABR por todos os pares ainda não foi implementado.
+
+BLOCKED permanece media-transport sem ICE; sem validação física de reconexão, áudio/vídeo/suspensão ou Windows/Tray. Headless usa minimizar como fallback de bandeja e não comprova clique nativo. Backend/ACL/DM/anexos/sync global e notificações de mensagens do SO continuam ausentes. Corte de waveform refere-se a arquivos importados; sintetizadores mantêm metadados e reprodução. Não há benchmark físico CPU/GPU/memória. Persistem avisos do bundler e limitações anteriores de armazenamento/EXIF/plataformas. Relatório detalhado em DESKTOP_REFINEMENT.md.

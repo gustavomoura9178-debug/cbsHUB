@@ -49,3 +49,15 @@ Electron 45 baixa o runtime sob demanda: preparar com `node node_modules/electro
 `workspace-sidebar.cjs`: favoritos/busca/persistência, não lidas da sala ativa, painel/rodapé de voz, temas, collapse/viewports e navegação por teclado no mobile.
 
 `chat-toolbar.cjs`: ações sob demanda, pins/eventos/densidade, histórico/estado vazio e mensagem numérica legítima de 7000 caracteres preservada sem overflow. `official-logo.cjs`: fonte/hash e fidelidade dos paths/cores no mark derivado, PNGs transparentes, frames ICO e renderização nos dois temas.
+
+
+## DESKTOP-004
+
+`desktop-refinement.cjs`: editores integrados em um Dialog, quatro temas/contraste/persistência, cards em três alturas, webcam/tela sintéticas/spotlight, qualidade por peer, tela de reconexão/cancelamento e movimento reduzido. Ações comuns não se repetem permanentemente no dock.
+
+`audio-trim.cjs`: WAV sintético, waveform, corte/prévia, original preservado, reedição/IndexedDB/reload, cache após transação, limpeza de player, arquivo/intervalos/tamanho inválidos e captura ativa. Sem qualidade auditiva física ou transporte remoto.
+
+`tray-lifecycle.cjs`: Electron headless, fechar preserva captura/renderer, activate restaura mesma janela, segundo processo não cria outra instância e app.quit encerra. Sem Tray físico nesse ambiente; criação GTK é evitada quando headless e X minimiza como fallback. Windows/menu/ícone reais ficam pendentes.
+
+
+`stream-telemetry.cjs`: nenhum FPS/RTT presumido, flags para métricas ausentes, associação A/B ao spotlight, troca do observer para o peer focado, rejeição de resultado assíncrono antigo e ausência de ramp-up ABR com rede desconhecida. Adapters não são transporte real. Após npm test, parar renderer antes de empacotar: arquivos HTML gerados em dist-package podem provocar reload do Vite e invalidar sessões de teste.

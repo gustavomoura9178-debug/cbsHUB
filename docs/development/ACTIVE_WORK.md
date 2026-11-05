@@ -157,3 +157,7 @@ Codex/OpenAI · feat/workspace-3-2026-11-05 · commits eb8f1fc, 8cd3dff, ac501cc
 
 ## DESKTOP-004 — ativo — 05/11/2026
 Codex/OpenAI · feat/desktop-refinement-2026-11-05 · base 29e60c1. PR #11 integrado, árvore limpa. Reserva: recuperação de sinalização/qualidade, Electron Tray, cards responsivos, editores embutidos, temas, animação de marca e corte de áudio, testes/docs. Plano em DESKTOP_REFINEMENT_PLAN.md. Logo nova e mensagem numérica legítima preservadas conforme instruções recentes. Sem substituição da stack/servidor ou merge automático.
+
+
+## DESKTOP-004 — 05/11/2026 — concluído localmente para revisão
+Codex/OpenAI · feat/desktop-refinement-2026-11-05 · base 29e60c1 · conteúdo até f9c5513 e fechamento documental posterior. Reservas liberadas. Build/tsc/pacote Linux passaram; suíte 26 PASSED/1 BLOCKED por ICE; audit zero. Detalhes e pendências em DESKTOP_REFINEMENT.md. Disponibilizar branch para revisão conforme entrega solicitada, sem release, force push ou merge em main.

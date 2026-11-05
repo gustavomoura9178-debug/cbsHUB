@@ -2,7 +2,7 @@
 
 Aplicativo Electron de comunicação P2P com React, TypeScript, shadcn/ui e Tailwind CSS.
 
-Versão de revisão: **2.0.0-rc.2**. Não há aprovação para produção. Leia [o relatório de estabilização](docs/development/SECURITY_UPDATE.md) e [a política de versões](docs/development/VERSIONING.md).
+Versão de revisão: **2.0.0-rc.3**. Não há aprovação para produção. Leia [a revisão desktop](docs/development/DESKTOP_REFINEMENT.md) e [a política de versões](docs/development/VERSIONING.md).
 
 ## Instalação e execução
 
@@ -68,3 +68,12 @@ Resultado: `dist-package/linux-unpacked/`. Distribua o diretório completo, não
 A marca oficial atual está em `public/brand/logo.svg` (símbolo azul-marinho/turquesa); PNG/ICO e exportador reproduzível documentados em `public/brand/README.md`. Pesquisa do chat no cabeçalho, fixadas/atividades no menu da sala e densidade em Configurações > Aparência.
 
 Configurações > Diagnóstico permite copiar estados recentes da chamada sem conteúdo ou endereços de rede. Configurações > Áudio inclui teste local de microfone e PTT opcional (F8/F9/F10, somente com foco). Favoritos são locais. Ler `docs/development/WORKSPACE_3_STATUS.md` e `VOICE_RECOVERY.md` para testes e limitações; este trabalho não declara versão estável nem garante recuperação em todas as redes.
+
+
+### Revisão desktop — DESKTOP-004
+
+Configurações integra Perfil e Studio; Aparência oferece Clássico, Moderno Roxo, Sakura Dream e Velvet Nocturne, mantendo presets e temas anteriores. X mantém o Electron em segundo plano (ou minimizado quando a bandeja não existe); para encerrar, use Encerrar no menu da bandeja. PTT continua limitado ao foco do aplicativo.
+
+Efeitos Sonoros inclui corte de arquivos importados, waveform/prévia local e original preservado. O palco adapta cards à área; controles comuns ficam na sidebar, com dispositivos/opções sob demanda. Logo animada acompanha inicialização real e reconexão sustentada, sem atraso artificial.
+
+Relatório, arquivos, testes e limitações em [DESKTOP_REFINEMENT.md](docs/development/DESKTOP_REFINEMENT.md). Backend/DM/anexos/sincronização global e notificações de mensagens do SO não são oferecidos nesta revisão. Transporte real e bandeja Windows ainda requerem matriz física.
