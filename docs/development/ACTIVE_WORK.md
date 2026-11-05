@@ -105,3 +105,5 @@ Entrega VISUAL-002: commit de conteúdo `27d6c15`; reserva liberada, branch limp
 ## STABILIZE-001 — 05/11/2026
 
 STABILIZE-001 concluído para revisão; reserva liberada. Branch fix/stabilization-2026-11-05, base 89dc1bb; candidato 2.0.0-rc.1. Build/pacote Linux testados; 14 scripts aprovados e 1 bloqueado. Ler STABILIZATION.md antes de integrar. Main intacta.
+
+Entrega STABILIZE-001: conteúdo em `f9df3e8`, branch fix/stabilization-2026-11-05, candidato 2.0.0-rc.1. 14 scripts aprovados e media-transport bloqueado, build/Electron/pacote Linux verificados. Reserva liberada; este é o registro documental posterior. Nenhum push, merge ou declaração de produção.
