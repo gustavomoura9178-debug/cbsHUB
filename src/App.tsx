@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/react/shallow";
 import React, { useEffect, useState } from "react";
 import { TitleBar } from "./components/TitleBar";
 import { LeftSidebar } from "./components/LeftSidebar";
@@ -25,6 +26,7 @@ import {
   SIDEBAR_MAX,
 } from "./hooks/useWorkspaceLayout";
 
+import { MediaNotice } from "./components/CallStatus";
 import { ProfileDialog } from "./profiles/ProfileDialog";
 import { StudioDialog } from "./studio/StudioDialog";
 
@@ -35,7 +37,15 @@ export const App: React.FC = () => {
     setIsSettingsOpen,
     setIsScreenPickerOpen,
     roomId,
-  } = useHubStore();
+  } = useHubStore(
+    useShallow((state) => ({
+      isSettingsOpen: state.isSettingsOpen,
+      isScreenPickerOpen: state.isScreenPickerOpen,
+      setIsSettingsOpen: state.setIsSettingsOpen,
+      setIsScreenPickerOpen: state.setIsScreenPickerOpen,
+      roomId: state.roomId,
+    })),
+  );
 
   const layout = useWorkspaceLayout();
   const compact = useMediaQuery("(max-width: 767px)");
@@ -53,14 +63,11 @@ export const App: React.FC = () => {
 
   // 1. Inicialização do microfone e da sala executada apenas UMA VEZ no mount
   useEffect(() => {
-    webrtcEngine.setupLocalMicrophone().catch((err) => {
-      console.warn("[App] Erro ao inicializar microfone no arranque:", err);
-    });
-
     const initialRoom = roomId || "cbs-irmandade";
     webrtcEngine.joinRoom(initialRoom, false).catch((err) => {
       console.warn("[App] Erro ao conectar na sala inicial:", err);
     });
+    return () => webrtcEngine.leaveRoom();
   }, []); // Array de dependências vazio estrito
 
   // 2. Listener global de teclado (ESC fecha modais ativos)
@@ -115,6 +122,7 @@ export const App: React.FC = () => {
             />
             <div className="workspace-content">
               <div className="workspace-conversation">
+                <MediaNotice />
                 <CallStagePanel />
                 <TextChatSection />
               </div>

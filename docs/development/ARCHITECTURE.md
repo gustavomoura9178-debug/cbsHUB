@@ -74,3 +74,8 @@ ProfileProvider envolve App; repository local vincula perfil ao clientId e mant�
 ## Atualização — CHAT-002 — 05/11/2026
 
 ChatPanel/MessageRow/SafeMarkdown substituem somente a camada de chat anterior. ChatLedger serializa operações no banco cbshub_chat_ledger; storageDb continua com mensagens/clips. Protocolo aditivo chat_operation/chat_operations_sync/chat_ack; histórico/mutação filtrados por sala/sessão/autoria local. Janela DOM de 100 e retenção 500. Ver CHAT_2.md.
+
+
+## Atualização — MEDIA-001 — 05/11/2026
+
+mediaState guarda apenas estado transitório de captura/erro/reconexão e qualidade por peer. PeerMediaSession separa webcamCall/screenCall recebidos de outgoingWebcam/outgoingScreen enviados; voiceCall permanece bidirecional. Tokens de geração invalidam capturas/salas antigas. PeerJS é reaproveitado no retry; transportes de chat e ledger não foram substituídos. Soundboard mantém retorno local via GainNode por contexto e injeção pós-gate; setSinkId condicionado à capacidade do runtime. SoundboardClip acrescenta category/order opcionais; banco/chaves existentes preservados. soundPreferences compartilha cbshub-chat-sounds entre painéis. Detalhes em MEDIA_EXPERIENCE.md.

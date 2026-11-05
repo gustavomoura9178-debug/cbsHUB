@@ -1,3 +1,6 @@
+import { useShallow } from "zustand/react/shallow";
+import { CallQualityBadge } from "./CallStatus";
+import { useMediaOutput } from "../hooks/useMediaOutput";
 import React, { useRef, useEffect, useState } from "react";
 import {
   MicOff,
@@ -36,7 +39,13 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
   participant,
   isCompact = false,
 }) => {
-  const { localWebcamStream, remoteStreams, peerVolumes } = useHubStore();
+  const { localWebcamStream, remoteStreams, peerVolumes } = useHubStore(
+    useShallow((s) => ({
+      localWebcamStream: s.localWebcamStream,
+      remoteStreams: s.remoteStreams,
+      peerVolumes: s.peerVolumes,
+    })),
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
@@ -46,7 +55,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
     : remoteStreams[participant.peerId]?.webcam;
   const hasActiveWebcam = participant.isWebcamActive && Boolean(webcamStream);
   const isSpeakingNow = participant.isSpeaking && !participant.isMuted;
-  const volume = peerVolumes[participant.clientId] ?? 1.0;
+  const volume = Math.min(1, peerVolumes[participant.clientId] ?? 1.0);
 
   useEffect(() => {
     if (videoRef.current && webcamStream) {
@@ -70,13 +79,21 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
           : "border-white/[0.07] hover:border-white/20"
       }`}
     >
+      {!isLocal && (
+        <div className="absolute top-2 left-2 z-10">
+          <CallQualityBadge peerId={participant.peerId} />
+        </div>
+      )}
+      {isSpeakingNow && (
+        <span className="sr-only">{participant.nickname} está falando</span>
+      )}
       {/* 1. Vídeo da Webcam ou Avatar Centralizado */}
       {hasActiveWebcam ? (
         <video
           ref={videoRef}
           autoPlay
           playsInline
-          muted={isLocal}
+          muted
           className="w-full h-full object-cover"
         />
       ) : (
@@ -93,7 +110,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
 
       {/* 2. Badge Flutuante Animada de Soundboard */}
       {isSoundActive && (
-        <div className="absolute top-2 z-20 animate-bounce bg-surface/95 border border-primary/50 text-foreground px-2.5 py-1 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-1.5 backdrop-blur-md">
+        <div className="absolute top-2 z-20  bg-surface/95 border border-primary/50 text-foreground px-2.5 py-1 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-1.5 backdrop-blur-md">
           <span className="text-sm">{soundEffect.emoji}</span>
           <span className="truncate max-w-[120px]">{soundEffect.name}</span>
         </div>
@@ -128,7 +145,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
               <PopoverTrigger asChild>
                 <button
                   aria-label="Ajustar Volume"
-                  className="pointer-events-auto bg-overlay hover:bg-black/90 text-white p-1 rounded-md border border-border opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="pointer-events-auto bg-overlay hover:bg-black/90 text-white p-1 rounded-md border border-border opacity-100 transition-opacity"
                 >
                   <Sliders className="w-3 h-3" />
                 </button>
@@ -149,7 +166,8 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
                 </div>
                 <Slider
                   min={0}
-                  max={2}
+                  aria-label={`Volume de ${participant.nickname}`}
+                  max={1}
                   step={0.05}
                   value={[volume]}
                   onValueChange={([val]) =>
@@ -205,6 +223,8 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isLocal = participant.isLocal;
+  const deafened = useHubStore((s) => s.isDeafened);
+  useMediaOutput(videoRef, participant.clientId, stream);
 
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -233,7 +253,7 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
         ref={videoRef}
         autoPlay
         playsInline
-        muted={isLocal}
+        muted={isLocal || deafened}
         className="w-full h-full object-contain pointer-events-none"
       />
 
@@ -250,12 +270,12 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
       </div>
 
       {/* Overlay no Hover: Assistir no Palco */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-20">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-20">
         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-lg transform group-hover:scale-110 transition-transform">
           <Maximize2 className="w-5 h-5" />
         </div>
         <span className="text-xs font-bold text-white tracking-wide">
-          Focar Transmissão 4K60
+          Focar transmissão
         </span>
       </div>
 

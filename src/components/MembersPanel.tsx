@@ -18,7 +18,9 @@ import { PRESENCES } from "../profiles/model";
 import type { Participant } from "../types/cbshub";
 
 function MemberRow({ participant: p }: { participant: Participant }) {
-  const volume = useHubStore((state) => state.peerVolumes[p.clientId] ?? 1);
+  const volume = useHubStore((state) =>
+    Math.min(1, state.peerVolumes[p.clientId] ?? 1),
+  );
   return (
     <div className="member-row">
       <ParticipantAvatar
@@ -85,7 +87,7 @@ function MemberRow({ participant: p }: { participant: Participant }) {
             <Slider
               aria-label={`Volume de ${p.nickname}`}
               min={0}
-              max={2}
+              max={1}
               step={0.05}
               value={[volume]}
               onValueChange={([v]) => webrtcEngine.setPeerVolume(p.clientId, v)}

@@ -83,3 +83,18 @@ Pendências para a outra IA: ler KNOWN_ISSUES; começar por K01/R1; preservar co
 - Falhas investigadas: singleton duplicado por HMR nos probes, preparação de fixture de perfil antes de readiness e comparador tipado de clip; preparação/tipagem corrigidas, não registradas como passes antes da correção.
 - Preservação: Electron, áudio, SoundboardEngine, Studio/perfis e dependências sem alteração funcional; alterações do motor focadas em mensagens.
 - Pendências: backend/ACL, histórico de ator ausente, clientes antigos, limites/quota de journal e K01. Ver CHAT_2.md antes de integrar. Sem push ou merge.
+
+
+## Atualização — MEDIA-001 — 05/11/2026
+
+Data: 05/11/2026, 06:40 America/Sao_Paulo (horário aproximado de fechamento). Responsável: Codex/OpenAI, a pedido do mantenedor. Tarefa MEDIA-001, branch feat/media-experience-2026-11-05, base 6a72051. Preflight: árvore limpa e Chat 2 integrado pelo PR #4; recuperação recovery/pre-media-experience-2026-11-05; sem alterações externas adicionais encontradas.
+
+Implementado: controles/qualidade/erros, seleção e rollback de dispositivos, captura sob demanda/cancelamento, separação dos canais de câmera/tela, retries e teardown, otimização das atualizações de fala; Soundboard com categorias/edição/ordenação, favoritos nativos persistentes, preview isolado, deafen e preferência de eventos comum ao chat. Arquivos modificados e fronteiras listados em MEDIA_EXPERIENCE.md; também atualizados os documentos compartilhados e tests/README.md. Primitivos shadcn/Tailwind, stack e conteúdo acústico preservados.
+
+Testes executados: npm run build passou (avisos preexistentes de bundle/preload); media-smoke e media-engine passaram com captura sintética/adapters; chat-model 7 grupos, theme-validation 8, profile-validation 7 passaram; chat-smoke/chat-drafts/profile-smoke/studio-smoke/redesign-smoke passaram. Falhas iniciais de JSX/fixtures corrigidas; detalhes no relatório. media-transport foi tentado e bloqueado por candidatos ICE ausentes; NÃO registrar como aprovado. Não houve teste em dois dispositivos físicos, redes distintas, saída/hotplug real, picker/loopback do SO, 4K60 ou release Windows.
+
+Pendências: matriz física, K07/ABR multipar, K01/preload e K16/dependências. Outra IA: conferir MEDIA_EXPERIENCE e commits antes de editar áreas de mídia; reservas liberadas. Entrega local para revisão, sem push/merge.
+
+Atualização do mantenedor: publicação da branch autorizada após executar os testes disponíveis. Build e dez scripts de teste passaram; media-transport foi executado e está bloqueado por ausência de candidatos ICE. Publicação não equivale a aprovação da matriz física ou merge.
+
+Commit de conteúdo MEDIA-001: `de8a914`. Dez scripts passaram e um teste de transporte ficou bloqueado (não aprovado). Alterações preparadas para publicação na branch `feat/media-experience-2026-11-05` conforme autorização do mantenedor; main não modificada. Este registro é o commit documental posterior, identificável pelo histórico Git.

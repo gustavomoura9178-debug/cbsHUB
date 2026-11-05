@@ -22,3 +22,11 @@ Os probes de persistência/mixagem/Electron usados na auditoria permanecem em `/
 `node tests/chat-smoke.cjs`: dois contextos e ponte local através dos handlers reais; envio/ACK, edição/exclusão, resposta/pin/reação, reconexão lógica, Soundboard, busca e paginação.
 `node tests/chat-drafts.cjs`: rascunhos por sala, erro de disco injetado/retry, retenção, janela limitada e não lidas.
 Requer os mesmos pré-requisitos de navegador/renderer. Reinicie o helper dev após modificar store/motor para evitar módulos duplicados do HMR nos imports dinâmicos dos probes. O teste de perfis aguarda readiness da sala antes de inserir sua sessão sintética. Limitações de autorização/recuperação P2P em docs/development/CHAT_2.md.
+
+# Voz, vídeo e Soundboard (MEDIA-001)
+
+`node tests/media-smoke.cjs`: captura sintética, permissão/erros, controles, troca/rollback de dispositivos, biblioteca e liberação após sair.
+`node tests/media-engine.cjs`: WebAudio real com sinais sintéticos e adapters de chamada/stats para testar canais independentes, entrada tardia, recuperação e teardown. Não equivale a transmissão pela rede.
+`node tests/media-transport.cjs`: tenta RTCPeerConnections locais entre dois contextos, com adapter de sinalização; falha explicitamente se não houver candidatos ICE. **Bloqueado nesta instância, não aprovado.** Não usar como evidência de dois dispositivos físicos.
+
+Mesmos pré-requisitos dos demais probes; iniciar renderer e reiniciar depois de alterações em módulos centrais para evitar HMR durante testes. Não modificar fontes enquanto um probe roda. Matriz física e resultados em `docs/development/MEDIA_EXPERIENCE.md`.

@@ -355,7 +355,7 @@ export const useHubStore = create<HubState>()(
         set((state) => ({
           peerVolumes: {
             ...state.peerVolumes,
-            [clientId]: Math.min(2.0, Math.max(0.0, volume)),
+            [clientId]: Math.min(1.0, Math.max(0.0, volume)),
           },
         })),
 

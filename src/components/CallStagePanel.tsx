@@ -1,4 +1,6 @@
-import React, { useRef, useState, useEffect } from 'react';
+import { useShallow } from "zustand/react/shallow";
+import { useMediaOutput } from "../hooks/useMediaOutput";
+import React, { useRef, useState, useEffect } from "react";
 import {
   PhoneCall,
   PhoneOff,
@@ -13,14 +15,14 @@ import {
   MicOff,
   Headphones,
   Tv,
-} from 'lucide-react';
-import { useHubStore } from '../store/useHubStore';
-import { webrtcEngine } from '../lib/webrtcEngine';
-import { UserCallCard, ScreenShareTile } from './UserCallCard';
-import { CallControlDock } from './CallControlDock';
-import { Button } from './ui/button';
-import { Tooltip, TooltipTrigger, TooltipContent } from './ui/tooltip';
-import type { Participant } from '../types/cbshub';
+} from "lucide-react";
+import { useHubStore } from "../store/useHubStore";
+import { webrtcEngine } from "../lib/webrtcEngine";
+import { UserCallCard, ScreenShareTile } from "./UserCallCard";
+import { CallControlDock } from "./CallControlDock";
+import { Button } from "./ui/button";
+import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
+import type { Participant } from "../types/cbshub";
 
 export const CallStagePanel: React.FC = () => {
   const {
@@ -37,9 +39,26 @@ export const CallStagePanel: React.FC = () => {
     setCallStageMode,
     setCallStageHeight,
     setFocusedPeerStreamKey,
-  } = useHubStore();
+  } = useHubStore(
+    useShallow((state) => ({
+      inVoiceCall: state.inVoiceCall,
+      callStageMode: state.callStageMode,
+      callStageHeight: state.callStageHeight,
+      focusedPeerStreamKey: state.focusedPeerStreamKey,
+      participants: state.participants,
+      localScreenStream: state.localScreenStream,
+      remoteStreams: state.remoteStreams,
+      telemetry: state.telemetry,
+      isMuted: state.isMuted,
+      isDeafened: state.isDeafened,
+      setCallStageMode: state.setCallStageMode,
+      setCallStageHeight: state.setCallStageHeight,
+      setFocusedPeerStreamKey: state.setFocusedPeerStreamKey,
+    })),
+  );
 
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [showHud, setShowHud] = useState(true);
   const [isMutedStream, setIsMutedStream] = useState(false);
 
@@ -47,15 +66,23 @@ export const CallStagePanel: React.FC = () => {
   const spotlightContainerRef = useRef<HTMLDivElement>(null);
 
   // Lista de participantes que estão na chamada de voz
-  const participantsInVoice = Object.values(participants).filter((p) => p.inVoiceCall);
+  const participantsInVoice = Object.values(participants).filter(
+    (p) => p.inVoiceCall,
+  );
   const inVoiceCount = participantsInVoice.length;
 
   // Participantes compartilhando tela
-  const screenSharers: Array<{ participant: Participant; stream: MediaStream; key: string }> = [];
+  const screenSharers: Array<{
+    participant: Participant;
+    stream: MediaStream;
+    key: string;
+  }> = [];
 
   for (const p of Object.values(participants)) {
     if (p.isScreenSharing) {
-      const stream = p.isLocal ? localScreenStream : remoteStreams[p.peerId]?.screen;
+      const stream = p.isLocal
+        ? localScreenStream
+        : remoteStreams[p.peerId]?.screen;
       if (stream) {
         screenSharers.push({
           participant: p,
@@ -67,12 +94,25 @@ export const CallStagePanel: React.FC = () => {
   }
 
   // Stream focado no modo Spotlight
-  let focusedItem: { participant: Participant; stream: MediaStream } | null = null;
+  let focusedItem: { participant: Participant; stream: MediaStream } | null =
+    null;
   if (screenSharers.length > 0) {
-    const found = screenSharers.find((s) => s.key === focusedPeerStreamKey) || screenSharers[0];
+    const found =
+      screenSharers.find((s) => s.key === focusedPeerStreamKey) ||
+      screenSharers[0];
     focusedItem = { participant: found.participant, stream: found.stream };
   }
 
+  useMediaOutput(
+    spotlightVideoRef,
+    focusedItem?.participant.clientId || "",
+    callStageMode === "spotlight" ? focusedItem?.stream : null,
+  );
+  useEffect(() => {
+    const listener = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", listener);
+    return () => document.removeEventListener("fullscreenchange", listener);
+  }, []);
   useEffect(() => {
     if (spotlightVideoRef.current && focusedItem?.stream) {
       spotlightVideoRef.current.srcObject = focusedItem.stream;
@@ -94,26 +134,31 @@ export const CallStagePanel: React.FC = () => {
     };
 
     const onMouseUp = () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
     };
 
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
   };
 
   const toggleFullscreen = () => {
     if (!spotlightContainerRef.current) return;
     if (!document.fullscreenElement) {
-      spotlightContainerRef.current.requestFullscreen().then(() => setIsFullscreen(true)).catch(() => {});
+      spotlightContainerRef.current
+        .requestFullscreen()
+        .then(() => setIsFullscreen(true))
+        .catch(() => {});
     } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false)).catch(() => {});
+      document
+        .exitFullscreen()
+        .then(() => setIsFullscreen(false))
+        .catch(() => {});
     }
   };
 
   const toggleMuteStream = () => {
     if (spotlightVideoRef.current) {
-      spotlightVideoRef.current.muted = !isMutedStream;
       setIsMutedStream(!isMutedStream);
     }
   };
@@ -136,9 +181,9 @@ export const CallStagePanel: React.FC = () => {
               <div
                 key={p.peerId}
                 className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-2xs text-white uppercase border-2 border-surface shadow ${
-                  p.isSpeaking ? 'ring-2 ring-success' : ''
+                  p.isSpeaking ? "ring-2 ring-success" : ""
                 }`}
-                style={{ backgroundColor: p.avatarColor || 'var(--primary)' }}
+                style={{ backgroundColor: p.avatarColor || "var(--primary)" }}
               >
                 {p.nickname.slice(0, 2).toUpperCase()}
               </div>
@@ -147,7 +192,9 @@ export const CallStagePanel: React.FC = () => {
 
           <div className="text-xs">
             <span className="font-semibold text-success">
-              {inVoiceCount} {inVoiceCount === 1 ? 'irmão está' : 'irmãos estão'} na chamada de voz
+              {inVoiceCount}{" "}
+              {inVoiceCount === 1 ? "irmão está" : "irmãos estão"} na chamada de
+              voz
             </span>
           </div>
         </div>
@@ -167,21 +214,23 @@ export const CallStagePanel: React.FC = () => {
   /* ========================================================================= */
   /* CASO 2: USUÁRIO NA CHAMADA — MODO MINIMIZADO                              */
   /* ========================================================================= */
-  if (callStageMode === 'minimized') {
+  if (callStageMode === "minimized") {
     return (
       <div className="h-12 bg-surface border-b border-border px-4 flex items-center justify-between select-none shrink-0 z-20">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
-          <span className="text-xs font-semibold text-foreground">Chamada em Andamento</span>
+          <span className="text-xs font-semibold text-foreground">
+            Chamada em Andamento
+          </span>
           <div className="flex -space-x-1.5 overflow-hidden ml-2">
             {participantsInVoice.map((p) => (
               <div
                 key={p.peerId}
                 title={p.nickname}
                 className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-micro text-white uppercase border-2 border-surface ${
-                  p.isSpeaking ? 'ring-2 ring-success' : ''
+                  p.isSpeaking ? "ring-2 ring-success" : ""
                 }`}
-                style={{ backgroundColor: p.avatarColor || 'var(--primary)' }}
+                style={{ backgroundColor: p.avatarColor || "var(--primary)" }}
               >
                 {p.nickname.slice(0, 2).toUpperCase()}
               </div>
@@ -194,24 +243,30 @@ export const CallStagePanel: React.FC = () => {
             variant="ghost"
             size="icon"
             onClick={() => webrtcEngine.toggleMute()}
-            className={`h-7 w-7 rounded-md ${isMuted ? 'text-destructive bg-destructive/10' : 'text-muted-foreground'}`}
+            className={`h-7 w-7 rounded-md ${isMuted ? "text-destructive bg-destructive/10" : "text-muted-foreground"}`}
           >
-            {isMuted ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+            {isMuted ? (
+              <MicOff className="w-3.5 h-3.5" />
+            ) : (
+              <Mic className="w-3.5 h-3.5" />
+            )}
           </Button>
 
           <Button
             variant="ghost"
             size="icon"
             onClick={() => webrtcEngine.toggleDeafen()}
-            className={`h-7 w-7 rounded-md ${isDeafened ? 'text-destructive bg-destructive/10' : 'text-muted-foreground'}`}
+            className={`h-7 w-7 rounded-md ${isDeafened ? "text-destructive bg-destructive/10" : "text-muted-foreground"}`}
           >
-            <Headphones className={`w-3.5 h-3.5 ${isDeafened ? 'line-through text-destructive' : ''}`} />
+            <Headphones
+              className={`w-3.5 h-3.5 ${isDeafened ? "line-through text-destructive" : ""}`}
+            />
           </Button>
 
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setCallStageMode('grid')}
+            onClick={() => setCallStageMode("grid")}
             className="h-7 text-xs px-2.5 flex items-center gap-1 text-muted-foreground hover:text-foreground"
           >
             <Maximize2 className="w-3.5 h-3.5" />
@@ -234,14 +289,18 @@ export const CallStagePanel: React.FC = () => {
   /* ========================================================================= */
   /* CASO 3: USUÁRIO NA CHAMADA — MODO FOCO 4K60 (SPOTLIGHT)                   */
   /* ========================================================================= */
-  if (callStageMode === 'spotlight' && focusedItem) {
+  if (callStageMode === "spotlight" && focusedItem) {
     const isLocal = focusedItem.participant.isLocal;
 
     return (
       <div
         ref={spotlightContainerRef}
         onDoubleClick={toggleFullscreen}
-        style={{ height: `${callStageHeight}px`, minHeight: 'min(18rem, 40dvh)', maxHeight: '55dvh' }}
+        style={{
+          height: `${callStageHeight}px`,
+          minHeight: "min(18rem, 40dvh)",
+          maxHeight: "55dvh",
+        }}
         className="relative bg-surface border-b border-border flex flex-col justify-between overflow-hidden select-none shrink-0"
       >
         {/* Vídeo Focado 4K */}
@@ -250,7 +309,7 @@ export const CallStagePanel: React.FC = () => {
             ref={spotlightVideoRef}
             autoPlay
             playsInline
-            muted={isLocal || isMutedStream}
+            muted={isLocal || isMutedStream || isDeafened}
             className="w-full h-full object-contain cursor-pointer"
           />
 
@@ -260,7 +319,9 @@ export const CallStagePanel: React.FC = () => {
               <div className="flex items-center gap-2 border-b border-border pb-1 mb-1">
                 <span className="w-2 h-2 rounded-full bg-success animate-ping" />
                 <span className="font-extrabold text-white uppercase text-caption tracking-wider">
-                  {isLocal ? 'Sua Transmissão Local' : `Tela de ${focusedItem.participant.nickname}`}
+                  {isLocal
+                    ? "Sua Transmissão Local"
+                    : `Tela de ${focusedItem.participant.nickname}`}
                 </span>
                 <span className="text-micro px-1.5 py-0.2 bg-primary/20 text-primary-foreground rounded font-mono font-bold">
                   Ao vivo
@@ -268,24 +329,32 @@ export const CallStagePanel: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2 text-foreground font-mono text-caption">
-                <span className="font-semibold text-white">{telemetry.resolution}</span>
+                <span className="font-semibold text-white">
+                  {telemetry.resolution}
+                </span>
                 <span className="text-zinc-600">•</span>
-                <span className="text-success font-bold">{telemetry.fps} FPS</span>
+                <span className="text-success font-bold">
+                  {telemetry.fps} FPS
+                </span>
                 <span className="text-zinc-600">•</span>
-                <span className="text-primary font-bold">{telemetry.bitrateMbps} Mbps</span>
+                <span className="text-primary font-bold">
+                  {telemetry.bitrateMbps} Mbps
+                </span>
                 <span className="text-zinc-600">•</span>
-                <span className="text-warning font-bold">{telemetry.rttMs} ms</span>
+                <span className="text-warning font-bold">
+                  {telemetry.rttMs} ms
+                </span>
               </div>
 
               <div className="flex items-center justify-between text-2xs text-muted-foreground pt-0.5">
                 <span className="flex items-center gap-1">
                   <Activity className="w-3 h-3 text-success" />
                   <span className="font-semibold uppercase text-micro">
-                    {telemetry.abrStatus === 'optimal'
-                      ? 'Qualidade estável'
-                      : telemetry.abrStatus === 'throttled'
-                      ? 'Qualidade ajustada'
-                      : 'Recuperando qualidade'}
+                    {telemetry.abrStatus === "optimal"
+                      ? "Qualidade estável"
+                      : telemetry.abrStatus === "throttled"
+                        ? "Qualidade ajustada"
+                        : "Recuperando qualidade"}
                   </span>
                 </span>
                 <span>Perda: {telemetry.packetsLostPercent}%</span>
@@ -301,11 +370,13 @@ export const CallStagePanel: React.FC = () => {
                   onClick={() => setShowHud(!showHud)}
                   className="p-1.5 rounded-lg backdrop-blur-md bg-black/60 border border-border text-foreground hover:text-white hover:bg-black/80 transition-colors"
                 >
-                  <Zap className={`w-4 h-4 ${showHud ? 'text-warning' : 'text-muted-foreground'}`} />
+                  <Zap
+                    className={`w-4 h-4 ${showHud ? "text-warning" : "text-muted-foreground"}`}
+                  />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
-                {showHud ? 'Ocultar Telemetria' : 'Exibir Telemetria'}
+                {showHud ? "Ocultar Telemetria" : "Exibir Telemetria"}
               </TooltipContent>
             </Tooltip>
 
@@ -324,7 +395,9 @@ export const CallStagePanel: React.FC = () => {
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom">
-                  {isMutedStream ? 'Desmutar Áudio da Tela' : 'Mutar Áudio da Tela'}
+                  {isMutedStream
+                    ? "Desmutar Áudio da Tela"
+                    : "Mutar Áudio da Tela"}
                 </TooltipContent>
               </Tooltip>
             )}
@@ -335,7 +408,11 @@ export const CallStagePanel: React.FC = () => {
                   onClick={toggleFullscreen}
                   className="p-1.5 rounded-lg backdrop-blur-md bg-black/60 border border-border text-foreground hover:text-white hover:bg-black/80 transition-colors"
                 >
-                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                  {isFullscreen ? (
+                    <Minimize2 className="w-4 h-4" />
+                  ) : (
+                    <Maximize2 className="w-4 h-4" />
+                  )}
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom">Tela Cheia</TooltipContent>
@@ -344,7 +421,7 @@ export const CallStagePanel: React.FC = () => {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setCallStageMode('grid')}
+              onClick={() => setCallStageMode("grid")}
               className="h-8 text-xs px-2.5 flex items-center gap-1 shadow-md ml-1"
             >
               <LayoutGrid className="w-3.5 h-3.5" />
@@ -381,21 +458,53 @@ export const CallStagePanel: React.FC = () => {
   const totalTiles = participantsInVoice.length + screenSharers.length;
 
   const getGridColsClass = () => {
-    if (totalTiles <= 1) return 'grid-cols-1 max-w-xl';
-    if (totalTiles === 2) return 'grid-cols-1 sm:grid-cols-2 max-w-4xl';
-    if (totalTiles <= 4) return 'grid-cols-1 sm:grid-cols-2 max-w-4xl';
-    if (totalTiles <= 6) return 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-6xl';
-    return 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-6xl';
+    if (totalTiles <= 1) return "grid-cols-1 max-w-xl";
+    if (totalTiles === 2) return "grid-cols-1 sm:grid-cols-2 max-w-4xl";
+    if (totalTiles <= 4) return "grid-cols-1 sm:grid-cols-2 max-w-4xl";
+    if (totalTiles <= 6)
+      return "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-6xl";
+    return "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-6xl";
   };
 
   return (
     <div
-      style={{ height: `${callStageHeight}px`, maxHeight: '50dvh' }}
+      style={{
+        height: expanded ? "75dvh" : `${callStageHeight}px`,
+        maxHeight: expanded ? "75dvh" : "50dvh",
+      }}
       className="relative bg-surface border-b border-border flex flex-col justify-between overflow-hidden select-none shrink-0"
     >
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border text-xs">
+        <span>
+          {inVoiceCount} participantes ·{" "}
+          {participantsInVoice
+            .filter((p) => p.isSpeaking && !p.isMuted)
+            .map((p) => p.nickname)
+            .join(", ") || "Ninguém falando"}
+        </span>
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="ghost"
+            aria-pressed={expanded}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? "Reduzir painel" : "Expandir painel"}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setCallStageMode("minimized")}
+          >
+            Minimizar
+          </Button>
+        </div>
+      </div>
       {/* Grade de Cards Responsiva */}
       <div className="flex-1 overflow-y-auto p-4 flex items-center justify-center">
-        <div className={`grid gap-3 w-full mx-auto items-center justify-center ${getGridColsClass()}`}>
+        <div
+          className={`grid gap-3 w-full mx-auto items-center justify-center ${getGridColsClass()}`}
+        >
           {/* Tiles de Transmissão de Tela */}
           {screenSharers.map(({ participant, stream, key }) => (
             <ScreenShareTile
@@ -404,7 +513,7 @@ export const CallStagePanel: React.FC = () => {
               stream={stream}
               onFocus={() => {
                 setFocusedPeerStreamKey(key);
-                setCallStageMode('spotlight');
+                setCallStageMode("spotlight");
               }}
             />
           ))}
@@ -431,4 +540,3 @@ export const CallStagePanel: React.FC = () => {
     </div>
   );
 };
-

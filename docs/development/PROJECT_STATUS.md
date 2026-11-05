@@ -50,3 +50,8 @@ Perfis locais/P2P implementados: identidade, cartão rápido/completo, editor/pr
 ## Atualização — CHAT-002 — 05/11/2026
 
 Chat 2.0 implementado: operações, ACK, edit/delete/reply/pin/reação, Markdown seguro, links locais, rascunhos, busca, janela limitada e modos Soundboard. Testes locais de dois contextos passaram; backend e sinalização remota não validados. CHAT_2.md registra limites de reconciliação/autoria.
+
+
+## Atualização — MEDIA-001 — 05/11/2026
+
+MEDIA-001 implementado para revisão em feat/media-experience-2026-11-05, base 6a72051. Melhorias incrementais de controles, dispositivos, qualidade por participante, lifecycle/retries e Soundboard. Build e regressões locais passaram; teste de transporte bloqueado por ausência de candidatos ICE. Dois dispositivos físicos ainda não validados. Ver MEDIA_EXPERIENCE.md. Sem push/merge nesta etapa.

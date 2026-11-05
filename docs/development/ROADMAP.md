@@ -51,3 +51,12 @@ PROFILE-001 implementado no escopo local/P2P aprovado. Próximos passos: revisã
 ## Atualização — CHAT-002 — 05/11/2026
 
 CHAT-002 implementado no escopo local/P2P; próxima revisão deve validar compatibilidade multipar real, ledger/retention e migração para ACL/backend quando existir. Não anunciar histórico offline global ou exclusão de cópias remotas. CHAT_2.md contém requisitos pendentes.
+
+
+## Atualização — MEDIA-001 — 05/11/2026
+
+1. Revisão de MEDIA-001 sobre 6a72051, com comparação de lifecycle e chamadas bidirecionais; depende desta entrega e dos testes locais registrados.
+2. Executar matriz física de MEDIA_EXPERIENCE.md em dois dispositivos e depois três: depende de dispositivos/permissões e sinalização/ICE acessível; incluir queda/restauração de rede, mídia simultânea e Soundboard. É gate de integração de mídia, não tarefa já concluída.
+3. Delimitar correção K07 (ABR e stats de tela por par) após baseline físico, mantendo seletores de foco e compatibilidade.
+4. Resolver K01/preload e planejar atualização de dependências K16 antes de distribuição; dependem de revisão e testes Electron/Windows.
+5. Backend/autenticação e permissões administrativas de sala permanecem etapa separada conforme escolha local/P2P. Não introduzir ACL global de Soundboard sem essa base.

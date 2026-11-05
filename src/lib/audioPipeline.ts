@@ -205,6 +205,7 @@ export class VoiceAudioPipeline {
     if (!this.analyserNode) return;
 
     const dataArray = new Float32Array(this.analyserNode.fftSize);
+    let lastLoudAt = 0;
 
     this.meterInterval = window.setInterval(() => {
       if (this.isDestroyed || !this.analyserNode) return;
@@ -229,7 +230,8 @@ export class VoiceAudioPipeline {
       const db = rms > 0.00001 ? 20 * Math.log10(rms) : -100;
 
       // Anel verde ativo quando o volume passar de -42 dB
-      const isSpeaking = db > -42;
+      if (db > -42) lastLoudAt = Date.now();
+      const isSpeaking = Date.now() - lastLoudAt < 180;
       const normalizedLevel = Math.min(100, Math.max(0, Math.round(((db + 60) / 60) * 100)));
 
       if (this.onSpeakingChange) {
@@ -317,6 +319,7 @@ export class VoiceAudioPipeline {
       this.audioCtx.close().catch(() => {});
     }
 
+    this.processedStream?.getTracks().forEach(track => track.stop());
     this.audioCtx = null;
     this.processedStream = null;
   }

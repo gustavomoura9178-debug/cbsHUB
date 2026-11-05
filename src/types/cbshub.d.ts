@@ -94,6 +94,8 @@ export interface ChatMessage {
 }
 
 export interface SoundboardClip {
+  category?: string;
+  order?: number;
   id: string;
   name: string;
   emoji: string;

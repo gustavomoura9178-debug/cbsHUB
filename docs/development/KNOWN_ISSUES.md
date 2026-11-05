@@ -55,3 +55,10 @@ Perfis: username só verifica participantes conhecidos, sem reserva global; data
 ## Atualização — CHAT-002 — 05/11/2026
 
 Chat 2.0: sem backend para ACL/autenticação; histórico relay não assinado, autor pode precisar estar online para recuperar mutações desconhecidas. Journal limitado a 5000 operações/sala; esgotamento dá erro, não limpa silenciosamente. Tombstone é exclusão lógica, sem apagar texto de versões do journal. Markdown é subconjunto seguro; preview não carrega OpenGraph. Retenção/busca local 500 mensagens; clientes antigos não aplicam mutações v2. K01 e demais limitações de mídia permanecem.
+
+
+## Atualização — MEDIA-001 — 05/11/2026
+
+K04/K05 receberam correções locais: VAD remoto fecha contexto, configurações não capturam para enumerar, mic sob demanda, falha de permissão não entra na voz e saída encerra tracks. K06 recebeu separação entrada/saída e câmera para entrada tardia, testadas com adapters e captura sintética; matriz física pendente. K08: faixa UI/store alinhada à reprodução de 0–100%, sem amplificação 200%. K10: defaults nativos persistidos e favoritos/edição verificados após reload. K12: tela e retorno Soundboard respeitam deafen inclusive durante som; sinalização de sistema não foi redesenhada. K13: pacotes de fala só nas transições e sustentação 180 ms, sem benchmark multipar. K02 mitigado por gerações/cleanup; não declarar concorrência integralmente resolvida.
+
+MEDIA-001: teste WebRTC local não recebeu candidatos ICE e NÃO passou. Sem confirmação em duas máquinas, hotplug físico, saída real de áudio, Electron picker/loopback, rede externa/TURN ou 3–6 pares. K07 continua (ABR/telemetria de tela globais), K01/K16 permanecem. Soundboard mistura efeitos e voz: não há mute independente dos efeitos recebidos, nem ACL de servidor. setSinkId de WebAudio depende do runtime. Ver MEDIA_EXPERIENCE.md.

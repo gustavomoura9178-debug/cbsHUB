@@ -24,10 +24,8 @@ const assert = require("node:assert/strict");
     );
     await p.goto("http://127.0.0.1:5173");
     await p.getByRole("button", { name: "Meu perfil", exact: true }).waitFor();
-    await p.waitForFunction(async () => {
-      const { webrtcEngine } = await import("/src/lib/webrtcEngine.ts");
-      return webrtcEngine.localPeer !== null;
-    });
+    await p.evaluate(async () => { window.__profileTestEngine = (await import("/src/lib/webrtcEngine.ts")).webrtcEngine; });
+    await p.waitForFunction(() => !!window.__profileTestEngine.localPeer && window.__profileTestEngine.roomGeneration >= 3);
     return p;
   }
   try {

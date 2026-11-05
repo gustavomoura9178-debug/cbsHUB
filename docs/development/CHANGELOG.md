@@ -38,3 +38,8 @@ PROFILE-001 · Codex/OpenAI · feat/user-profiles-2026-11-05 · 7a88783. Perfis 
 ## Atualização — CHAT-002 — 05/11/2026
 
 CHAT-002 · Codex/OpenAI · feat/chat-v2-2026-11-05 · b74272e. Chat com edição/exclusão/resposta/pin, reações idempotentes, Markdown/código/links seguros, drafts, ACK, reconciliação lógica, busca/janela limitada e três modos de eventos Soundboard. Sem dependências novas. Resultados/limites em CHAT_2.md.
+
+
+## Atualização — MEDIA-001 — 05/11/2026
+
+Controles de mídia com estados/erros e painel expandido; RTT/perda por participante; aquisição sob demanda, encerramento/rollback de capturas, handles separados de câmera/tela e reconexão com backoff. Soundboard com categorias, edição/ordem, favoritos nativos persistentes, preview isolado e preferência de eventos compartilhada com chat. Deafen aplicado às telas e sons ativos. Limite de volume individual corrigido para 100%. Sem dependências novas. Detalhes e limites em MEDIA_EXPERIENCE.md.
