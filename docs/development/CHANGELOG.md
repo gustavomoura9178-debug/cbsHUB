@@ -27,4 +27,4 @@ Codex/OpenAI · feat/workspace-redesign-2026-11-05 · a29e4ca. Novo workspace, s
 
 ## Atualização — STUDIO-001 — 05/11/2026
 
-STUDIO-001 · Codex/OpenAI · feat/cbshub-studio-2026-11-05 · STUDIO_CONTENT_COMMIT. Adicionados presets/editor/preview/library/JSON v1, imagens raster locais, layout e contraste. Slider com nome no Thumb; foco inicial de Sheet ajustado. Sem dependências novas, perfis ou backend de sincronização. Detalhes e testes em STUDIO.md.
+STUDIO-001 · Codex/OpenAI · feat/cbshub-studio-2026-11-05 · 19d316f. Adicionados presets/editor/preview/library/JSON v1, imagens raster locais, layout e contraste. Slider com nome no Thumb; foco inicial de Sheet ajustado. Sem dependências novas, perfis ou backend de sincronização. Detalhes e testes em STUDIO.md.

@@ -48,4 +48,4 @@ Preflight: redesign integrado pelo PR #1; main remota revisada e incorporada por
 
 ## Atualização — STUDIO-001 — 05/11/2026
 
-STUDIO-001 concluído para revisão; reserva liberada. Commit STUDIO_CONTENT_COMMIT; base 08f0c51. Componentes, testes e limites em STUDIO.md. Sem perfis, push ou merge nesta tarefa.
+STUDIO-001 concluído para revisão; reserva liberada. Commit 19d316f; base 08f0c51. Componentes, testes e limites em STUDIO.md. Sem perfis, push ou merge nesta tarefa.

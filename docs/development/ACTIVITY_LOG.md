@@ -51,7 +51,7 @@ Pendências para a outra IA: ler KNOWN_ISSUES; começar por K01/R1; preservar co
 
 ## 05/11/2026 — STUDIO-001 — Codex/OpenAI
 
-- Branch feat/cbshub-studio-2026-11-05; base 08f0c51; recuperação recovery/pre-studio-2026-11-05; commit STUDIO_CONTENT_COMMIT.
+- Branch feat/cbshub-studio-2026-11-05; base 08f0c51; recuperação recovery/pre-studio-2026-11-05; commit 19d316f.
 - Preflight: checkout limpo; main remota atualizada pelo merge PR #1; atualização incorporada via fast-forward antes de editar. Documentos compartilhados e mudanças revisados.
 - Arquivos: novos src/studio/theme.ts, StudioProvider.tsx e StudioDialog.tsx; integração em main/App/WorkspaceRail/useWorkspaceLayout/index.css; ajustes de acessibilidade ui/slider e ui/sheet. Novos tests/theme-validation.cjs e studio-smoke.cjs, teste de redesign formatado e sincronizado com foco; docs/themes/dark-modern.cbshub.json; STUDIO.md e documentos de desenvolvimento atualizados.
 - Funcionalidades: seis presets, editor visual, preview/cancel/save, biblioteca até 20, duplicar/renomear/excluir/importar/exportar, JSON versionado validado, fundos sólidos/gradientes/raster, layout, contraste e movimento reduzido. Persistência local, sem perfis ou sync remoto fictício.
