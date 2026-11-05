@@ -1,20 +1,30 @@
-import {OfficialLogo} from "./OfficialLogo";
+import { OfficialLogo } from "./OfficialLogo";
 import React, { useState, useEffect } from "react";
 import { Minus, Square, X, Pin, Radio, SlidersHorizontal } from "lucide-react";
 import { useHubStore } from "../store/useHubStore";
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 
 export const TitleBar: React.FC = () => {
-  const isAlwaysOnTop = useHubStore(state => state.isAlwaysOnTop);
-  const setAlwaysOnTop = useHubStore(state => state.setAlwaysOnTop);
+  const isAlwaysOnTop = useHubStore((state) => state.isAlwaysOnTop);
+  const setAlwaysOnTop = useHubStore((state) => state.setAlwaysOnTop);
 
   const [isMaximized, setIsMaximized] = useState(false);
   useEffect(() => {
     const api = window.cbsHubAPI;
     let active = true;
-    void api?.getWindowState?.().then(state => { if(active) setIsMaximized(state.isMaximized); }).catch(() => {});
-    const unsubscribe = api?.onWindowStateChanged?.(state => setIsMaximized(state.isMaximized));
-    return () => { active = false; unsubscribe?.(); };
+    void api
+      ?.getWindowState?.()
+      .then((state) => {
+        if (active) setIsMaximized(state.isMaximized);
+      })
+      .catch(() => {});
+    const unsubscribe = api?.onWindowStateChanged?.((state) =>
+      setIsMaximized(state.isMaximized),
+    );
+    return () => {
+      active = false;
+      unsubscribe?.();
+    };
   }, []);
 
   const handleMinimize = () => {
@@ -28,7 +38,6 @@ export const TitleBar: React.FC = () => {
   const handleMaximize = () => {
     if (window.cbsHubAPI) {
       window.cbsHubAPI.maximizeWindow();
-
     } else {
       console.warn("[TitleBar] cbsHubAPI indisponível no renderer.");
     }
@@ -50,7 +59,6 @@ export const TitleBar: React.FC = () => {
     }
   };
 
-
   return (
     <header className="native-titlebar drag-region">
       <div className="flex items-center gap-2 min-w-0">
@@ -58,7 +66,6 @@ export const TitleBar: React.FC = () => {
         <span className="font-semibold tracking-tight text-caption text-foreground">
           cbs<span className="text-primary">HUB</span>
         </span>
-
       </div>
       <div className="flex items-center gap-1 no-drag">
         <Tooltip>
@@ -98,6 +105,7 @@ export const TitleBar: React.FC = () => {
           type="button"
           onClick={handleClose}
           aria-label="Fechar janela"
+          title="Continuar em segundo plano. Para encerrar, use o menu da bandeja."
           className="native-window-button hover:bg-destructive hover:text-destructive-foreground"
         >
           <X className="size-3.5" />
