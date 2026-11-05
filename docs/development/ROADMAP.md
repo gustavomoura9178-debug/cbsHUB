@@ -70,3 +70,12 @@ Próximo gate: revisão do candidato 2.0.0-rc.1, plano de atualização das 19 v
 ## SECURITY-002 — 05/11/2026
 
 Após SECURITY-002, revisar BACKEND_PROPOSAL antes de implementar contas e infraestrutura. Sequência proposta: serviço/DB → sessões → perfis/preferências/migração → salas/WebSocket/chat → tickets de mídia → arquivos/pastas → GIFs. Em paralelo, ABR por par e matriz de mídia física, acessibilidade completa, EXIF/memória e instaladores na plataforma-alvo. Audit 0 não substitui testes de release.
+
+
+## Após WORKSPACE-3 — 05/11/2026
+
+1. Revisão dos commits eb8f1fc/8cd3dff/ac501cc/bed3859 e relatório de queda real → depende desta branch e de reprodução com usuário. Sem merge automático.
+2. Matriz física de mídia/rede/TURN/suspensão/dispositivos → depende de dois computadores e infraestrutura acessível; depois carga com 3–6 participantes. É gate de estabilização, não teste já concluído.
+3. Windows/ícones/instalação/janelas reais, leitor de tela/contraste e carga prolongada → depende de plataforma e medição. Selecionar novo rc antes de distribuir candidato.
+4. Revisar BACKEND_PROPOSAL → serviço/sessões/migração de identidades → perfis/preferências/salas/chat/ACL → DM/notificações/arquivos/pastas/GIFs. Não criar servidor paralelo ou UI falsa antes dos contratos aprovados.
+5. ABR/telemetria de tela por par e dividir bundle → depende de baseline físico e perfis CPU/memória para decidir mudanças mensuráveis.

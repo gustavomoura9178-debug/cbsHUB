@@ -295,6 +295,12 @@ const assert = require("node:assert/strict");
     await page.keyboard.press("Escape");
     await page.evaluate(() => {
       window.track = e.rawMicStream.getTracks()[0];
+      // The failed signaling-rebuild scenario intentionally removed old sessions.
+      // Establish a new text channel before verifying independent voice teardown.
+      window.afterRecoveryData = makeData();
+      e.setupDataConnection(afterRecoveryData, "remote-client");
+      afterRecoveryData.open = true;
+      afterRecoveryData.emit("open");
       e.leaveVoiceCall();
     });
     await page.clock.runFor(20000);

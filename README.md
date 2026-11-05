@@ -61,3 +61,10 @@ npx --no-install electron-builder --linux --dir -c.electronDist=node_modules/ele
 ```
 
 Resultado: `dist-package/linux-unpacked/`. Distribua o diretório completo, não somente o arquivo `cbshub`: recursos e bibliotecas adjacentes são necessários. Abertura headless e reload foram testados; áudio físico, captura do SO e instalação em outro computador não foram aprovados.
+
+
+### Revisão local WORKSPACE-3
+
+A marca oficial atual está em `public/brand/logo.svg` (símbolo azul-marinho/turquesa); PNG/ICO e exportador reproduzível documentados em `public/brand/README.md`. Pesquisa do chat no cabeçalho, fixadas/atividades no menu da sala e densidade em Configurações > Aparência.
+
+Configurações > Diagnóstico permite copiar estados recentes da chamada sem conteúdo ou endereços de rede. Configurações > Áudio inclui teste local de microfone e PTT opcional (F8/F9/F10, somente com foco). Favoritos são locais. Ler `docs/development/WORKSPACE_3_STATUS.md` e `VOICE_RECOVERY.md` para testes e limitações; este trabalho não declara versão estável nem garante recuperação em todas as redes.

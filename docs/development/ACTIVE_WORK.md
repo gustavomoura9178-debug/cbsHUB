@@ -149,3 +149,8 @@ Codex/OpenAI · feat/workspace-3-2026-11-05 · base 27eb0fe + CHAT-UI-003 eb8f1f
 
 
 BRAND-003 — nova logo oficial integrada e verificada conforme OFFICIAL_LOGO.md. Reserva de identidade liberada; WORKSPACE-3 A/B continua em andamento.
+
+
+## WORKSPACE-3 / CHAT-UI-003 / BRAND-003 — 05/11/2026 — fechamento
+
+Codex/OpenAI · feat/workspace-3-2026-11-05 · commits eb8f1fc, 8cd3dff, ac501cc, bed3859 e fechamento documental posterior. Todas as reservas desta sessão liberadas. Build/tsc e pacote Linux passaram; suíte final 22 PASSED/1 BLOCKED (ICE), sem falhas restantes. Ler WORKSPACE_3_STATUS.md e VOICE_RECOVERY.md antes de novos ajustes. Mídia física, Windows e backend permanecem pendentes. Main preservada, nenhum push/merge.
