@@ -97,3 +97,13 @@ Testes executados: npm run build e tsc passaram (avisos de bundle e preload perm
 Pendências: validação visual fina contra as capturas, acessibilidade completa, imagens de celulares com EXIF e memória sob carga; chamadas, som e tela entre dois dispositivos físicos continuam NÃO testados nesta instância (ICE/rede cloud já bloqueados na fase anterior). Não declarar reprodução remota, captura real do SO, exclusão global ou autorização no servidor como aprovadas. Exclusão global depende de backend autenticado e política de retenção. Documentação de fases anteriores é histórica: modos normal/compacto não recolocam eventos no histórico nesta fase. Atividades transitórias não persistem; eventos antigos permanecem intactos no banco. Reserva liberada para revisão ao concluir. Nenhum push/merge nesta tarefa.
 
 Entrega VISUAL-002: commit de conteúdo `27d6c15`; reserva liberada, branch limpa para revisão. tsc e teste visual-fixes passaram após inclusão da confirmação AlertDialog. Uma execução em HMR expirou ao procurar preset; após reiniciar helper e usar módulos estáveis passou. Nenhum push/merge.
+
+## STABILIZE-001 — ativo
+05/11/2026 · Codex/OpenAI · fix/stabilization-2026-11-05 · base 89dc1bb (PR #6 integrado). Checkout limpo, sem reservas ativas. Recuperação recovery/pre-stabilization-2026-11-05. Reserva: preload/Electron, lifecycle/performance pontuais, testes e documentação. Preservar bibliotecas e todos os dados; não publicar produção sem matriz real.
+
+
+## STABILIZE-001 — 05/11/2026
+
+STABILIZE-001 concluído para revisão; reserva liberada. Branch fix/stabilization-2026-11-05, base 89dc1bb; candidato 2.0.0-rc.1. Build/pacote Linux testados; 14 scripts aprovados e 1 bloqueado. Ler STABILIZATION.md antes de integrar. Main intacta.
+
+Entrega STABILIZE-001: conteúdo em `f9df3e8`, branch fix/stabilization-2026-11-05, candidato 2.0.0-rc.1. 14 scripts aprovados e media-transport bloqueado, build/Electron/pacote Linux verificados. Reserva liberada; este é o registro documental posterior. Nenhum push, merge ou declaração de produção.

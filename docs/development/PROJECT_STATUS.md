@@ -1,3 +1,5 @@
+> Estado atual em 05/11/2026: candidato **2.0.0-rc.1**, estabilização STABILIZE-001. Consulte [STABILIZATION.md](STABILIZATION.md). As seções anteriores abaixo são históricas.
+
 # Estado do projeto
 
 Data: 05/11/2026 (America/Sao_Paulo). Responsável: Codex/OpenAI.
@@ -67,3 +69,8 @@ AvatarCrop integra seleção de PNG/JPEG/WebP até 20 MB, verificação de assin
 Testes executados: npm run build e tsc passaram (avisos de bundle e preload permanecem); theme-validation 8 grupos, visual-fixes (temas/persistência/sem registros Soundboard/remoção local após reload), profile-smoke (inclui recorte/persistência), media-engine (WebAudio real sintético e adapters), studio-smoke, redesign-smoke, chat-smoke, chat-drafts e chat-model passaram. Testes atualizados para novos presets/recorte e ausência de eventos na conversa; ambiguidades de seletores corrigidas. Tentativas iniciais falharam por índices de preset/expectativa de cor e dupla submissão do recorte; corrigidas e reexecutadas.
 
 Pendências: validação visual fina contra as capturas, acessibilidade completa, imagens de celulares com EXIF e memória sob carga; chamadas, som e tela entre dois dispositivos físicos continuam NÃO testados nesta instância (ICE/rede cloud já bloqueados na fase anterior). Não declarar reprodução remota, captura real do SO, exclusão global ou autorização no servidor como aprovadas. Exclusão global depende de backend autenticado e política de retenção. Documentação de fases anteriores é histórica: modos normal/compacto não recolocam eventos no histórico nesta fase. Atividades transitórias não persistem; eventos antigos permanecem intactos no banco. Reserva liberada para revisão ao concluir. Nenhum push/merge nesta tarefa.
+
+
+## STABILIZE-001 — 05/11/2026
+
+Candidato de revisão 2.0.0-rc.1, base 89dc1bb. Todos os testes disponíveis executados: 14 aprovados, media-transport bloqueado por ICE. Electron produção/reload e pacote Linux testados headless. 19 vulnerabilidades de dependências continuam. Arquivos/pastas/GIFs compartilhados e autenticação de contas ausentes. Chamadas entre usuários reais e Windows não aprovados. Ver STABILIZATION.md para matriz completa.

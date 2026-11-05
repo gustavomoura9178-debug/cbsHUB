@@ -72,8 +72,11 @@ class ChatLedger {
     const ops = await this.operations(room);
     const messages = await storageDb.getMessagesByRoom(room);
     const grouped = new Map<string, ChatOperation[]>();
-    for (const op of ops)
-      grouped.set(op.messageId, [...(grouped.get(op.messageId) || []), op]);
+    for (const op of ops) {
+      let group = grouped.get(op.messageId);
+      if (!group) { group = []; grouped.set(op.messageId, group); }
+      group.push(op);
+    }
     const projected = messages.map((m) =>
       projectMessage(m, grouped.get(m.id) || []),
     );

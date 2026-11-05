@@ -79,3 +79,8 @@ ChatPanel/MessageRow/SafeMarkdown substituem somente a camada de chat anterior. 
 ## Atualização — MEDIA-001 — 05/11/2026
 
 mediaState guarda apenas estado transitório de captura/erro/reconexão e qualidade por peer. PeerMediaSession separa webcamCall/screenCall recebidos de outgoingWebcam/outgoingScreen enviados; voiceCall permanece bidirecional. Tokens de geração invalidam capturas/salas antigas. PeerJS é reaproveitado no retry; transportes de chat e ledger não foram substituídos. Soundboard mantém retorno local via GainNode por contexto e injeção pós-gate; setSinkId condicionado à capacidade do runtime. SoundboardClip acrescenta category/order opcionais; banco/chaves existentes preservados. soundPreferences compartilha cbshub-chat-sounds entre painéis. Detalhes em MEDIA_EXPERIENCE.md.
+
+
+## STABILIZE-001 — 05/11/2026
+
+Preload usa build Rollup CJS único com lib:false, mantendo seis métodos da API. Main valida origem/frame/argumentos de IPC, bloqueia navegação externa e usa sandbox de renderer. Captura exige fonte selecionada e não usa fallback automático para a primeira tela. Journal agrupa operações por append linear, sem mudar banco/protocolo. Servidor de testes e runner agora estão versionados em scripts/. Ver STABILIZATION.md.
