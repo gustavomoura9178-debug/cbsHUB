@@ -1946,7 +1946,7 @@ class WebRTCEngine {
     if (this.localPeer) {
       useHubStore
         .getState()
-        .updateParticipant(this.localPeer.id, { inVoiceCall: true });
+        .updateParticipant(this.localParticipantId(), { inVoiceCall: true });
     }
 
     // Notifica todos os irmãos da sala via peer_state_sync
@@ -2015,7 +2015,7 @@ class WebRTCEngine {
     if (this.localPeer) {
       useHubStore
         .getState()
-        .updateParticipant(this.localPeer.id, { inVoiceCall: false });
+        .updateParticipant(this.localParticipantId(), { inVoiceCall: false });
     }
 
     // Notifica todos os irmãos mantendo o chat ativo!
@@ -2074,7 +2074,7 @@ class WebRTCEngine {
     state.setNickname(profile.displayName);
     state.setAvatarColor(profile.appearance.color);
     if (this.localPeer)
-      state.updateParticipant(this.localPeer.id, {
+      state.updateParticipant(this.localParticipantId(), {
         nickname: profile.displayName,
         avatarColor: profile.appearance.color,
       });
@@ -2093,7 +2093,7 @@ class WebRTCEngine {
   private broadcastLocalState(): void {
     if (!this.localPeer) return;
     const state = useHubStore.getState();
-    const local = state.participants[this.localPeer.id];
+    const local = state.participants[this.localParticipantId()];
     if (!local) return;
 
     const { isLocal, profile: _profile, ...rest } = local;
@@ -2129,7 +2129,7 @@ class WebRTCEngine {
       if (this.localPeer) {
         useHubStore
           .getState()
-          .updateParticipant(this.localPeer.id, { nickname: msg.name });
+          .updateParticipant(this.localParticipantId(), { nickname: msg.name });
       }
       this.broadcastLocalState();
     } else if (msg.type === "speaking") {
@@ -2145,6 +2145,13 @@ class WebRTCEngine {
   /* CONTROLES DE MÍDIA LOCAL (MUTE, DEAFEN, WEBCAM, SCREEN SHARE)             */
   /* ========================================================================= */
 
+  private localParticipantId(): string {
+    const participants = useHubStore.getState().participants;
+    const id = this.localPeer?.id;
+    return id && participants[id]?.isLocal
+      ? id
+      : Object.values(participants).find((p) => p.isLocal)?.peerId || "";
+  }
   private pushToTalkHeld = false;
   public setPushToTalkHeld(held: boolean): void {
     this.pushToTalkHeld = held && useHubStore.getState().inVoiceCall;
@@ -2174,7 +2181,7 @@ class WebRTCEngine {
     if (this.localPeer) {
       useHubStore
         .getState()
-        .updateParticipant(this.localPeer.id, { isMuted: nextMuted });
+        .updateParticipant(this.localParticipantId(), { isMuted: nextMuted });
     }
     this.broadcastLocalState();
   }
@@ -2206,7 +2213,9 @@ class WebRTCEngine {
     if (this.localPeer) {
       useHubStore
         .getState()
-        .updateParticipant(this.localPeer.id, { isDeafened: nextDeafened });
+        .updateParticipant(this.localParticipantId(), {
+          isDeafened: nextDeafened,
+        });
     }
     this.broadcastLocalState();
   }
@@ -2239,7 +2248,9 @@ class WebRTCEngine {
       if (this.localPeer) {
         useHubStore
           .getState()
-          .updateParticipant(this.localPeer.id, { isWebcamActive: false });
+          .updateParticipant(this.localParticipantId(), {
+            isWebcamActive: false,
+          });
       }
       this.broadcastLocalState();
     } else {
@@ -2277,7 +2288,9 @@ class WebRTCEngine {
         if (this.localPeer) {
           useHubStore
             .getState()
-            .updateParticipant(this.localPeer.id, { isWebcamActive: true });
+            .updateParticipant(this.localParticipantId(), {
+              isWebcamActive: true,
+            });
         }
         this.broadcastLocalState();
 
@@ -2370,7 +2383,7 @@ class WebRTCEngine {
       sounds.playStreamStart();
 
       if (this.localPeer) {
-        useHubStore.getState().updateParticipant(this.localPeer.id, {
+        useHubStore.getState().updateParticipant(this.localParticipantId(), {
           isScreenSharing: true,
           screenQualityLabel: `${qualityConfig.resolution} ${qualityConfig.fps}FPS`,
         });
@@ -2426,7 +2439,7 @@ class WebRTCEngine {
     useHubStore.getState().setTelemetry({ active: false });
 
     if (this.localPeer) {
-      useHubStore.getState().updateParticipant(this.localPeer.id, {
+      useHubStore.getState().updateParticipant(this.localParticipantId(), {
         isScreenSharing: false,
         screenQualityLabel: undefined,
       });
@@ -2487,7 +2500,7 @@ class WebRTCEngine {
           if (this.localPeer && previousSpeaking !== isSpeaking) {
             useHubStore
               .getState()
-              .updateParticipant(this.localPeer.id, { isSpeaking });
+              .updateParticipant(this.localParticipantId(), { isSpeaking });
             if (useHubStore.getState().inVoiceCall)
               this.broadcast({
                 type: "speaking",
@@ -3012,7 +3025,7 @@ class WebRTCEngine {
 
     if (this.localPeer) {
       // Exibe animação visual flutuante localmente
-      useHubStore.getState().updateParticipant(this.localPeer.id, {
+      useHubStore.getState().updateParticipant(this.localParticipantId(), {
         activeSoundEffect: {
           emoji: clip.emoji,
           name: clip.name,
@@ -3044,7 +3057,9 @@ class WebRTCEngine {
         if (current?.activeSoundEffect?.name === clip.name) {
           useHubStore
             .getState()
-            .updateParticipant(this.localPeer!.id, { activeSoundEffect: null });
+            .updateParticipant(this.localParticipantId(), {
+              activeSoundEffect: null,
+            });
         }
       }, 3600);
     }
