@@ -142,3 +142,10 @@ BRAND-002 entregue em `8cd560e`; SVG oficial preservado, PNG/ICO e integração 
 
 ## CHAT-UI-003 — ativo — 05/11/2026
 Codex/OpenAI · fix/chat-toolbar-rendering-2026-11-05 · base 27eb0fe. Sem alterações locais prévias; logo integrada PR #10. Reserva: ChatPanel/RoomTopBar/SettingsModal, estado visual do chat, CSS/testes/docs. Pedido atual prevalece sobre anexo amplo: não alterar motor WebRTC. Usuário esclareceu que números eram mensagem legítima; não remover conteúdo nem tratá-lo como bug. Recuperação recovery/pre-chat-toolbar-2026-11-05.
+
+## WORKSPACE-3 — fases A/B — ativo — 05/11/2026
+
+Codex/OpenAI · feat/workspace-3-2026-11-05 · base 27eb0fe + CHAT-UI-003 eb8f1fc. Chat entregue em commit independente sem motor; pedido adicional 3.0 autorizado explicitamente. Reserva: diagnóstico de chamadas, caminhos de teardown/retry, painel/sidebar e testes próprios. Auditado caminho reproduzível: fechamento de DataConnection chama handlePeerDisconnected → closeBlockedMedia, fechando mídia mesmo se RTCPeerConnection continua connected. Isto é um risco confirmado no fluxo, não prova da causa das quedas no computador do usuário. Outros riscos: retry sem limite/jitter e fechamento localPeer chama leaveRoom. Mudanças serão verificadas com falhas controladas; não alegar testes físicos.
+
+
+BRAND-003 — nova logo oficial integrada e verificada conforme OFFICIAL_LOGO.md. Reserva de identidade liberada; WORKSPACE-3 A/B continua em andamento.

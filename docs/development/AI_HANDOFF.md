@@ -147,3 +147,12 @@ BRAND-002 entregue em `8cd560e`; SVG oficial preservado, PNG/ICO e integração 
 ## CHAT-UI-003 — 05/11/2026
 
 Chat reorganizado sem tocar webrtcEngine. Testes chat-toolbar/chat-smoke e build passaram; suite completa executada e compact-bars corrigido/reexecutado com passe após ajustar subtítulo responsivo. Números são mensagem legítima conforme confirmação do usuário, sem remoção/migração de dados. Estado UI em chat/viewState, por sala e limitado; densidade usa chave antiga. Próxima etapa adicional explicitamente pedida: WORKSPACE_3_PLAN.md. Nova logo enviada em SVG no chat em 05/11/2026 substitui a marca de arcos; integrar em commit próprio.
+
+
+## BRAND-003 — nova logo oficial — 05/11/2026
+
+Codex/OpenAI · branch feat/workspace-3-2026-11-05 · base eb8f1fc. O mantenedor confirmou o SVG de duas partes como a nova logo oficial, substituindo a marca circular anterior. Fonte preservada em public/brand/logo.svg, azul-marinho #29256B e turquesa #12C9BD. mark.svg ajusta somente margens transparentes para leitura em 20px; paths e cores idênticos. Exportador gera nove PNGs transparentes e ICO com sete resoluções. Integração anterior BrowserWindow/builder preservada, sem instalar biblioteca.
+
+Arquivos: public/brand/*, scripts/export-brand.cjs, src/components/OfficialLogo.tsx, tests/official-logo.cjs, tests/electron-smoke.cjs e documentação. Testes executados: tsc, npm run build, official-logo, compact-bars e electron-smoke passaram. Verificados hash/fidelidade dos paths/cores, transparência e tamanhos PNG, frames PNG do ICO, renderização 20px nos temas Clássico/Moderno Roxo e build Electron. Uma primeira comparação de tags falhou por serialização equivalente <path/> versus <path></path>; teste normalizado e reexecutado com passe.
+
+Limitações: instalador/ícone do Windows, bandeja e arraste físico não testados; Tray não implementado. A marca anterior está no histórico Git. A versão 2.0.0-rc.2 continua inalterada. Esta entrega de identidade não conclui a estabilização de voz ou as demais fases WORKSPACE-3; alterações em andamento preservadas separadamente. Sem push/merge.
