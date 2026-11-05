@@ -1,3 +1,4 @@
+import { usePushToTalk } from "./hooks/usePushToTalk";
 import { useShallow } from "zustand/react/shallow";
 import React, { useEffect, useState } from "react";
 import { TitleBar } from "./components/TitleBar";
@@ -31,6 +32,7 @@ import { ProfileDialog } from "./profiles/ProfileDialog";
 import { StudioDialog } from "./studio/StudioDialog";
 
 export const App: React.FC = () => {
+  usePushToTalk();
   const {
     isSettingsOpen,
     isScreenPickerOpen,
@@ -63,13 +65,25 @@ export const App: React.FC = () => {
 
   // 1. Inicialização do microfone e da sala executada apenas UMA VEZ no mount
   useEffect(() => {
-    if (localStorage.getItem("cbshub-room-removed-active") === "1" && !roomId) return;
+    if (localStorage.getItem("cbshub-room-removed-active") === "1" && !roomId)
+      return;
     const initialRoom = roomId || "cbs-irmandade";
     webrtcEngine.joinRoom(initialRoom, false).catch((err) => {
       console.warn("[App] Erro ao conectar na sala inicial:", err);
     });
     return () => webrtcEngine.leaveRoom();
   }, []); // Array de dependências vazio estrito
+
+  useEffect(() => {
+    const online = () => webrtcEngine.notifyNetwork(true),
+      offline = () => webrtcEngine.notifyNetwork(false);
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
+    return () => {
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
+    };
+  }, []);
 
   // 2. Listener global de teclado (ESC fecha modais ativos)
   useEffect(() => {

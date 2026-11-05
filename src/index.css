@@ -197,7 +197,7 @@
     @apply flex items-start gap-2 px-5 py-4 text-caption text-muted-foreground leading-relaxed;
   }
   .local-user-panel {
-    @apply p-4 border-t border-border bg-background/35;
+    @apply p-2 border-t border-border bg-background/35;
   }
   .status-dot {
     @apply inline-block size-1.5 shrink-0 rounded-full bg-success;
@@ -482,3 +482,15 @@ html[data-studio-motion="reduced"] *, html[data-studio-motion="reduced"] *::befo
  .call-stage-toolbar { @apply flex min-h-8 shrink-0 items-center justify-between gap-2 px-3 py-0.5 text-xs; }
  .call-stage-toolbar .call-toolbar-action { @apply size-7; }
 }
+
+.chat-search { padding:8px 16px; flex-shrink:0; }
+.chat-filter-status { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 16px; font-size:12px; color:var(--muted-foreground); }
+.chat-message-row { min-width:0; max-width:100%; }
+.chat-markdown { min-width:0; max-width:100%; }
+.room-subtitle { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Sidebar: shared tokens keep the footer and voice shortcuts compact. */
+.sidebar-voice-panel { padding: calc(var(--space-panel) * .6); border-top: 1px solid var(--border); background: var(--card); }
+.room-unread { border-radius: var(--radius); padding: .125rem .375rem; background: var(--primary); color: var(--primary-foreground); font-size: var(--text-caption); font-weight: 600; }
+.local-user-panel .text-sm { font-size: var(--text-caption); }
+.local-user-panel .text-caption { font-size: var(--text-micro); }

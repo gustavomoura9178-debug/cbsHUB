@@ -89,3 +89,8 @@ Preload usa build Rollup CJS único com lib:false, mantendo seis métodos da API
 ## SECURITY-002 — 05/11/2026
 
 SECURITY-002 preserva arquitetura local/P2P. Acrescenta CSP no HTML de produção, política explícita de capacidades Electron e validador allowlist de presença. Atualiza ferramentas mantendo UI e motores. BACKEND_PROPOSAL descreve arquitetura futura para revisão, não implementação atual.
+
+
+## WORKSPACE-3 — 05/11/2026
+
+callDiagnostics armazena no máximo 200 eventos sanitizados em memória. CallDiagnosticsPanel exporta somente estatísticas e estados permitidos. Reconexão reutiliza PeerMediaSession ao substituir DataConnection, com guards por conexão/geração e retries limitados; não existe backend novo. voicePreferences guarda somente PTT/tecla em chave local separada; hook de foco controla ganho no pipeline existente. MicrophoneTest tem captura local independente, explícita e com cleanup. Favoritos locais vivem na sidebar; chat/viewState coordena pesquisa/fixadas/atividades por sala e densidade existente. Ver VOICE_RECOVERY.md e WORKSPACE_3_STATUS.md; descrições antigas de Vite/preload/backend são históricas, versões atuais em package.json e correções em SECURITY_UPDATE.md.

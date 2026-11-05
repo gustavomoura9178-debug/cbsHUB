@@ -4,7 +4,7 @@
 
 Cobre resize/limites/persistência, collapse, painel de membros, menu, diagnóstico sem métricas inventadas, mensagem offline, três viewports e Sheets/Escape. Bloqueia destinos externos e usa perfil efêmero e mídia sintética. Não valida comunicação remota. Capturas são gravadas em `/workspace/cbshub-onboarding`.
 
-Os probes de persistência/mixagem/Electron usados na auditoria permanecem em `/workspace/cbshub-onboarding/audit-smoke.cjs`; resultados resumidos nos documentos compartilhados. Não existe script npm test nem CI. A integração futura de testes em CI está pendente de R2a, com avaliação das dependências necessárias.
+Os probes de persistência/mixagem/Electron usados na auditoria permanecem em `/workspace/cbshub-onboarding/audit-smoke.cjs`; resultados resumidos nos documentos compartilhados. Existe `npm test` para descobrir os scripts `.cjs`, gravar logs em build/test-logs e resultados em build/test-results.json. Status BLOCKED também gera exit 1 e nunca significa teste aprovado. CI permanece pendente de ambiente equivalente.
 
 # Studio
 
@@ -38,3 +38,14 @@ Use `npm run build`, `npm run dev:renderer` (terminal separado) e `npm test`. O 
 # SECURITY-002
 
 Electron 45 baixa o runtime sob demanda: preparar com `node node_modules/electron/install.js` antes dos testes (cloud: ELECTRON_GET_USE_PROXY=1). Node mínimo 22.12; ambiente testado Node 24.22.1. Novo signaling-validation valida presença P2P malformada. Electron smoke agora verifica interface carregada, CSP efetiva e entrada/saída da voz com captura sintética, além de preload/sandbox/reload. Resultados atuais em docs/development/SECURITY_UPDATE.md.
+
+
+## WORKSPACE-3
+
+`call-recovery.cjs`: adapters e relógio controlado para perda/substituição de dados preservando voz, estados transitórios/falhas, limites/cancelamento e falha de reconstrução da sinalização; relatório sanitizado, cópia/limpeza e teardown. Não comprova ICE remoto.
+
+`audio-tools.cjs`: captura de teste local e cleanup de diálogo; WebAudio sintético real mede PTT/release/edição/blur/silêncio manual/Soundboard independente e persistência. Sem teste de hardware ou atalho global.
+
+`workspace-sidebar.cjs`: favoritos/busca/persistência, não lidas da sala ativa, painel/rodapé de voz, temas, collapse/viewports e navegação por teclado no mobile.
+
+`chat-toolbar.cjs`: ações sob demanda, pins/eventos/densidade, histórico/estado vazio e mensagem numérica legítima de 7000 caracteres preservada sem overflow. `official-logo.cjs`: fonte/hash e fidelidade dos paths/cores no mark derivado, PNGs transparentes, frames ICO e renderização nos dois temas.

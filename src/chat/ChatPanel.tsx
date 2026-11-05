@@ -1,11 +1,9 @@
+import { useChatView, updateChatView, EMPTY_CHAT_VIEW } from "./viewState";
 import { useActivities } from "./activities";
-import { useSoundPreferences, setSoundMode } from "./soundPreferences";
 import { useShallow } from "zustand/react/shallow";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity,
   MessageSquare,
-  Pin,
   Search,
   SendHorizontal,
   Smile,
@@ -14,7 +12,6 @@ import {
 } from "lucide-react";
 import { useHubStore } from "../store/useHubStore";
 import { useProfiles } from "../profiles/ProfileProvider";
-import { useStudio } from "../studio/StudioProvider";
 import { webrtcEngine } from "../lib/webrtcEngine";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -24,18 +21,10 @@ import {
   DialogTitle,
   DialogDescription,
 } from "../components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuRadioGroup,
-  DropdownMenuRadioItem,
-} from "../components/ui/dropdown-menu";
 import { SoundboardPopover } from "../components/SoundboardPopover";
 import { EmojiPickerPopover } from "../components/EmojiPickerPopover";
 import { MessageRow } from "./MessageRow";
 import type { ChatMessage } from "../types/cbshub";
-type SoundMode = "normal" | "compact" | "hidden";
 function draftKey(room: string) {
   return `cbshub-chat-draft:${room}`;
 }
@@ -88,11 +77,8 @@ export function ChatPanel() {
       }[],
     [participantData],
   );
-  const profiles = useProfiles(),
-    studio = useStudio();
+  const profiles = useProfiles();
   const [text, setText] = useState(() => readDraft(roomId)),
-    [query, setQuery] = useState(""),
-    [pinned, setPinned] = useState(false),
     [end, setEnd] = useState<number | null>(null),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
@@ -100,17 +86,28 @@ export function ChatPanel() {
     [edit, setEdit] = useState<ChatMessage | null>(null),
     [editText, setEditText] = useState(""),
     [deleting, setDeleting] = useState<ChatMessage | null>(null),
-    [activities, setActivities] = useState(false),
     [nearBottom, setNearBottom] = useState(true);
-  const mode = useSoundPreferences(s => s.mode);
-  const soundEvents = useActivities(s => s.events);
-  const [compact, setCompact] = useState(() => {
-    try {
-      return localStorage.getItem("cbshub-chat-density") === "compact";
-    } catch {
-      return false;
-    }
-  });
+  const soundEvents = useActivities((s) => s.events);
+  const view = useChatView((state) => state.views[roomId] ?? EMPTY_CHAT_VIEW);
+  const { query, pinned, activities, searchOpen } = view;
+  const compact = useChatView((state) => state.compact);
+  const closeSearch = () => {
+    updateChatView(roomId, { searchOpen: false, query: "" });
+    requestAnimationFrame(() => {
+      (
+        document.querySelector(
+          '[aria-label="Pesquisar mensagens"]',
+        ) as HTMLElement | null
+      )?.focus();
+    });
+  };
+  const setQuery = (query: string) => updateChatView(roomId, { query });
+  const setPinned = (pinned: boolean) => updateChatView(roomId, { pinned });
+  const setActivities = (activities: boolean) =>
+    updateChatView(roomId, { activities });
+  useEffect(() => {
+    setEnd(null);
+  }, [query, pinned]);
   const feed = useRef<HTMLDivElement>(null),
     composer = useRef<HTMLTextAreaElement>(null),
     lastRoom = useRef(roomId),
@@ -177,7 +174,7 @@ export function ChatPanel() {
               .toLowerCase()
               .includes(query.toLowerCase())),
       ),
-    [messages, profiles.blocked, mode, pinned, query],
+    [messages, profiles.blocked, pinned, query],
   );
   const limit = Math.min(end ?? visible.length, visible.length);
   const start = Math.max(0, limit - 100);
@@ -263,97 +260,42 @@ export function ChatPanel() {
     });
   return (
     <section className="chat-panel relative" aria-label="Chat 2.0">
-      <div className="chat-v2-toolbar">
-        <h3>
-          <MessageSquare className="size-4" />
-          Conversa
-        </h3>
-        <div className="chat-v2-actions">
-          <Button
-            variant={pinned ? "secondary" : "ghost"}
-            size="icon-sm"
-            aria-label="Mensagens fixadas"
-            aria-pressed={pinned}
-            onClick={() => {
-              setPinned(!pinned);
-              setEnd(null);
+      {searchOpen && (
+        <div
+          className="chat-search"
+          role="search"
+          aria-label="Pesquisa de mensagens"
+        >
+          <Search className="size-4" />
+          <Input
+            autoFocus
+            aria-label="Buscar no histórico"
+            placeholder="Buscar nas últimas 500 mensagens…"
+            value={query}
+            maxLength={200}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") closeSearch();
             }}
-          >
-            <Pin className="size-4" />
-          </Button>
+          />
           <Button
             variant="ghost"
             size="icon-sm"
-            aria-label="Atividades do Soundboard"
-            onClick={() => setActivities(true)}
+            aria-label="Fechar pesquisa"
+            onClick={closeSearch}
           >
-            <Activity className="size-4" />
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label="Exibição de eventos do Soundboard"
-              >
-                <Volume2 className="size-4" />
-                <span className="hidden sm:inline ml-2">Eventos</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuRadioGroup
-                value={mode}
-                onValueChange={(value) => {
-                  try {
-                    setSoundMode(value as SoundMode);
-                  } catch {
-                    setError("Não foi possível salvar a preferência.");
-                  }
-                }}
-              >
-                <DropdownMenuRadioItem value="normal">
-                  Eventos normais
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="compact">
-                  Eventos compactos
-                </DropdownMenuRadioItem>
-                <DropdownMenuRadioItem value="hidden">
-                  Somente nas atividades
-                </DropdownMenuRadioItem>
-              </DropdownMenuRadioGroup>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            variant={compact ? "secondary" : "ghost"}
-            size="sm"
-            aria-label="Alternar densidade do chat"
-            onClick={() => {
-              setCompact(!compact);
-              try {
-                localStorage.setItem(
-                  "cbshub-chat-density",
-                  !compact ? "compact" : "comfortable",
-                );
-              } catch {}
-            }}
-          >
-            {compact ? "Compacto" : "Confortável"}
+            <X className="size-4" />
           </Button>
         </div>
-      </div>
-      <div className="chat-search">
-        <Search className="size-4" />
-        <Input
-          aria-label="Buscar no histórico"
-          placeholder="Buscar nas últimas 500 mensagens…"
-          value={query}
-          maxLength={200}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setEnd(null);
-          }}
-        />
-      </div>
+      )}
+      {pinned && (
+        <div className="chat-filter-status">
+          <span>Mensagens fixadas</span>
+          <Button variant="ghost" size="sm" onClick={() => setPinned(false)}>
+            Mostrar todas as mensagens
+          </Button>
+        </div>
+      )}
       <div
         className="chat-feed"
         ref={feed}
@@ -419,13 +361,13 @@ export function ChatPanel() {
               <MessageRow
                 message={m}
                 grouped={grouped}
-                compact={
-                  compact ||
-                  studio.theme.layout.density < 0.9 ||
-                  (mode === "compact" && m.type === "soundboard")
-                }
+                compact={compact}
                 own={m.authorClientId === clientId}
-                replied={messages.find((x) => x.id === m.replyTo && !profiles.blocked.includes(x.authorClientId))}
+                replied={messages.find(
+                  (x) =>
+                    x.id === m.replyTo &&
+                    !profiles.blocked.includes(x.authorClientId),
+                )}
                 mentions={mentions}
                 onMention={profiles.view}
                 onReply={() => {
@@ -679,7 +621,8 @@ export function ChatPanel() {
           {[...messages, ...soundEvents]
             .filter(
               (m) =>
-                m.type === "soundboard" && m.roomId === roomId &&
+                m.type === "soundboard" &&
+                m.roomId === roomId &&
                 !profiles.blocked.includes(m.authorClientId),
             )
             .slice(-50)

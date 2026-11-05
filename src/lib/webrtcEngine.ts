@@ -1,5 +1,11 @@
-import {peerState} from "./signalingValidation";
-import {soundActivity} from "../chat/activities";
+import { useVoicePreferences } from "./voicePreferences";
+import {
+  callEvent,
+  beginCallDiagnostics,
+  endCallDiagnostics,
+} from "./callDiagnostics";
+import { peerState } from "./signalingValidation";
+import { soundActivity } from "../chat/activities";
 import { chatLedger } from "../chat/ledger";
 import {
   validateMessage,
@@ -74,6 +80,11 @@ interface PeerMediaSession {
   outgoingScreen?: MediaConnection | null;
   outgoingWebcam?: MediaConnection | null;
   qualityTimer?: number;
+  voiceRetryTimer?: number;
+  voiceRetryAttempts?: number;
+  dataGraceTimer?: number;
+  dataConnectTimer?: number;
+  dataConnecting?: boolean;
 
   // Reprodução direta (0–100%); WebAudio separado apenas para detecção de fala.
   voiceAudioCtx: AudioContext | null;
@@ -93,6 +104,7 @@ class WebRTCEngine {
   private joiningVoice = false;
   private recoveryTimer: number | null = null;
   private recoveryAttempts = 0;
+  private recoveryCancelled = false;
 
   private localPeer: Peer | null = null;
   private beaconPeer: Peer | null = null;
@@ -169,6 +181,10 @@ class WebRTCEngine {
 
     if (this.currentRoomSlug !== slug || generation !== this.roomGeneration)
       return;
+    this.openRoomPeer(slug, autoJoinVoice);
+  }
+
+  private openRoomPeer(slug: string, autoJoinVoice: boolean): void {
     const state = useHubStore.getState();
     const shortId = this.generateShortId(state.clientId);
     // Sufixo efêmero único garante que recarregamentos rápidos nunca recebam unavailable-id
@@ -182,12 +198,12 @@ class WebRTCEngine {
       nickname: state.nickname,
       avatarColor: state.avatarColor,
       isLocal: true,
-      inVoiceCall: false,
+      inVoiceCall: state.inVoiceCall,
       isMuted: state.isMuted,
       isDeafened: state.isDeafened,
       isSpeaking: false,
-      isWebcamActive: false,
-      isScreenSharing: false,
+      isWebcamActive: state.isWebcamActive,
+      isScreenSharing: state.isScreenSharing,
       activeSoundEffect: null,
     };
 
@@ -202,6 +218,7 @@ class WebRTCEngine {
     this.localPeer.on("open", (id) => {
       if (this.localPeer !== peer) return;
       this.recoveryAttempts = 0;
+      callEvent("signaling_open");
       useMediaState.setState({ reconnecting: false });
       useHubStore
         .getState()
@@ -231,6 +248,14 @@ class WebRTCEngine {
 
     this.localPeer.on("error", (err: { type?: string }) => {
       if (this.localPeer !== peer) return;
+      callEvent("signaling_error", {
+        reason:
+          err.type === "network" ||
+          err.type === "socket-error" ||
+          err.type === "server-error"
+            ? err.type
+            : "unknown",
+      });
       console.error("[WebRTC Engine] Erro no localPeer:", err);
       if (
         err.type === "network" ||
@@ -244,54 +269,185 @@ class WebRTCEngine {
     });
 
     this.localPeer.on("disconnected", () => {
-      if (this.localPeer === peer) this.scheduleRecovery();
+      if (this.localPeer === peer) {
+        callEvent("signaling_disconnected");
+        this.scheduleRecovery();
+      }
     });
 
     this.localPeer.on("close", () => {
-      // Executa saída apenas se o peer não foi fechado intencionalmente pelo leaveRoom
-      if (this.localPeer === peer && useHubStore.getState().isConnected) {
-        this.leaveRoom();
+      // Fechamento inesperado recupera sinalização; leaveRoom invalida a identidade antes de destroy.
+      if (this.localPeer === peer && this.currentRoomSlug) {
+        callEvent("signaling_closed", { reason: "peer_closed" });
+        this.localPeer = null;
+        this.scheduleRecovery();
       }
     });
   }
 
   private scheduleRecovery(): void {
-    if (!this.currentRoomSlug || this.recoveryTimer !== null) return;
+    if (
+      !this.currentRoomSlug ||
+      this.recoveryTimer !== null ||
+      this.recoveryCancelled
+    )
+      return;
+    if (this.recoveryAttempts >= 8) {
+      callEvent("retry_exhausted", {
+        attempt: this.recoveryAttempts,
+        reason: "retry_limit",
+      });
+      useMediaState.setState({
+        reconnecting: false,
+        error:
+          "Não foi possível reconectar à sala. A voz ativa foi preservada quando possível. Tente novamente.",
+      });
+      return;
+    }
+    const attempt = ++this.recoveryAttempts;
+    const delayMs = Math.round(
+      Math.min(15000, 1000 * 2 ** Math.min(attempt - 1, 4)) *
+        (0.8 + Math.random() * 0.4),
+    );
+    callEvent("retry_scheduled", { attempt, delayMs });
     useMediaState.setState({ reconnecting: true });
     useHubStore
       .getState()
       .setStatusText("Reconectando sinalização e participantes...");
     const generation = this.roomGeneration;
-    this.recoveryTimer = window.setTimeout(
-      () => {
-        this.recoveryTimer = null;
-        if (
-          generation !== this.roomGeneration ||
-          !this.localPeer ||
-          this.localPeer.destroyed
-        )
-          return;
-        if (navigator.onLine && this.localPeer.disconnected) {
+    this.recoveryTimer = window.setTimeout(() => {
+      this.recoveryTimer = null;
+      if (
+        generation !== this.roomGeneration ||
+        this.recoveryCancelled ||
+        !this.currentRoomSlug
+      )
+        return;
+      if (navigator.onLine) {
+        if (!this.localPeer || this.localPeer.destroyed) {
+          const old = [...this.sessions.values()];
+          this.sessions.clear();
+          for (const session of old) {
+            if (session.dataConnectTimer)
+              clearTimeout(session.dataConnectTimer);
+            this.closeBlockedMedia(session);
+            try {
+              session.dataConn.close();
+            } catch {}
+          }
+          if (this.beaconPeer) {
+            try {
+              this.beaconPeer.destroy();
+            } catch {}
+            this.beaconPeer = null;
+            this.isBeaconOwner = false;
+          }
+          try {
+            this.openRoomPeer(this.currentRoomSlug, false);
+          } catch {
+            callEvent("signaling_error", { reason: "unknown" });
+          }
+        } else if (this.localPeer.disconnected) {
           try {
             this.localPeer.reconnect();
-          } catch (error) {
-            mediaError("Reconexão", error);
+          } catch {
+            callEvent("signaling_error", { reason: "unknown" });
           }
-        } else if (navigator.onLine) {
+        } else {
           this.queryBeaconDirectory(`cbshub-v2-${this.currentRoomSlug}-beacon`);
+          let pending = false;
+          for (const session of this.sessions.values())
+            if (!session.dataConn.open) {
+              pending = true;
+              this.connectToPeer(session.peerId, session.clientId);
+            }
           this.broadcastLocalState();
-          useMediaState.setState({ reconnecting: false });
-          return;
+          if (!pending) {
+            this.recoveryAttempts = 0;
+            useMediaState.setState({ reconnecting: false });
+            return;
+          }
         }
-        this.scheduleRecovery();
-      },
-      Math.min(15000, 1000 * 2 ** Math.min(this.recoveryAttempts++, 4)),
-    );
+      }
+      this.scheduleRecovery();
+    }, delayMs);
   }
 
   public retryConnection(): void {
+    this.recoveryCancelled = false;
     this.recoveryAttempts = 0;
+    if (this.recoveryTimer !== null) clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = null;
+    useMediaState.setState({ error: null });
+    for (const session of this.sessions.values()) {
+      session.voiceRetryAttempts = 0;
+      if (useHubStore.getState().inVoiceCall && !session.voiceCall)
+        this.scheduleVoiceRetry(session);
+    }
     this.scheduleRecovery();
+  }
+
+  public notifyNetwork(online: boolean): void {
+    callEvent(online ? "network_online" : "network_offline");
+    if (online && !this.recoveryCancelled) this.recoveryAttempts = 0;
+    this.scheduleRecovery();
+  }
+
+  public cancelRecovery(): void {
+    this.recoveryCancelled = true;
+    if (this.recoveryTimer !== null) clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = null;
+    for (const session of this.sessions.values()) {
+      if (session.voiceRetryTimer) clearTimeout(session.voiceRetryTimer);
+      session.voiceRetryTimer = undefined;
+    }
+    useMediaState.setState({
+      reconnecting: false,
+      error: "Reconexão automática cancelada. Você pode tentar novamente.",
+    });
+    callEvent("retry_cancelled", { reason: "manual_leave" });
+  }
+
+  private scheduleVoiceRetry(session: PeerMediaSession): void {
+    if (
+      this.recoveryCancelled ||
+      session.voiceRetryTimer ||
+      this.sessions.get(session.peerId) !== session ||
+      !this.canCallSession(session)
+    )
+      return;
+    const attempt = (session.voiceRetryAttempts || 0) + 1;
+    if (attempt > 6) {
+      session.voiceRetryAttempts = 7;
+      callEvent(
+        "retry_exhausted",
+        { attempt: 6, reason: "retry_limit" },
+        session.peerId,
+      );
+      useMediaState.setState({
+        error:
+          "Não foi possível recuperar uma conexão de voz. Use Tentar novamente.",
+      });
+      return;
+    }
+    session.voiceRetryAttempts = attempt;
+    const base = (this.localPeer?.id || "") < session.peerId ? 500 : 1500;
+    const delayMs = Math.round(
+      Math.min(15000, base * 2 ** (attempt - 1)) * (0.8 + Math.random() * 0.4),
+    );
+    callEvent("retry_scheduled", { attempt, delayMs }, session.peerId);
+    const generation = this.roomGeneration;
+    session.voiceRetryTimer = window.setTimeout(() => {
+      session.voiceRetryTimer = undefined;
+      if (
+        generation === this.roomGeneration &&
+        !this.recoveryCancelled &&
+        this.sessions.get(session.peerId) === session &&
+        !session.voiceCall &&
+        this.canCallSession(session)
+      )
+        this.initiateVoiceCallWithPeer(session);
+    }, delayMs);
   }
 
   private setupLocalPeerListeners(): void {
@@ -495,9 +651,13 @@ class WebRTCEngine {
       remotePeerId === this.localPeer.id
     )
       return;
-    if (this.sessions.has(remotePeerId)) return;
+    const existing = this.sessions.get(remotePeerId);
+    if (existing && (existing.dataConn.open || existing.dataConnecting)) return;
 
-    const conn = this.localPeer.connect(remotePeerId, { reliable: true });
+    const conn = this.localPeer.connect(remotePeerId, {
+      reliable: true,
+      metadata: { initiator: this.localPeer.id },
+    });
     this.setupDataConnection(conn, clientId);
   }
 
@@ -505,7 +665,11 @@ class WebRTCEngine {
     if (this.sessions.has(conn.peer)) {
       // Já existe sessão ativa; fecha duplicada
       const existing = this.sessions.get(conn.peer);
-      if (existing && existing.dataConn.open) {
+      if (
+        existing &&
+        (existing.dataConn.open ||
+          (existing.dataConnecting && (this.localPeer?.id || "") < conn.peer))
+      ) {
         conn.close();
         return;
       }
@@ -519,7 +683,8 @@ class WebRTCEngine {
   ): void {
     const remotePeerId = conn.peer;
 
-    const session: PeerMediaSession = {
+    const previous = this.sessions.get(remotePeerId);
+    const session: PeerMediaSession = previous || {
       peerId: remotePeerId,
       clientId: initialClientId || "",
       nickname: "Irmão Conectando...",
@@ -535,12 +700,44 @@ class WebRTCEngine {
       remoteSpeakingInterval: null,
     };
 
-    const previous = this.sessions.get(remotePeerId);
-    if (previous) this.closeBlockedMedia(previous);
+    const replaced = previous?.dataConn;
+    if (session.dataGraceTimer) clearTimeout(session.dataGraceTimer);
+    session.dataGraceTimer = undefined;
+    if (session.dataConnectTimer) clearTimeout(session.dataConnectTimer);
+    session.dataConn = conn;
+    session.dataConnecting = !conn.open;
     this.sessions.set(remotePeerId, session);
+    if (replaced && replaced !== conn) {
+      callEvent("data_replaced", {}, remotePeerId);
+      try {
+        replaced.close();
+      } catch {}
+    }
+    const generation = this.roomGeneration;
+    session.dataConnectTimer = window.setTimeout(() => {
+      if (
+        generation === this.roomGeneration &&
+        session.dataConn === conn &&
+        !conn.open
+      ) {
+        session.dataConnecting = false;
+        try {
+          conn.close();
+        } catch {}
+        this.handlePeerDisconnected(session);
+      }
+    }, 10000);
 
     conn.on("open", () => {
-      if (this.sessions.get(remotePeerId) !== session) return;
+      if (
+        this.sessions.get(remotePeerId) !== session ||
+        session.dataConn !== conn
+      )
+        return;
+      session.dataConnecting = false;
+      if (session.dataConnectTimer) clearTimeout(session.dataConnectTimer);
+      session.dataConnectTimer = undefined;
+      callEvent("data_open", {}, remotePeerId);
       const state = useHubStore.getState();
       const localParticipant = state.participants[this.localPeer?.id || ""];
 
@@ -565,11 +762,17 @@ class WebRTCEngine {
     });
 
     conn.on("data", (data) => {
-      if (this.sessions.get(remotePeerId) !== session) return;
+      if (
+        this.sessions.get(remotePeerId) !== session ||
+        session.dataConn !== conn
+      )
+        return;
       this.handleIncomingSignalingPacket(session, data as SignalingPacket);
     });
 
     conn.on("close", () => {
+      if (session.dataConn !== conn) return;
+      session.dataConnecting = false;
       this.handlePeerDisconnected(session);
     });
 
@@ -583,7 +786,50 @@ class WebRTCEngine {
 
   private handlePeerDisconnected(session: PeerMediaSession): void {
     if (this.sessions.get(session.peerId) !== session) return;
+    session.dataConnecting = false;
+    const pc = session.voiceCall?.peerConnection;
+    callEvent(
+      "data_closed",
+      {
+        connection: pc?.connectionState,
+        reason:
+          pc?.connectionState === "connected"
+            ? "preserve_media"
+            : "remote_or_unknown",
+      },
+      session.peerId,
+    );
+    if (
+      useHubStore.getState().inVoiceCall &&
+      session.voiceCall &&
+      pc?.connectionState !== "failed" &&
+      pc?.connectionState !== "closed"
+    ) {
+      this.scheduleRecovery();
+      if (!session.dataGraceTimer)
+        session.dataGraceTimer = window.setTimeout(() => {
+          session.dataGraceTimer = undefined;
+          if (
+            this.sessions.get(session.peerId) !== session ||
+            session.dataConn.open
+          )
+            return;
+          if (
+            session.voiceCall?.peerConnection?.connectionState === "connected"
+          )
+            return;
+          this.finalizePeerDisconnected(session);
+        }, 15000);
+      return;
+    }
+    this.finalizePeerDisconnected(session);
+  }
+
+  private finalizePeerDisconnected(session: PeerMediaSession): void {
+    if (this.sessions.get(session.peerId) !== session) return;
     this.sessions.delete(session.peerId);
+    if (session.dataConnectTimer) clearTimeout(session.dataConnectTimer);
+    session.dataConnectTimer = undefined;
     this.closeBlockedMedia(session);
     this.scheduleRecovery();
     sounds.playLeave();
@@ -663,7 +909,11 @@ class WebRTCEngine {
         break;
       }
       case "peer_state_sync": {
-        const remote = peerState(packet.state, session.peerId, session.clientId);
+        const remote = peerState(
+          packet.state,
+          session.peerId,
+          session.clientId,
+        );
         if (!remote) return;
         session.clientId = remote.clientId;
         session.nickname = remote.nickname;
@@ -885,7 +1135,10 @@ class WebRTCEngine {
             const known = new Set(packet.knownIds);
             const missing = all.filter(
               (m) =>
-                !known.has(m.id) && m.type !== "soundboard" && !m.deleted && !isBlocked(m.authorClientId),
+                !known.has(m.id) &&
+                m.type !== "soundboard" &&
+                !m.deleted &&
+                !isBlocked(m.authorClientId),
             );
             // Original author is needed to authenticate a new v2 edit/delete; history remains best-effort P2P.
             for (let i = 0; i < missing.length; i += 50)
@@ -909,7 +1162,9 @@ class WebRTCEngine {
           return;
         try {
           const clean = packet.messages
-            .filter((m) => m.type !== "soundboard" && !isBlocked(m.authorClientId))
+            .filter(
+              (m) => m.type !== "soundboard" && !isBlocked(m.authorClientId),
+            )
             .map((m) => validateMessage(m, room));
           chatLedger
             .mergeMessages(room, clean)
@@ -934,7 +1189,13 @@ class WebRTCEngine {
           packet.soundName.length > 80
         )
           return;
-        soundActivity(useHubStore.getState().roomId, session.clientId, session.nickname, packet.emoji, packet.soundName);
+        soundActivity(
+          useHubStore.getState().roomId,
+          session.clientId,
+          session.nickname,
+          packet.emoji,
+          packet.soundName,
+        );
         // Exibe animação flutuante no card do participante que tocou o som
         useHubStore.getState().updateParticipant(packet.peerId, {
           activeSoundEffect: {
@@ -1207,16 +1468,33 @@ class WebRTCEngine {
   }
 
   private initiateVoiceCallWithPeer(session: PeerMediaSession): void {
-    if (!this.localPeer || session.voiceCall || !this.canCallSession(session))
+    if (
+      !this.localPeer ||
+      this.localPeer.destroyed ||
+      session.voiceCall ||
+      (session.voiceRetryAttempts || 0) > 6 ||
+      !this.canCallSession(session)
+    )
       return;
 
     const voiceStream =
       this.audioPipeline?.getProcessedStream() || this.rawMicStream;
     if (!voiceStream) return;
 
-    const call = this.localPeer.call(session.peerId, voiceStream, {
-      metadata: { channel: "voice" },
-    });
+    let call: MediaConnection;
+    try {
+      call = this.localPeer.call(session.peerId, voiceStream, {
+        metadata: { channel: "voice" },
+      });
+      if (!call) {
+        this.scheduleVoiceRetry(session);
+        return;
+      }
+    } catch {
+      callEvent("signaling_error", { reason: "unknown" }, session.peerId);
+      this.scheduleVoiceRetry(session);
+      return;
+    }
 
     session.voiceCall = call;
     this.patchCallSdp(call, false);
@@ -1242,25 +1520,75 @@ class WebRTCEngine {
     call: MediaConnection,
   ): void {
     if (session.qualityTimer) clearInterval(session.qualityTimer);
+    if (session.voiceRetryTimer) clearTimeout(session.voiceRetryTimer);
+    session.voiceRetryTimer = undefined;
+    const connectingAt = Date.now();
+    let lastState = "",
+      lastTick = Date.now();
     let previousReceived = 0,
       previousLost = 0,
       busy = false,
       disconnectedAt = 0;
     session.qualityTimer = window.setInterval(async () => {
       if (
-        busy ||
         this.sessions.get(session.peerId) !== session ||
         session.voiceCall !== call
       )
         return;
+      const pc = call.peerConnection;
+      if (!pc) return;
+      const tick = Date.now();
+      if (tick - lastTick > 15000)
+        callEvent("timer_gap", { delayMs: tick - lastTick }, session.peerId);
+      lastTick = tick;
+      const signature = [
+        pc.connectionState,
+        pc.iceConnectionState,
+        pc.signalingState,
+      ].join(":");
+      if (signature !== lastState) {
+        lastState = signature;
+        callEvent(
+          "media_state",
+          {
+            connection: pc.connectionState,
+            ice: pc.iceConnectionState,
+            signaling: pc.signalingState,
+          },
+          session.peerId,
+        );
+      }
+      if (pc.connectionState === "connected") session.voiceRetryAttempts = 0;
+      if (pc.connectionState === "disconnected") disconnectedAt ||= Date.now();
+      else disconnectedAt = 0;
+      if (
+        pc.connectionState === "failed" ||
+        (disconnectedAt && Date.now() - disconnectedAt > 8000) ||
+        (["new", "connecting"].includes(pc.connectionState) &&
+          Date.now() - connectingAt > 30000)
+      ) {
+        callEvent(
+          "media_closed",
+          {
+            reason:
+              pc.connectionState === "failed"
+                ? "media_failed"
+                : "media_timeout",
+          },
+          session.peerId,
+        );
+        call.close();
+        this.broadcastLocalState();
+        return;
+      }
+      if (busy) return;
       busy = true;
       try {
-        const pc = call.peerConnection;
-        if (!pc) return;
         const stats = await pc.getStats();
         if (session.voiceCall !== call) return;
         let rttMs: number | null = null,
-          loss: number | null = null;
+          loss: number | null = null,
+          jitterMs: number | null = null;
         stats.forEach((report) => {
           if (
             report.type === "candidate-pair" &&
@@ -1273,6 +1601,8 @@ class WebRTCEngine {
             report.type === "inbound-rtp" &&
             (report.kind === "audio" || report.mediaType === "audio")
           ) {
+            if (Number.isFinite(report.jitter))
+              jitterMs = Math.round(report.jitter * 10000) / 10;
             const received = report.packetsReceived || 0,
               lost = report.packetsLost || 0;
             const delta = Math.max(0, received - previousReceived),
@@ -1288,19 +1618,14 @@ class WebRTCEngine {
         useMediaState.setState((s) => ({
           quality: {
             ...s.quality,
-            [session.peerId]: { state: pc.connectionState, rttMs, loss },
+            [session.peerId]: {
+              state: pc.connectionState,
+              rttMs,
+              loss,
+              jitterMs,
+            },
           },
         }));
-        if (pc.connectionState === "disconnected")
-          disconnectedAt ||= Date.now();
-        else disconnectedAt = 0;
-        if (
-          pc.connectionState === "failed" ||
-          (disconnectedAt && Date.now() - disconnectedAt > 8000)
-        ) {
-          call.close();
-          this.broadcastLocalState();
-        }
       } catch {
         /* Stats unavailable: never fabricate quality. */
       } finally {
@@ -1316,20 +1641,15 @@ class WebRTCEngine {
         delete quality[session.peerId];
         return { quality };
       });
-      const generation = this.roomGeneration;
-      window.setTimeout(
-        () => {
-          if (
-            generation === this.roomGeneration &&
-            this.sessions.get(session.peerId) === session &&
-            !session.voiceCall &&
-            useHubStore.getState().inVoiceCall &&
-            useHubStore.getState().participants[session.peerId]?.inVoiceCall
-          )
-            this.initiateVoiceCallWithPeer(session);
+      callEvent(
+        "media_closed",
+        {
+          connection: call.peerConnection?.connectionState,
+          reason: "remote_or_unknown",
         },
-        (this.localPeer?.id || "") < session.peerId ? 500 : 1500,
+        session.peerId,
       );
+      this.scheduleVoiceRetry(session);
     });
   }
 
@@ -1579,6 +1899,10 @@ class WebRTCEngine {
     this.joiningVoice = false;
     if (generation !== this.roomGeneration || !this.rawMicStream?.active)
       return;
+    this.recoveryCancelled = false;
+    for (const session of this.sessions.values())
+      session.voiceRetryAttempts = 0;
+    beginCallDiagnostics();
     sounds.playJoin();
 
     useHubStore.getState().setInVoiceCall(true);
@@ -1600,7 +1924,11 @@ class WebRTCEngine {
     }
   }
 
-  public leaveVoiceCall(): void {
+  public leaveVoiceCall(
+    reason: "manual_leave" | "microphone_ended" = "manual_leave",
+  ): void {
+    endCallDiagnostics(reason);
+    this.pushToTalkHeld = false;
     const state = useHubStore.getState();
     this.micGeneration++;
     this.joiningVoice = false;
@@ -1669,6 +1997,10 @@ class WebRTCEngine {
   }
 
   private closeBlockedMedia(session: PeerMediaSession): void {
+    if (session.voiceRetryTimer) clearTimeout(session.voiceRetryTimer);
+    session.voiceRetryTimer = undefined;
+    if (session.dataGraceTimer) clearTimeout(session.dataGraceTimer);
+    session.dataGraceTimer = undefined;
     this.teardownPeerVoiceAudio(session);
     for (const call of [
       session.voiceCall,
@@ -1776,13 +2108,25 @@ class WebRTCEngine {
   /* CONTROLES DE MÍDIA LOCAL (MUTE, DEAFEN, WEBCAM, SCREEN SHARE)             */
   /* ========================================================================= */
 
+  private pushToTalkHeld = false;
+  public setPushToTalkHeld(held: boolean): void {
+    this.pushToTalkHeld = held && useHubStore.getState().inVoiceCall;
+    this.audioPipeline?.setMicMuted(this.microphoneGated());
+  }
+  private microphoneGated(): boolean {
+    return (
+      useHubStore.getState().isMuted ||
+      (useVoicePreferences.getState().pushToTalk && !this.pushToTalkHeld)
+    );
+  }
+
   public toggleMute(muted?: boolean): void {
     const state = useHubStore.getState();
     const nextMuted = muted !== undefined ? muted : !state.isMuted;
     useHubStore.getState().setMuted(nextMuted);
 
     // Ajusta o ganho do microfone no pipeline WebAudio (sem cortar o Soundboard!)
-    this.audioPipeline?.setMicMuted(nextMuted);
+    this.audioPipeline?.setMicMuted(this.microphoneGated());
 
     if (nextMuted) {
       sounds.playMute();
@@ -2117,7 +2461,7 @@ class WebRTCEngine {
           previousSpeaking = isSpeaking;
         },
       );
-      pipeline.setMicMuted(useHubStore.getState().isMuted);
+      pipeline.setMicMuted(this.microphoneGated());
       const processed = await pipeline.initialize();
       if (generation !== this.micGeneration) {
         pipeline.destroy();
@@ -2154,18 +2498,19 @@ class WebRTCEngine {
       soundboardEngine.stopAll();
       this.audioPipeline?.destroy();
       this.rawMicStream?.getTracks().forEach((t) => t.stop());
-      pipeline.setMicMuted(useHubStore.getState().isMuted);
+      pipeline.setMicMuted(this.microphoneGated());
       this.audioPipeline = pipeline;
       this.rawMicStream = stream;
       stream.getAudioTracks()[0].onended = () => {
         if (this.rawMicStream === stream) {
-          this.leaveVoiceCall();
+          this.leaveVoiceCall("microphone_ended");
           mediaError(
             "Microfone desconectado",
             "Selecione um dispositivo e entre novamente.",
           );
         }
       };
+      callEvent("microphone_ready");
       useHubStore.getState().setLocalVoiceStream(processed);
       soundboardEngine.registerPipelineHooks(
         () => this.audioPipeline?.getAudioContext() ?? null,
@@ -2174,6 +2519,7 @@ class WebRTCEngine {
     } catch (error) {
       pipeline?.destroy();
       stream?.getTracks().forEach((t) => t.stop());
+      callEvent("microphone_error", { reason: "unknown" });
       mediaError("Microfone indisponível", error);
       throw error;
     } finally {
@@ -2560,7 +2906,8 @@ class WebRTCEngine {
     content: string,
     replyTo?: string,
   ): Promise<ChatMessage | null> {
-    if (!useHubStore.getState().roomId) throw new Error("Entre em uma sala para enviar mensagens.");
+    if (!useHubStore.getState().roomId)
+      throw new Error("Entre em uma sala para enviar mensagens.");
     await storageDb.requirePersistentStorage();
     const trimmed = content.trim();
     if (!trimmed) return null;
@@ -2646,7 +2993,13 @@ class WebRTCEngine {
         soundName: clip.name,
       });
 
-      soundActivity(state.roomId,state.clientId,state.nickname,clip.emoji,clip.name);
+      soundActivity(
+        state.roomId,
+        state.clientId,
+        state.nickname,
+        clip.emoji,
+        clip.name,
+      );
 
       window.setTimeout(() => {
         const current =
@@ -2669,6 +3022,10 @@ class WebRTCEngine {
   /* ========================================================================= */
 
   public leaveRoom(): void {
+    endCallDiagnostics("room_left");
+    this.pushToTalkHeld = false;
+    this.recoveryCancelled = false;
+    this.recoveryAttempts = 0;
     this.roomGeneration++;
     this.micGeneration++;
     this.cameraGeneration++;
@@ -2714,6 +3071,8 @@ class WebRTCEngine {
     const leavingSessions = [...this.sessions.values()];
     this.sessions.clear();
     for (const session of leavingSessions) {
+      if (session.dataConnectTimer) clearTimeout(session.dataConnectTimer);
+      session.dataConnectTimer = undefined;
       this.closeBlockedMedia(session);
       this.teardownPeerVoiceAudio(session);
       if (session.voiceCall) {

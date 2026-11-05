@@ -1,5 +1,13 @@
-import {useStudio} from "../studio/StudioProvider";
-import {PRESETS} from "../studio/theme";
+import { MicrophoneTest } from "./MicrophoneTest";
+import {
+  useVoicePreferences,
+  saveVoicePreferences,
+  TALK_KEYS,
+} from "../lib/voicePreferences";
+import { CallDiagnosticsPanel } from "./CallDiagnosticsPanel";
+import { useChatView, setChatCompact } from "../chat/viewState";
+import { useStudio } from "../studio/StudioProvider";
+import { PRESETS } from "../studio/theme";
 import { supportsAudioOutput } from "../lib/mediaState";
 import React, { useState, useEffect } from "react";
 import {
@@ -37,6 +45,20 @@ import { useProfiles } from "../profiles/ProfileProvider";
 
 export const SettingsModal: React.FC = () => {
   const profiles = useProfiles();
+  const voicePreferences = useVoicePreferences();
+  const [voicePreferenceError, setVoicePreferenceError] = useState("");
+  const saveVoice = (patch: Parameters<typeof saveVoicePreferences>[0]) => {
+    try {
+      saveVoicePreferences(patch);
+      setVoicePreferenceError("");
+    } catch {
+      setVoicePreferenceError(
+        "Não foi possível salvar as preferências de voz.",
+      );
+    }
+  };
+  const compact = useChatView((state) => state.compact);
+  const [appearanceError, setAppearanceError] = useState("");
   const studio = useStudio();
   const {
     isSettingsOpen,
@@ -139,11 +161,35 @@ export const SettingsModal: React.FC = () => {
           </div>
         </DialogHeader>
 
-        <div className="px-5 py-3 flex gap-2 items-center"><span className="text-sm">Aparência</span>{PRESETS.filter(t=>["Clássico","Moderno Roxo"].includes(t.name)).map(t=><Button key={t.name} size="sm" variant={studio.theme.name===t.name?"default":"outline"} onClick={()=>studio.selectPreset(t)}>{t.name}</Button>)}<Button size="sm" variant="ghost" onClick={()=>{setIsSettingsOpen(false);studio.begin();}}>Editar temas</Button></div>
+        <div className="px-5 py-3 flex gap-2 items-center">
+          <span className="text-sm">Aparência</span>
+          {PRESETS.filter((t) =>
+            ["Clássico", "Moderno Roxo"].includes(t.name),
+          ).map((t) => (
+            <Button
+              key={t.name}
+              size="sm"
+              variant={studio.theme.name === t.name ? "default" : "outline"}
+              onClick={() => studio.selectPreset(t)}
+            >
+              {t.name}
+            </Button>
+          ))}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setIsSettingsOpen(false);
+              studio.begin();
+            }}
+          >
+            Editar temas
+          </Button>
+        </div>
         {/* Abas e Conteúdo */}
         <Tabs defaultValue="audio" className="flex-1 flex flex-col min-h-0">
           <div className="px-5 pt-3 border-b border-border/50 bg-card/20 shrink-0">
-            <TabsList className="bg-secondary/70 h-8 p-0.5">
+            <TabsList className="bg-secondary/70 h-auto min-h-8 p-0.5 flex-wrap">
               <TabsTrigger
                 value="profile"
                 className="text-xs h-7 px-3 flex items-center gap-1.5"
@@ -158,10 +204,48 @@ export const SettingsModal: React.FC = () => {
                 <Mic className="w-3.5 h-3.5" />
                 <span>Áudio, Vídeo & Estúdio</span>
               </TabsTrigger>
+              <TabsTrigger value="appearance">Aparência</TabsTrigger>
+              <TabsTrigger value="diagnostics">Diagnóstico</TabsTrigger>
             </TabsList>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 min-h-0">
+            <TabsContent value="diagnostics" className="m-0">
+              <CallDiagnosticsPanel />
+            </TabsContent>
+            <TabsContent value="appearance" className="m-0 space-y-4">
+              <h3 className="font-semibold">Densidade das mensagens</h3>
+              <p className="text-sm text-muted-foreground">
+                Ajuste a apresentação do chat. A escolha é salva neste
+                dispositivo.
+              </p>
+              <div
+                role="group"
+                aria-label="Densidade das mensagens"
+                className="flex gap-2"
+              >
+                {[false, true].map((value) => (
+                  <Button
+                    key={String(value)}
+                    variant={compact === value ? "default" : "outline"}
+                    aria-pressed={compact === value}
+                    onClick={() => {
+                      try {
+                        setChatCompact(value);
+                        setAppearanceError("");
+                      } catch {
+                        setAppearanceError(
+                          "Não foi possível salvar a densidade.",
+                        );
+                      }
+                    }}
+                  >
+                    {value ? "Compacta" : "Confortável"}
+                  </Button>
+                ))}
+              </div>
+              {appearanceError && <p role="alert">{appearanceError}</p>}
+            </TabsContent>
             {/* ABA 1: PERFIL & IDENTIDADE */}
             <TabsContent value="profile" className="m-0 space-y-6">
               <div className="space-y-3">
@@ -185,6 +269,51 @@ export const SettingsModal: React.FC = () => {
 
             {/* ABA 2: ÁUDIO, VÍDEO & ESTÚDIO */}
             <TabsContent value="audio" className="m-0 space-y-6">
+              <section
+                className="space-y-3 rounded-lg border border-border p-3"
+                aria-label="Modo de fala"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <label htmlFor="push-to-talk" className="text-sm font-medium">
+                    Push-to-talk
+                  </label>
+                  <Switch
+                    id="push-to-talk"
+                    aria-label="Push-to-talk"
+                    checked={voicePreferences.pushToTalk}
+                    onCheckedChange={(value) =>
+                      saveVoice({ pushToTalk: value })
+                    }
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Segure a tecla para falar com a janela em foco. Não funciona
+                  enquanto digita. O silêncio manual sempre prevalece;
+                  Soundboard continua independente.
+                </p>
+                <label className="text-xs flex items-center gap-2">
+                  Tecla de fala
+                  <select
+                    aria-label="Tecla de push-to-talk"
+                    className="rounded-md bg-secondary p-1"
+                    value={voicePreferences.talkKey}
+                    onChange={(event) =>
+                      saveVoice({
+                        talkKey: event.target
+                          .value as (typeof TALK_KEYS)[number],
+                      })
+                    }
+                  >
+                    {TALK_KEYS.map((key) => (
+                      <option key={key}>{key}</option>
+                    ))}
+                  </select>
+                </label>
+                {voicePreferenceError && (
+                  <p role="alert">{voicePreferenceError}</p>
+                )}
+              </section>
+              <MicrophoneTest />
               {/* Seletores de Dispositivos (Sem <select> HTML nativo!) */}
               <div className="space-y-3.5">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">

@@ -89,3 +89,14 @@ As 19 vulnerabilidades conhecidas anteriores foram eliminadas nesta árvore (npm
 ## BRAND-001 — 05/11/2026 — Codex/OpenAI
 
 Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px titlebar, 60/56px sala, ~32px chamada); subtítulo removido e estado de maximização sincronizado com Electron. Build e testes compact-bars/window-controls/desktop-security/electron-smoke/redesign-smoke/media-smoke passaram localmente. Arraste e aparência real maximizada/restaurada exigem desktop gráfico. Logo/PNG/ICO ainda pendentes do arquivo original solicitado: tentativa generativa alterou arte e não foi integrada. Ler COMPACT_BARS.md para arquivos, evidências e retomada. Trabalho das barras pronto para revisão; não declarar integração da logo concluída. Reserva da identidade permanece aguardando entrada, sem mudanças de motores/backend. Sem push/merge.
+
+
+## WORKSPACE-3 — 05/11/2026 — estado atual
+
+- Corrigido caminho de fechamento prematuro de voz por DataConnection.close e sessão de dados substituta; regressões controladas passaram. A causa das quedas no computador do usuário ainda precisa ser correlacionada com o novo relatório. Não considerar todas as quedas resolvidas.
+- media-transport continua BLOCKED: Chromium não oferece candidatos ICE locais; não houve validação entre dois dispositivos reais. Recobro sem sinalização/TURN acessível não é garantido.
+- Backend/contas/ACL, nomes globais, salas/sync entre dispositivos, DM, arquivos/pastas/GIFs e notificações do SO continuam ausentes. Presença e dados locais/P2P não são autorização autenticada.
+- Atalho PTT global não implementado; funciona apenas com foco e fora de campos de edição. Sem benchmarks de CPU/memória, matriz física ou verificação Windows/macOS.
+- Favoritos e remoção/restauração de recentes são locais. Unread da sidebar só representa a sala ativa; não simula múltiplas salas conectadas em segundo plano.
+- Diagnóstico é memória limitada e não sobrevive a restart; deve ser copiado antes de fechar o app. Logs de console antigos do motor não são o relatório sanitizado; não compartilhá-los como se tivessem a mesma política de campos.
+- Permanecem ABR/stats de tela por par, avisos Vite/bundle, suspensão real e testes prolongados. Ver WORKSPACE_3_STATUS.md para dependências e evidências.

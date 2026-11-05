@@ -1,11 +1,13 @@
-# Identidade oficial cbsHUB
+# Identidade oficial cbsHUB — marca atual
 
-`logo.svg` é o vetor fornecido pelo mantenedor em 05/11/2026, sem alterações de bytes/paths/cores. O fundo já é transparente. O preenchimento branco central e os brancos das máscaras fazem parte da arte e foram preservados.
+A marca atual é o símbolo em duas partes fornecido pelo mantenedor e confirmado como nova logo oficial em 05/11/2026. Ela substitui a marca circular anterior. Cores originais: azul-marinho `#29256B` e turquesa `#12C9BD`.
 
-SHA-256 do original: `373f0b7d55b512c30fbe61fed90d1734e33bc1bba3ede2fb1646250d1350e3d5`.
+`logo.svg` preserva o SVG fornecido: viewBox 1000 × 1000, os dois paths e as cores. O fundo é transparente. SHA-256 do arquivo: `6ecb64a39d9cc15049018e1aa5ded72230f19329bc3220ff5fa3bf5cda3356c7`.
 
-`logo-N.png`: exportações transparentes de 16, 20, 24, 32, 48, 64, 128, 256 e 512 px. Canvas quadrado, proporções originais 1656:1536 preservadas, margem externa de 4% para ícones. `app.ico`: frames PNG RGBA em 16/24/32/48/64/128/256 px.
+`mark.svg` deriva do original ajustando somente o viewBox às margens transparentes, com 4% de respiro para ícones. Não altera paths, cores ou proporções. É usado na titlebar e na navegação para tornar o símbolo legível em 20px.
 
-Regenerar na raiz do projeto: `node scripts/export-brand.cjs`. Requer Playwright/Chromium no host, como os testes; não é dependência de runtime. Exportação por canvas, sem geração de imagem ou redesenho. `manifest.json` registra hash e tamanhos.
+`logo-N.png`: exportações transparentes quadradas em 16, 20, 24, 32, 48, 64, 128, 256 e 512 px. `app.ico`: frames PNG RGBA de 16/24/32/48/64/128/256 px. `manifest.json` registra hash, viewBoxes e resoluções.
 
-Uso: titlebar/rail importam o SVG; BrowserWindow usa PNG256; electron-builder Windows usa ICO e Linux usa PNG512. Não existe sistema Tray ativo no aplicativo; o ICO pode ser reutilizado se uma tarefa futura o adicionar.
+Regenerar na raiz: `node scripts/export-brand.cjs`. Requer Playwright e Chromium no host, sem dependência nova no aplicativo. Conversão por SVG/canvas, sem redesenho ou geração de imagem.
+
+Integração: OfficialLogo usa mark.svg; BrowserWindow usa PNG256; electron-builder Windows usa ICO e Linux usa PNG512. Não existe Tray ativo. O ICO está disponível para eventual implementação, sem declarar bandeja ou instalador Windows testados.
