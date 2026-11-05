@@ -1,4 +1,6 @@
-import { app, BrowserWindow, ipcMain, desktopCapturer, session } from 'electron';
+import {trustedRenderer,externalLink,validCaptureSource} from './security';
+import {pathToFileURL} from 'node:url';
+import { app, BrowserWindow, ipcMain, desktopCapturer, session, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +14,11 @@ app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 
+const rendererUrl = process.env.VITE_DEV_SERVER_URL || pathToFileURL(path.join(__dirname, '../dist/index.html')).href;
 let mainWindow: BrowserWindow | null = null;
+function allowedSender(event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent): boolean {
+ return !!mainWindow && event.sender === mainWindow.webContents && event.senderFrame === mainWindow.webContents.mainFrame && trustedRenderer(event.senderFrame.url, rendererUrl);
+}
 let pendingSourceId: string | null = null;
 let pendingSystemAudio = true;
 
@@ -51,12 +57,14 @@ function createWindow(): void {
       preload: preloadPath,
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
       backgroundThrottling: false,
     },
   });
 
-  mainWindow.webContents.on('preload-error', (_event, failedPath, error) => {
+  mainWindow.webContents.setWindowOpenHandler(({url}) => { if(externalLink(url)) void shell.openExternal(url); return {action:'deny'}; });
+  mainWindow.webContents.on('will-navigate', (event,url) => { if(!trustedRenderer(url,rendererUrl)) event.preventDefault(); });
+  mainWindow.webContents.on('preload-error' , (_event, failedPath, error) => {
     console.error('[cbsHUB Main] Falha no script de Preload:', failedPath, error);
   });
 
@@ -81,7 +89,8 @@ function createWindow(): void {
 }
 
 // Interceptador IPC de busca de fontes de desktop
-ipcMain.handle('cbs:get-sources', async () => {
+ipcMain.handle('cbs:get-sources', async (event) => {
+  if(!allowedSender(event)) throw new Error('Origem IPC não autorizada.');
   const sources = await desktopCapturer.getSources({
     types: ['screen', 'window'],
     thumbnailSize: { width: 480, height: 270 },
@@ -98,7 +107,8 @@ ipcMain.handle('cbs:get-sources', async () => {
 });
 
 // Interceptador IPC para configurar a fonte escolhida pelo usuário
-ipcMain.handle('cbs:set-capture-source', (_event, sourceId: string, includeAudio: boolean) => {
+ipcMain.handle('cbs:set-capture-source', (event, sourceId: string, includeAudio: boolean) => {
+  if(!allowedSender(event) || !validCaptureSource(sourceId,includeAudio)) return false;
   pendingSourceId = sourceId;
   pendingSystemAudio = includeAudio;
   return true;
@@ -106,6 +116,7 @@ ipcMain.handle('cbs:set-capture-source', (_event, sourceId: string, includeAudio
 
 // Handlers de controle de janela nativa blindados contra perda de referência
 ipcMain.on('cbs:minimize', (event) => {
+  if(!allowedSender(event)) return;
   const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
   if (win && !win.isDestroyed()) {
     win.minimize();
@@ -113,6 +124,7 @@ ipcMain.on('cbs:minimize', (event) => {
 });
 
 ipcMain.on('cbs:maximize', (event) => {
+  if(!allowedSender(event)) return;
   const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
   if (win && !win.isDestroyed()) {
     if (win.isMaximized()) {
@@ -124,6 +136,7 @@ ipcMain.on('cbs:maximize', (event) => {
 });
 
 ipcMain.on('cbs:close', (event) => {
+  if(!allowedSender(event)) return;
   const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
   if (win && !win.isDestroyed()) {
     win.close();
@@ -131,6 +144,7 @@ ipcMain.on('cbs:close', (event) => {
 });
 
 ipcMain.on('cbs:always-on-top', (event, flag: boolean) => {
+  if(!allowedSender(event) || typeof flag !== 'boolean') return;
   const win = BrowserWindow.fromWebContents(event.sender) || mainWindow;
   if (win && !win.isDestroyed()) {
     win.setAlwaysOnTop(flag);
@@ -139,9 +153,11 @@ ipcMain.on('cbs:always-on-top', (event, flag: boolean) => {
 
 app.whenReady().then(() => {
   // Interceptador oficial do Electron para getDisplayMedia (Seção 4.1 do SDD.md)
-  session.defaultSession.setDisplayMediaRequestHandler(async (_request, callback) => {
+  session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
+    const sourceId = pendingSourceId; pendingSourceId = null;
+    if (!request.frame || request.frame !== mainWindow?.webContents.mainFrame || !trustedRenderer(request.frame.url,rendererUrl) || !sourceId) { callback({}); return; }
     const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] });
-    const chosen = sources.find((s) => s.id === pendingSourceId) || sources[0];
+    const chosen = sources.find((s) => s.id === sourceId);
 
     if (!chosen) {
       callback({});

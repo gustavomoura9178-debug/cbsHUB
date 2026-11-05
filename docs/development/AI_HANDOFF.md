@@ -1,3 +1,5 @@
+> Estado atual em 05/11/2026: candidato **2.0.0-rc.1**, estabilização STABILIZE-001. Consulte [STABILIZATION.md](STABILIZATION.md). As seções anteriores abaixo são históricas.
+
 # Passagem entre pessoas e agentes de IA
 
 Data: 05/11/2026 (America/Sao_Paulo). Responsável: Codex/OpenAI.
@@ -111,3 +113,8 @@ Testes executados: npm run build e tsc passaram (avisos de bundle e preload perm
 Pendências: validação visual fina contra as capturas, acessibilidade completa, imagens de celulares com EXIF e memória sob carga; chamadas, som e tela entre dois dispositivos físicos continuam NÃO testados nesta instância (ICE/rede cloud já bloqueados na fase anterior). Não declarar reprodução remota, captura real do SO, exclusão global ou autorização no servidor como aprovadas. Exclusão global depende de backend autenticado e política de retenção. Documentação de fases anteriores é histórica: modos normal/compacto não recolocam eventos no histórico nesta fase. Atividades transitórias não persistem; eventos antigos permanecem intactos no banco. Reserva liberada para revisão ao concluir. Nenhum push/merge nesta tarefa.
 
 Entrega VISUAL-002: commit de conteúdo `27d6c15`; reserva liberada, branch limpa para revisão. tsc e teste visual-fixes passaram após inclusão da confirmação AlertDialog. Uma execução em HMR expirou ao procurar preset; após reiniciar helper e usar módulos estáveis passou. Nenhum push/merge.
+
+
+## STABILIZE-001 — 05/11/2026
+
+Branch fix/stabilization-2026-11-05, base 89dc1bb; recuperação recovery/pre-stabilization-2026-11-05. Ler STABILIZATION.md, VERSIONING.md e README antes de continuar. Não reintroduzir lib/formats no preload (merge concatena ES/CJS). IPC exige renderer principal; captura não deve cair na primeira tela quando fonte inválida. Rodar npm run build, servidor npm run dev:renderer e npm test. Bloqueio ambiental também gera exit 1, com classificação BLOCKED. Sem push/merge ou tag estável nesta tarefa. Artefatos ignorados locais não são compartilhados automaticamente.

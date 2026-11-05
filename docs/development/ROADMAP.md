@@ -60,3 +60,8 @@ CHAT-002 implementado no escopo local/P2P; próxima revisão deve validar compat
 3. Delimitar correção K07 (ABR e stats de tela por par) após baseline físico, mantendo seletores de foco e compatibilidade.
 4. Resolver K01/preload e planejar atualização de dependências K16 antes de distribuição; dependem de revisão e testes Electron/Windows.
 5. Backend/autenticação e permissões administrativas de sala permanecem etapa separada conforme escolha local/P2P. Não introduzir ACL global de Soundboard sem essa base.
+
+
+## STABILIZE-001 — 05/11/2026
+
+Próximo gate: revisão do candidato 2.0.0-rc.1, plano de atualização das 19 vulnerabilidades, matriz física em 2 e depois 3–6 dispositivos, ABR/telemetria por par, acessibilidade completa e instaladores na plataforma-alvo. Cada etapa depende de evidência própria. 2.0.0 estável somente após revisão/autorização; backend e recursos ausentes exigem escopo separado.

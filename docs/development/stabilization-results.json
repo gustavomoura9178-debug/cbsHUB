@@ -1,0 +1,84 @@
+{
+  "date": "2026-11-05",
+  "version": "2.0.0-rc.1",
+  "base": "89dc1bb",
+  "command": "npm test",
+  "overall": "blocked",
+  "results": [
+    {
+      "file": "chat-drafts.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "chat-model.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "chat-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "desktop-security.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "electron-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "media-engine.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "media-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "media-transport.cjs",
+      "status": "blocked",
+      "exit": 1
+    },
+    {
+      "file": "profile-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "profile-validation.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "redesign-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "stabilization-a11y.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "studio-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "theme-validation.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "visual-fixes.cjs",
+      "status": "passed",
+      "exit": 0
+    }
+  ]
+}

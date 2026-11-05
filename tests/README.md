@@ -30,3 +30,7 @@ Requer os mesmos pré-requisitos de navegador/renderer. Reinicie o helper dev ap
 `node tests/media-transport.cjs`: tenta RTCPeerConnections locais entre dois contextos, com adapter de sinalização; falha explicitamente se não houver candidatos ICE. **Bloqueado nesta instância, não aprovado.** Não usar como evidência de dois dispositivos físicos.
 
 Mesmos pré-requisitos dos demais probes; iniciar renderer e reiniciar depois de alterações em módulos centrais para evitar HMR durante testes. Não modificar fontes enquanto um probe roda. Matriz física e resultados em `docs/development/MEDIA_EXPERIENCE.md`.
+
+# Estabilização
+
+Use `npm run build`, `npm run dev:renderer` (terminal separado) e `npm test`. O runner versionado registra logs/resultados em build/; bloqueio não é aprovação e retorna exit 1. Novos probes: desktop-security (origens/argumentos/CJS), electron-smoke (runtime/reload/sandbox) e stabilization-a11y (foco/Tab/Escape/reduced motion). O teste Electron aceita CBSHUB_TEST_EXECUTABLE para validar pacote Linux. Relatório atual: docs/development/STABILIZATION.md.
