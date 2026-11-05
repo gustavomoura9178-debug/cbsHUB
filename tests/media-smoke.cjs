@@ -125,7 +125,7 @@ const assert = require("node:assert/strict");
     );
     await page.evaluate(() => m.setState({ error: null }));
     await page
-      .getByRole("button", { name: "Soundboard da chamada", exact: true })
+      .getByRole("button", { name: "Efeitos Sonoros da chamada", exact: true })
       .click();
     const favorite = page.getByRole("button", {
       name: "Favoritar Buzina de Estádio",

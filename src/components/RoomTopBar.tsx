@@ -178,7 +178,7 @@ export function RoomTopBar({ membersOpen, onToggleMembers }: Props) {
               onSelect={() => updateChatView(roomId, { activities: true })}
             >
               <Activity className="mr-2 size-4" />
-              Atividades do Soundboard
+              Atividades de Efeitos Sonoros
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={copy}>

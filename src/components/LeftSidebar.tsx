@@ -1,3 +1,4 @@
+import { CallQualityBadge } from "./CallStatus";
 import { useShallow } from "zustand/react/shallow";
 import { useVoicePreferences } from "../lib/voicePreferences";
 import { useStudio } from "../studio/StudioProvider";
@@ -443,6 +444,20 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
               <PhoneOff className="size-4" />
             </VoiceAction>
           </div>
+          {Object.values(participants)
+            .filter((p) => !p.isLocal && p.inVoiceCall)
+            .slice(0, 6)
+            .map((p) => (
+              <div
+                key={p.peerId}
+                className="text-micro mt-1 flex gap-1 items-center min-w-0"
+              >
+                <span className="truncate" title={p.nickname}>
+                  {p.nickname}
+                </span>
+                <CallQualityBadge peerId={p.peerId} />
+              </div>
+            ))}
           <div className="flex gap-1 mt-2">
             <VoiceAction
               label={

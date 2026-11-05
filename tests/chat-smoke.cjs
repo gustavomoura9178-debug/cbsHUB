@@ -258,10 +258,10 @@ const assert = require("node:assert/strict");
       .getByRole("button", { name: "Opções da sala", exact: true })
       .click();
     await a
-      .getByRole("menuitem", { name: "Atividades do Soundboard", exact: true })
+      .getByRole("menuitem", { name: "Atividades de Efeitos Sonoros", exact: true })
       .click();
     await a
-      .getByRole("heading", { name: "Atividades do Soundboard", exact: true })
+      .getByRole("heading", { name: "Atividades de Efeitos Sonoros", exact: true })
       .waitFor();
     await a.keyboard.press("Escape");
     console.log("PASS Soundboard preservado e eventos movidos às atividades");

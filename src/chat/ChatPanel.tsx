@@ -613,7 +613,7 @@ export function ChatPanel() {
       </Dialog>
       <Dialog open={activities} onOpenChange={setActivities}>
         <DialogContent className="chat-activities">
-          <DialogTitle>Atividades do Soundboard</DialogTitle>
+          <DialogTitle>Atividades de Efeitos Sonoros</DialogTitle>
           <DialogDescription>
             Os últimos 50 eventos disponíveis. Os sons continuam funcionando em
             qualquer modo de exibição.
