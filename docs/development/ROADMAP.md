@@ -32,3 +32,7 @@ Este roadmap propõe tarefas; não autoriza trocar bibliotecas nem marca trabalh
 ## Ordem para duas pessoas/IAs
 
 Pessoa A pode assumir R1/motores e Pessoa B R4/documentação após registro explícito em ACTIVE_WORK. Isso é sugestão, não atribuição ativa. Evitar edição concorrente de store, contratos, webrtcEngine, App, CSS global, manifesto/lockfile e arquivos compartilhados. R2a e R2b precisam combinar casos e contratos antes de dividir arquivos. Design visual só começa após o aceite de R3, sem reescrever o aplicativo.
+
+## Atualização de escopo pelo mantenedor
+
+Em 05/11/2026 o mantenedor solicitou explicitamente a implementação do redesign. R4/R5 foram executados com regressões locais nesta branch; R3 continua pendente e é requisito de validação para integração segura, não um resultado já obtido. A etapa seguinte não é personalização. Ver REDESIGN_REVIEW.md.

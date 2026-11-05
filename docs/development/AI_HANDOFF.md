@@ -69,3 +69,7 @@ No cloud: `node /workspace/cbshub-onboarding/dev.mjs` para renderer e Electron h
 Scripts e resultados auxiliares: `/workspace/cbshub-onboarding/audit-smoke.cjs`, `smoke-results.json`, `npm-audit.json`, `install.sh`. Foram usados perfis/dados sintéticos isolados. Esses arquivos não constituem suite versionada. Os documentos registram a evidência essencial para outro clone.
 
 Cloud: install_script/start_skill/rede salvos em rascunho, ainda sem publicação. PeerJS bloqueado na instância auditada; não solicitar token GitHub (leitura Git funcionou) nem credenciais TURN para testes locais. Não abrir nova tarefa de redesign como se a matriz multipar estivesse aprovada.
+
+## Entrega mais recente — REDESIGN-001
+
+Branch `feat/workspace-redesign-2026-11-05`, base `recovery/pre-redesign-2026-11-05`. Commit UI: REDESIGN_CONTENT_COMMIT. Ler REDESIGN_REVIEW.md, DESIGN_SYSTEM.md e tests/README.md antes de continuar. O usuário autorizou o redesign após a auditoria, antecipando o gate recomendado; não declarar R3 aprovado. Motores, dependências e última otimização de áudio da outra IA preservados. Sem push/merge. Próxima ação é revisão/validação de mídia e correções delimitadas, sem avançar para personalização.

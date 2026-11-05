@@ -19,3 +19,7 @@ Build e comportamento local de renderer, chat/IndexedDB, reações, Dialog e Sou
 ### Limitações
 
 Sem alterações de funcionalidade ou visual; sem substituição/atualização de bibliotecas. Redesign e correções permanecem pendentes de tarefas próprias. Chamadas reais, 4K60, beacon failover e release Windows não foram validados. Documentação anterior preservada. Nenhum release ou push publicado.
+
+## Não lançado — REDESIGN-001 — 05/11/2026
+
+Codex/OpenAI · feat/workspace-redesign-2026-11-05 · REDESIGN_CONTENT_COMMIT. Novo workspace, sidebar ajustável/recolhível, membros opcionais, chat refinado, menus/foco, controle de voz identificado e diagnóstico organizado. Tokens grafite/verde-água e responsividade. Primitivos shadcn/Radix e Tailwind preservados, sem bibliotecas novas. Build e regressões locais passaram; mídia entre máquinas pendente. Detalhes em REDESIGN_REVIEW.md.

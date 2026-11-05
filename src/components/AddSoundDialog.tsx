@@ -158,7 +158,7 @@ export const AddSoundDialog: React.FC<AddSoundDialogProps> = ({ open, onOpenChan
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md bg-[#151518] border-border text-foreground">
+      <DialogContent className="sm:max-w-md bg-card border-border text-foreground">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-base font-bold">
             <Sparkles className="w-4 h-4 text-primary" />
@@ -195,12 +195,12 @@ export const AddSoundDialog: React.FC<AddSoundDialogProps> = ({ open, onOpenChan
                   <Music className="w-5 h-5" />
                 </div>
                 <span className="font-semibold text-foreground text-xs truncate max-w-xs">{file.name}</span>
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <div className="flex items-center gap-2 text-2xs text-muted-foreground">
                   <span>{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
                   {durationSec !== null && (
                     <>
                       <span>•</span>
-                      <span className="flex items-center gap-0.5 font-mono text-emerald-400">
+                      <span className="flex items-center gap-0.5 font-mono text-success">
                         <Clock className="w-3 h-3" />
                         <span>{durationSec}s</span>
                       </span>
@@ -217,7 +217,7 @@ export const AddSoundDialog: React.FC<AddSoundDialogProps> = ({ open, onOpenChan
                   <span className="font-semibold text-foreground">Clique para escolher um arquivo</span>
                   <span className="text-muted-foreground"> ou arraste para cá</span>
                 </div>
-                <span className="text-[10px] text-muted-foreground">MP3, WAV, OGG, M4A ou WEBM (Máx 5MB)</span>
+                <span className="text-2xs text-muted-foreground">MP3, WAV, OGG, M4A ou WEBM (Máx 5MB)</span>
               </div>
             )}
           </div>
@@ -288,7 +288,7 @@ export const AddSoundDialog: React.FC<AddSoundDialogProps> = ({ open, onOpenChan
                     onClick={handlePlayPreview}
                     className="h-8 text-xs flex items-center gap-1.5 text-foreground"
                   >
-                    <Play className="w-3.5 h-3.5 text-emerald-500 fill-emerald-500" />
+                    <Play className="w-3.5 h-3.5 text-success fill-emerald-500" />
                     <span>Ouvir Prévia</span>
                   </Button>
                 ) : (

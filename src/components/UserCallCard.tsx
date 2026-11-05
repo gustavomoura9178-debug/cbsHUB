@@ -54,11 +54,11 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
 
   return (
     <div
-      className={`relative rounded-xl border transition-all duration-200 overflow-hidden flex items-center justify-center select-none group bg-[#141418] ${
+      className={`relative rounded-xl border transition-all duration-200 overflow-hidden flex items-center justify-center select-none group bg-card ${
         isCompact ? 'h-20 w-32 shrink-0' : 'w-full h-full min-h-[140px] aspect-video'
       } ${
         isSpeakingNow
-          ? 'border-emerald-500 ring-2 ring-emerald-500/30 shadow-lg shadow-emerald-500/10'
+          ? 'border-success ring-2 ring-success/30 shadow-lg shadow-emerald-500/10'
           : 'border-white/[0.07] hover:border-white/20'
       }`}
     >
@@ -78,10 +78,10 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
               isCompact ? 'w-10 h-10 text-xs' : 'w-16 h-16 text-lg'
             } ${
               isSpeakingNow
-                ? 'ring-4 ring-emerald-500 shadow-xl shadow-emerald-500/40 animate-pulse'
+                ? 'ring-4 ring-success shadow-xl shadow-emerald-500/40 animate-pulse'
                 : 'ring-1 ring-white/10'
             }`}
-            style={{ backgroundColor: participant.avatarColor || 'hsl(var(--primary))' }}
+            style={{ backgroundColor: participant.avatarColor || 'var(--primary)' }}
           >
             {getInitials(participant.nickname)}
           </div>
@@ -90,7 +90,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
 
       {/* 2. Badge Flutuante Animada de Soundboard */}
       {isSoundActive && (
-        <div className="absolute top-2 z-20 animate-bounce bg-zinc-950/95 border border-primary/50 text-foreground px-2.5 py-1 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-1.5 backdrop-blur-md">
+        <div className="absolute top-2 z-20 animate-bounce bg-surface/95 border border-primary/50 text-foreground px-2.5 py-1 rounded-full text-xs font-semibold shadow-2xl flex items-center gap-1.5 backdrop-blur-md">
           <span className="text-sm">{soundEffect.emoji}</span>
           <span className="truncate max-w-[120px]">{soundEffect.name}</span>
         </div>
@@ -98,10 +98,10 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
 
       {/* 3. Rodapé Inferior: Nickname (Esquerda) e Badges de Mídia (Direita) */}
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-1 pointer-events-none z-10">
-        <div className="bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10 text-white text-[11px] font-medium flex items-center gap-1 truncate max-w-[70%]">
+        <div className="bg-overlay backdrop-blur-md px-2 py-0.5 rounded-md border border-border text-white text-caption font-medium flex items-center gap-1 truncate max-w-[70%]">
           <span className="truncate">{participant.nickname}</span>
           {isLocal && (
-            <span className="text-[9px] font-mono text-muted-foreground shrink-0">
+            <span className="text-micro font-mono text-muted-foreground shrink-0">
               (Você)
             </span>
           )}
@@ -125,7 +125,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
               <PopoverTrigger asChild>
                 <button
                   aria-label="Ajustar Volume"
-                  className="pointer-events-auto bg-black/70 hover:bg-black/90 text-white p-1 rounded-md border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="pointer-events-auto bg-overlay hover:bg-black/90 text-white p-1 rounded-md border border-border opacity-0 group-hover:opacity-100 transition-opacity"
                 >
                   <Sliders className="w-3 h-3" />
                 </button>
@@ -152,7 +152,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
                     variant="ghost"
                     size="sm"
                     onClick={() => webrtcEngine.setPeerVolume(participant.clientId, volume === 0 ? 1 : 0)}
-                    className="h-6 text-[10px] px-2 text-muted-foreground"
+                    className="h-6 text-2xs px-2 text-muted-foreground"
                   >
                     {volume === 0 ? 'Desmutar' : 'Mutar'}
                   </Button>
@@ -160,7 +160,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
                     variant="ghost"
                     size="sm"
                     onClick={() => webrtcEngine.setPeerVolume(participant.clientId, 1.0)}
-                    className="h-6 text-[10px] px-2 text-muted-foreground"
+                    className="h-6 text-2xs px-2 text-muted-foreground"
                   >
                     100%
                   </Button>
@@ -199,8 +199,12 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Focar tela de ${participant.nickname}`}
+      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onFocus(); } }}
       onClick={onFocus}
-      className={`relative rounded-xl border border-white/10 bg-black overflow-hidden flex items-center justify-center select-none group cursor-pointer aspect-video w-full h-full min-h-[140px] shadow-lg transition-all ${
+      className={`relative rounded-xl border border-border bg-black overflow-hidden flex items-center justify-center select-none group cursor-pointer aspect-video w-full h-full min-h-[140px] shadow-lg transition-all ${
         isFocused ? 'ring-2 ring-primary' : 'hover:border-primary/50'
       }`}
     >
@@ -213,7 +217,7 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
       />
 
       {/* Badge Superior Direito: AO VIVO */}
-      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-600 text-white font-bold text-[10px] shadow-md tracking-wider">
+      <div className="absolute top-2 right-2 z-10 flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive text-white font-bold text-2xs shadow-md tracking-wider">
         <Radio className="w-3 h-3 animate-pulse" />
         <span>AO VIVO</span>
         {participant.screenQualityLabel && (
@@ -235,7 +239,7 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
       </div>
 
       {/* Rodapé: Tela de Nickname */}
-      <div className="absolute bottom-2 left-2 z-10 bg-black/70 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10 text-white text-[11px] font-medium flex items-center gap-1.5">
+      <div className="absolute bottom-2 left-2 z-10 bg-overlay backdrop-blur-md px-2 py-0.5 rounded-md border border-border text-white text-caption font-medium flex items-center gap-1.5">
         <Tv className="w-3.5 h-3.5 text-primary" />
         <span>Tela de {participant.nickname}</span>
       </div>

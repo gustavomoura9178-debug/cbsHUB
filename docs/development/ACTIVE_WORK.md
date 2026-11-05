@@ -25,3 +25,17 @@ Branch: `audit/cbshub-v2-2026-11-05`. Base auditada: `5deab40aa1629a975dc72588b6
 Registrar ID, pessoa/agente, data, branch/base, arquivos exatos, objetivo, critérios de aceite, dependências, estado e evidência de sincronização com o outro mantenedor. Não editar reservas existentes para tomar posse; registrar a transição acordada. Ao finalizar, registrar commit, resultados reais e pendências no ACTIVITY_LOG e AI_HANDOFF e liberar a reserva.
 
 Áreas com alto risco de conflito: `webrtcEngine.ts`, `useHubStore.ts`, `cbshub.d.ts`, `App.tsx`, `index.css`, `vite.config.ts`, package/lock e estes documentos. Evitar duas tarefas ativas nesses arquivos. Nenhuma pessoa B foi designada automaticamente.
+
+## REDESIGN-001 — em execução
+
+- Data: 05/11/2026; responsável: Codex/OpenAI, por solicitação explícita do mantenedor após AUDIT-001.
+- Branch: `feat/workspace-redesign-2026-11-05`; base: tag `recovery/pre-redesign-2026-11-05`.
+- Reserva: componentes de interface, App, index.css, index.html, hook local de layout e documentação compartilhada. Motores, contratos de rede, store, manifests e lockfile ficam fora deste escopo.
+- Objetivo: shell/nav, sidebar redimensionável/recolhível, membros opcionais, chat, controles e telemetria, mantendo shadcn/ui/Tailwind.
+- Autorização: o pedido atual permite executar R5 com regressões locais, antecipando o gate proposto no roadmap. A matriz multipar R3 continua pendente; não será declarada aprovada.
+- Conferência concorrente: remoto segue somente main em 5deab40; sem alterações externas no checkout. Último commit da outra IA em áudio/SDP foi revisado e será preservado. Trabalho não publicado fora deste checkout não é visível.
+- Aceite: build, smoke local de chat/Soundboard, resize/collapse/membros/menus, teclados e viewports; sem personalização de temas nesta etapa.
+
+## Encerramento — REDESIGN-001
+
+Implementação concluída para revisão. Commit de conteúdo: REDESIGN_CONTENT_COMMIT. Reserva liberada. Componentes e testes descritos em REDESIGN_REVIEW.md. R3 continua não executado. Sem tarefa de personalização ativa.

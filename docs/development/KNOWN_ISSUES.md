@@ -36,3 +36,7 @@ P1 = resolver/validar antes de implementar redesign; P2 = corrigir em tarefa del
 - E03: TURN opcional ausente; placeholders de `.env.example` não são credenciais. Não é requisito para build ou smoke local.
 
 Nenhum desses problemas foi corrigido em código nesta fase. Não usar `npm audit fix --force`, remover asserts, ocultar erros ou substituir bibliotecas para produzir um status verde.
+
+## Atualização — REDESIGN-001
+
+K21 parcialmente tratado na apresentação: histórico local agora permanece visível offline, com aviso no compositor; entrega remota continua sem confirmação. K19 recebeu foco/nomes/teclado e tokens na camada visual, mas auditoria completa de acessibilidade ainda não foi executada. Demais problemas de motor/build/dependências permanecem. CPU/GPU explicitamente indisponíveis na telemetria; não há coleta ou valores simulados.

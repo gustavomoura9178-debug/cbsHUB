@@ -55,3 +55,7 @@ Defeito conhecido: merge de formatos do preload gera ES+CJS no mesmo caminho. Ve
 ## Limites para mudanças futuras
 
 Preservar contratos de `src/types/cbshub.d.ts`, chaves do armazenamento, canais IPC, signaling e separação sala/voz. Uma alteração de layout não deve reconfigurar engine ou reiniciar mídia. Migrations de dados e alterações de protocolo exigem plano de compatibilidade e testes entre versões. Ver K02–K15 antes de interpretar esta arquitetura como garantia de correção.
+
+## Camada visual após REDESIGN-001
+
+WorkspaceRail + LeftSidebar + RoomTopBar compõem a navegação; MembersPanel é opcional. Sheet usa Radix Dialog existente. ResizeHandle controla somente a largura; useWorkspaceLayout persiste preferências em chave separada sem mudar o store de comunicação. Motores, tipos e IPC preservados. Design system em DESIGN_SYSTEM.md.

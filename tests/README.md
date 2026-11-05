@@ -1,0 +1,7 @@
+# Regressão de interface
+
+`node tests/redesign-smoke.cjs` executa interações no Chromium contra o renderer em `127.0.0.1:5173` (iniciar com o helper cloud descrito em AI_HANDOFF). Requer Playwright disponível no host e `/usr/bin/chromium`; ambos já existem no ambiente preparado. Nenhuma dependência da aplicação foi adicionada. Para outro ambiente, preparar essas ferramentas externamente antes de rodar.
+
+Cobre resize/limites/persistência, collapse, painel de membros, menu, diagnóstico sem métricas inventadas, mensagem offline, três viewports e Sheets/Escape. Bloqueia destinos externos e usa perfil efêmero e mídia sintética. Não valida comunicação remota. Capturas são gravadas em `/workspace/cbshub-onboarding`.
+
+Os probes de persistência/mixagem/Electron usados na auditoria permanecem em `/workspace/cbshub-onboarding/audit-smoke.cjs`; resultados resumidos nos documentos compartilhados. Não existe script npm test nem CI. A integração futura de testes em CI está pendente de R2a, com avaliação das dependências necessárias.
