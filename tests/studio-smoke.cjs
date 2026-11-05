@@ -34,7 +34,7 @@ const fs = require("node:fs/promises");
       .click();
     assert.equal(await bg(), "#f6f8fa");
     await p.getByRole("button", { name: "Cancelar", exact: true }).click();
-    assert.equal(await bg(), "#13161b");
+    assert.equal(await bg(), "#101116");
     console.log("PASS prévia clara e rollback ao cancelar");
     await open();
     await p
@@ -166,7 +166,7 @@ const fs = require("node:fs/promises");
     await p
       .getByRole("button", { name: "Restaurar padrões", exact: true })
       .click();
-    assert.equal(await bg(), "#13161b");
+    assert.equal(await bg(), "#101116");
     await p.screenshot({
       path: "/workspace/cbshub-onboarding/studio-desktop.png",
     });

@@ -1,3 +1,5 @@
+import {useStudio} from "../studio/StudioProvider";
+import {PRESETS} from "../studio/theme";
 import { supportsAudioOutput } from "../lib/mediaState";
 import React, { useState, useEffect } from "react";
 import {
@@ -35,6 +37,7 @@ import { useProfiles } from "../profiles/ProfileProvider";
 
 export const SettingsModal: React.FC = () => {
   const profiles = useProfiles();
+  const studio = useStudio();
   const {
     isSettingsOpen,
     setIsSettingsOpen,
@@ -136,6 +139,7 @@ export const SettingsModal: React.FC = () => {
           </div>
         </DialogHeader>
 
+        <div className="px-5 py-3 flex gap-2 items-center"><span className="text-sm">Aparência</span>{PRESETS.filter(t=>["Clássico","Moderno Roxo"].includes(t.name)).map(t=><Button key={t.name} size="sm" variant={studio.theme.name===t.name?"default":"outline"} onClick={()=>studio.selectPreset(t)}>{t.name}</Button>)}<Button size="sm" variant="ghost" onClick={()=>{setIsSettingsOpen(false);studio.begin();}}>Editar temas</Button></div>
         {/* Abas e Conteúdo */}
         <Tabs defaultValue="audio" className="flex-1 flex flex-col min-h-0">
           <div className="px-5 pt-3 border-b border-border/50 bg-card/20 shrink-0">

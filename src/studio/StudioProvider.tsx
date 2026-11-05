@@ -57,6 +57,7 @@ function read(): Saved {
   }
 }
 interface StudioContext {
+  selectPreset: (theme: Theme) => void;
   theme: Theme;
   library: Entry[];
   open: boolean;
@@ -99,6 +100,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }
   const context: StudioContext = {
+    selectPreset: next => { if(persist({...saved,active:validateTheme(next)})) setDraft(null); },
     theme,
     library: saved.library,
     open,
@@ -185,6 +187,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
   };
   useEffect(() => {
     const root = document.documentElement;
+    root.dataset.workspaceStyle = theme.name === "Clássico" ? "classic" : "modern";
     const c = theme.colors,
       l = theme.layout;
     const vars: Record<string, string> = {

@@ -1,3 +1,4 @@
+import {soundActivity} from "../chat/activities";
 import { chatLedger } from "../chat/ledger";
 import {
   validateMessage,
@@ -138,6 +139,7 @@ class WebRTCEngine {
     roomInput: string,
     autoJoinVoice = false,
   ): Promise<void> {
+    localStorage.removeItem("cbshub-room-removed-active");
     this.leaveRoom();
     const generation = this.roomGeneration;
 
@@ -767,6 +769,7 @@ class WebRTCEngine {
         const room = useHubStore.getState().roomId;
         try {
           const msg = validateMessage(packet.message, room);
+          if (msg.type === "soundboard") return;
           if (msg.authorClientId !== session.clientId) return;
           chatLedger
             .mergeMessages(room, [msg])
@@ -890,7 +893,7 @@ class WebRTCEngine {
             const known = new Set(packet.knownIds);
             const missing = all.filter(
               (m) =>
-                !known.has(m.id) && !m.deleted && !isBlocked(m.authorClientId),
+                !known.has(m.id) && m.type !== "soundboard" && !m.deleted && !isBlocked(m.authorClientId),
             );
             // Original author is needed to authenticate a new v2 edit/delete; history remains best-effort P2P.
             for (let i = 0; i < missing.length; i += 50)
@@ -914,7 +917,7 @@ class WebRTCEngine {
           return;
         try {
           const clean = packet.messages
-            .filter((m) => !isBlocked(m.authorClientId))
+            .filter((m) => m.type !== "soundboard" && !isBlocked(m.authorClientId))
             .map((m) => validateMessage(m, room));
           chatLedger
             .mergeMessages(room, clean)
@@ -939,6 +942,7 @@ class WebRTCEngine {
           packet.soundName.length > 80
         )
           return;
+        soundActivity(useHubStore.getState().roomId, session.clientId, session.nickname, packet.emoji, packet.soundName);
         // Exibe animação flutuante no card do participante que tocou o som
         useHubStore.getState().updateParticipant(packet.peerId, {
           activeSoundEffect: {
@@ -2564,6 +2568,7 @@ class WebRTCEngine {
     content: string,
     replyTo?: string,
   ): Promise<ChatMessage | null> {
+    if (!useHubStore.getState().roomId) throw new Error("Entre em uma sala para enviar mensagens.");
     await storageDb.requirePersistentStorage();
     const trimmed = content.trim();
     if (!trimmed) return null;
@@ -2649,33 +2654,7 @@ class WebRTCEngine {
         soundName: clip.name,
       });
 
-      // Registra mensagem de soundboard no chat
-      const msgId =
-        typeof crypto !== "undefined" && crypto.randomUUID
-          ? crypto.randomUUID()
-          : "sb-" + Date.now();
-      const soundMsg: ChatMessage = {
-        id: msgId,
-        roomId: state.roomId,
-        type: "soundboard",
-        authorClientId: state.clientId,
-        authorNickname: state.nickname,
-        authorAvatarColor: state.avatarColor,
-        content: `tocou "${clip.emoji} ${clip.name}" no Soundboard`,
-        createdAt: Date.now(),
-        reactions: {},
-        soundMeta: {
-          emoji: clip.emoji,
-          soundName: clip.name,
-        },
-      };
-
-      await storageDb.saveMessage(soundMsg);
-      useHubStore.getState().addMessage(soundMsg);
-      this.broadcast({
-        type: "chat_message",
-        message: soundMsg,
-      });
+      soundActivity(state.roomId,state.clientId,state.nickname,clip.emoji,clip.name);
 
       window.setTimeout(() => {
         const current =

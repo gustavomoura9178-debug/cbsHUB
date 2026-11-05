@@ -49,21 +49,21 @@ export interface ThemeFile {
 }
 export const MAX_FILE_BYTES = 1_500_000;
 export const DEFAULT_THEME: Theme = {
-  name: "Dark Modern",
+  name: "Moderno Roxo",
   mode: "dark",
   colors: {
-    background: "#13161b",
-    sidebar: "#171b21",
-    messages: "#13161b",
-    editor: "#1c2128",
-    button: "#6eddbd",
-    buttonText: "#10251e",
-    text: "#e7ebef",
-    muted: "#a0a8b5",
-    accent: "#6eddbd",
-    border: "#303640",
-    hover: "#303945",
-    focus: "#88eace",
+    background: "#101116",
+    sidebar: "#171820",
+    messages: "#101116",
+    editor: "#1d1f2a",
+    button: "#7c3aed",
+    buttonText: "#ffffff",
+    text: "#f5f5f7",
+    muted: "#a1a1aa",
+    accent: "#8b5cf6",
+    border: "#292b36",
+    hover: "#282333",
+    focus: "#a78bfa",
   },
   background: {
     kind: "solid",
@@ -101,6 +101,7 @@ const preset = (
   colors: { ...DEFAULT_THEME.colors, ...colors },
 });
 export const PRESETS: Theme[] = [
+  preset("Clássico", {background:'#090909',sidebar:'#111111',messages:'#090909',editor:'#191919',button:'#757575',buttonText:'#ffffff',accent:'#bdbdbd',border:'#282828',hover:'#242424',focus:'#cccccc'}, {layout:{...DEFAULT_THEME.layout,sidebarWidth:240,membersOpen:false,density:0.85,radius:4,spacing:0.85,shadow:0}}),
   structuredClone(DEFAULT_THEME),
   preset(
     "Light Modern",

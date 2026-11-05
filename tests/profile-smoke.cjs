@@ -53,12 +53,14 @@ const assert = require("node:assert/strict");
       c.getContext("2d").fillRect(0, 0, 8, 8);
       return c.toDataURL("image/png").split(",")[1];
     });
-    for (const kind of ["avatar", "banner"])
+    for (const kind of ["avatar", "banner"]) {
       await a.getByLabel(`Upload de ${kind}`, { exact: true }).setInputFiles({
         name: "image.png",
         mimeType: "image/png",
         buffer: Buffer.from(image, "base64"),
       });
+      if(kind === "avatar") await a.getByRole("button",{name:"Aplicar recorte",exact:true}).click();
+    }
     await a.getByRole("button", { name: "Salvar perfil", exact: true }).click();
     await a.getByRole("dialog").waitFor({ state: "hidden" });
     await a.reload();
