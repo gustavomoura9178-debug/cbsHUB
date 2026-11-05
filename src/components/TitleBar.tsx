@@ -1,20 +1,20 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Minus, Square, X, Pin, Radio, SlidersHorizontal } from "lucide-react";
 import { useHubStore } from "../store/useHubStore";
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 
 export const TitleBar: React.FC = () => {
-  const {
-    roomId,
-    isConnected,
-    isAlwaysOnTop,
-    setAlwaysOnTop,
-    telemetry,
-    participants,
-    setIsSettingsOpen,
-  } = useHubStore();
+  const isAlwaysOnTop = useHubStore(state => state.isAlwaysOnTop);
+  const setAlwaysOnTop = useHubStore(state => state.setAlwaysOnTop);
 
   const [isMaximized, setIsMaximized] = useState(false);
+  useEffect(() => {
+    const api = window.cbsHubAPI;
+    let active = true;
+    void api?.getWindowState?.().then(state => { if(active) setIsMaximized(state.isMaximized); }).catch(() => {});
+    const unsubscribe = api?.onWindowStateChanged?.(state => setIsMaximized(state.isMaximized));
+    return () => { active = false; unsubscribe?.(); };
+  }, []);
 
   const handleMinimize = () => {
     if (window.cbsHubAPI) {
@@ -27,7 +27,7 @@ export const TitleBar: React.FC = () => {
   const handleMaximize = () => {
     if (window.cbsHubAPI) {
       window.cbsHubAPI.maximizeWindow();
-      setIsMaximized((prev) => !prev);
+
     } else {
       console.warn("[TitleBar] cbsHubAPI indisponível no renderer.");
     }
@@ -49,7 +49,6 @@ export const TitleBar: React.FC = () => {
     }
   };
 
-  const participantCount = Object.keys(participants).length || 1;
 
   return (
     <header className="native-titlebar drag-region">
@@ -57,9 +56,7 @@ export const TitleBar: React.FC = () => {
         <span className="font-semibold tracking-tight text-caption text-foreground">
           cbs<span className="text-primary">HUB</span>
         </span>
-        <span className="hidden sm:inline text-2xs text-muted-foreground">
-          Um espaço para suas pessoas
-        </span>
+
       </div>
       <div className="flex items-center gap-1 no-drag">
         <Tooltip>

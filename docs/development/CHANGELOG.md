@@ -69,3 +69,8 @@ Candidato 2.0.0-rc.1: preload CJS único; sandbox/IPC/navegação/captura refor�
 ## SECURITY-002 — 05/11/2026
 
 SECURITY-002: Electron 45.2.3, builder 26.18.0, Vite 8.3.6 e plugins compatíveis; esbuild explícito e override restrito de minimatch. CSP de produção, allowlist de capacidades, captura fail-closed e validação de presença. Novo teste de sinalização, Electron smoke ampliado e teste de rascunho desambiguado. Proposta de backend próprio adicionada. Ver SECURITY_UPDATE.md para justificativas e limites.
+
+
+## BRAND-001 — 05/11/2026 — Codex/OpenAI
+
+Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px titlebar, 60/56px sala, ~32px chamada); subtítulo removido e estado de maximização sincronizado com Electron. Build e testes compact-bars/window-controls/desktop-security/electron-smoke/redesign-smoke/media-smoke passaram localmente. Arraste e aparência real maximizada/restaurada exigem desktop gráfico. Logo/PNG/ICO ainda pendentes do arquivo original solicitado: tentativa generativa alterou arte e não foi integrada. Ler COMPACT_BARS.md para arquivos, evidências e retomada. Trabalho das barras pronto para revisão; não declarar integração da logo concluída. Reserva da identidade permanece aguardando entrada, sem mudanças de motores/backend. Sem push/merge.

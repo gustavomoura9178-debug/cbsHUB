@@ -32,8 +32,8 @@
   --space-panel: 1.25rem;
   --rail-width: 3.75rem;
   --members-width: 16rem;
-  --titlebar-height: 2.25rem;
-  --header-height: 5.25rem;
+  --titlebar-height: 32px;
+  --header-height: 60px;
   --elevation-panel: 0 8px 32px hsl(220 30% 3% / 0.22);
   --elevation-floating: 0 16px 48px hsl(220 30% 3% / 0.45);
   --duration-ui: 160ms;
@@ -119,11 +119,11 @@
 
 @layer components {
   .native-titlebar {
-    @apply flex items-center justify-between shrink-0 border-b border-border/70 bg-surface px-4;
+    @apply flex items-center justify-between shrink-0 border-b border-border/70 bg-surface px-3;
     height: var(--titlebar-height);
   }
   .native-window-button {
-    @apply size-7 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors;
+    @apply h-7 w-9 rounded-md flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-foreground transition-colors;
   }
   .workspace-root {
     @apply h-dvh w-full flex flex-col overflow-hidden;
@@ -222,11 +222,11 @@
     @apply bg-primary;
   }
   .room-topbar {
-    @apply relative flex shrink-0 items-center gap-3 border-b border-border px-6 bg-background;
+    @apply relative flex shrink-0 items-center gap-3 border-b border-border/60 px-4 py-2 bg-background;
     min-height: var(--header-height);
   }
   .room-heading-icon {
-    @apply size-10 rounded-xl border border-border bg-card flex shrink-0 items-center justify-center text-primary;
+    @apply size-8 rounded-lg bg-card flex shrink-0 items-center justify-center text-primary;
   }
   .room-heading {
     @apply flex-1 min-w-0 space-y-0.5;
@@ -351,7 +351,7 @@
 @media (max-width: 767px) {
   :root {
     --rail-width: 3.25rem;
-    --header-height: 4.75rem;
+    --header-height: 56px;
   }
   .workspace-rail {
     @apply py-3;
@@ -360,7 +360,6 @@
     @apply gap-2 px-3;
   }
   .room-heading .section-eyebrow,
-  .room-subtitle,
   .voice-action span,
   .stage-toggle,
   .diagnostics-trigger {
@@ -478,3 +477,8 @@ html[data-studio-motion="reduced"] *, html[data-studio-motion="reduced"] *::befo
 [data-workspace-style="classic"] .workspace-rail { display:none; }
 [data-workspace-style="classic"] .navigation-heading { padding-block: .75rem; }
 [data-workspace-style="classic"] .room-item { border-radius:var(--radius); }
+
+@layer components {
+ .call-stage-toolbar { @apply flex min-h-8 shrink-0 items-center justify-between gap-2 px-3 py-0.5 text-xs; }
+ .call-stage-toolbar .call-toolbar-action { @apply size-7; }
+}
