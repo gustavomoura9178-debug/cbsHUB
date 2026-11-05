@@ -36,3 +36,8 @@ Pessoa A pode assumir R1/motores e Pessoa B R4/documentação após registro exp
 ## Atualização de escopo pelo mantenedor
 
 Em 05/11/2026 o mantenedor solicitou explicitamente a implementação do redesign. R4/R5 foram executados com regressões locais nesta branch; R3 continua pendente e é requisito de validação para integração segura, não um resultado já obtido. A etapa seguinte não é personalização. Ver REDESIGN_REVIEW.md.
+
+
+## Atualização — STUDIO-001 — 05/11/2026
+
+STUDIO-001 implementado por nova autorização do mantenedor após redesign integrado. Antes de integrar, revisar presets e testes descritos em STUDIO.md. Sync remoto depende de backend autenticado ainda inexistente; perfis não iniciados. R1/R2/R3 e defeitos anteriores continuam pendentes.

@@ -39,3 +39,13 @@ Registrar ID, pessoa/agente, data, branch/base, arquivos exatos, objetivo, crit�
 ## Encerramento — REDESIGN-001
 
 Implementação concluída para revisão. Commit de conteúdo: a29e4ca. Reserva liberada. Componentes e testes descritos em REDESIGN_REVIEW.md. R3 continua não executado. Sem tarefa de personalização ativa.
+
+## STUDIO-001 — em execução
+
+05/11/2026 · Codex/OpenAI · feat/cbshub-studio-2026-11-05 · base 08f0c51.
+Preflight: redesign integrado pelo PR #1; main remota revisada e incorporada por fast-forward, sem mudanças concorrentes adicionais. Reserva: src/studio, integração visual App/main/rail/layout/CSS, testes e docs. Objetivo: temas/presets seguros, preview, persistência, import/export e acessibilidade. Motores de comunicação e perfis fora do escopo. Recuperação: recovery/pre-studio-2026-11-05.
+
+
+## Atualização — STUDIO-001 — 05/11/2026
+
+STUDIO-001 concluído para revisão; reserva liberada. Commit 19d316f; base 08f0c51. Componentes, testes e limites em STUDIO.md. Sem perfis, push ou merge nesta tarefa.

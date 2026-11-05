@@ -47,3 +47,16 @@ Pendências para a outra IA: ler KNOWN_ISSUES; começar por K01/R1; preservar co
 - Preservação confirmada por git diff sem mudanças em src/lib, store, tipos, Electron, manifests/lock e build config.
 - Pendências: K01 e demais defeitos auditados, testes reais P2P/voz/vídeo/4K60/Windows, CPU/GPU, acessibilidade completa e CI. Nenhum resultado remoto foi simulado.
 - Passagem: revisar REDESIGN_REVIEW e DESIGN_SYSTEM; reservar próximos arquivos em ACTIVE_WORK. Sem push ou merge; personalização não iniciada.
+
+
+## 05/11/2026 — STUDIO-001 — Codex/OpenAI
+
+- Branch feat/cbshub-studio-2026-11-05; base 08f0c51; recuperação recovery/pre-studio-2026-11-05; commit 19d316f.
+- Preflight: checkout limpo; main remota atualizada pelo merge PR #1; atualização incorporada via fast-forward antes de editar. Documentos compartilhados e mudanças revisados.
+- Arquivos: novos src/studio/theme.ts, StudioProvider.tsx e StudioDialog.tsx; integração em main/App/WorkspaceRail/useWorkspaceLayout/index.css; ajustes de acessibilidade ui/slider e ui/sheet. Novos tests/theme-validation.cjs e studio-smoke.cjs, teste de redesign formatado e sincronizado com foco; docs/themes/dark-modern.cbshub.json; STUDIO.md e documentos de desenvolvimento atualizados.
+- Funcionalidades: seis presets, editor visual, preview/cancel/save, biblioteca até 20, duplicar/renomear/excluir/importar/exportar, JSON versionado validado, fundos sólidos/gradientes/raster, layout, contraste e movimento reduzido. Persistência local, sem perfis ou sync remoto fictício.
+- Testes: build passou; 8 grupos de validação/segurança passaram; smoke Studio passou (prévia, rollback, save/reload, CRUD/export/import, HEX, raster/gradiente, largura/reduced motion, defaults/móvel/Escape). Regressão de redesign passou após correção de foco inicial da gaveta. Core smoke passou: compositor/persistência/reação/modal/WAV/mixagem com mic mudo/stopAll; Electron API disponível.
+- Falhas investigadas: slider sem nome acessível no Thumb, corrigido; Escape consumido por tooltip autoaberto no foco da gaveta, corrigido focando o painel inicialmente. Tentativas falhas não registradas como passes.
+- Preservação: motores src/lib, store/tipos de comunicação, Electron, manifest/lock e config build sem mudanças.
+- Pendências: revisão humana das paletas/contraste, testes reais multipar e Windows, CI, quota local, ausência de backend de sincronização e defeitos K01 etc. Ver STUDIO.md. Nenhuma validação de chamadas reais alegada.
+- Passagem: não avançar para perfis. Mudanças prontas para revisão na branch de Studio; sem push/merge nesta tarefa.

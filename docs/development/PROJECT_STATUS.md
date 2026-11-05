@@ -35,3 +35,8 @@ Próxima tarefa recomendada: R1, corrigir exclusivamente K01 e validar preload e
 ## Atualização — REDESIGN-001
 
 Redesign implementado a pedido explícito do mantenedor na branch `feat/workspace-redesign-2026-11-05`, para revisão. O gate R3 proposto anteriormente permanece pendente, sem impedir a implementação autorizada. Ver REDESIGN_REVIEW.md e DESIGN_SYSTEM.md. Sem sistema de personalização. Build/regressões locais passaram; chamadas reais não validadas.
+
+
+## Atualização — STUDIO-001 — 05/11/2026
+
+Studio implementado para revisão: editor de temas, seis presets, preview/cancelamento, biblioteca local, JSON v1 validado, fundos/layout/contraste/movimento reduzido. Ver STUDIO.md. Sincronização automática indisponível por ausência de backend adequado. Sem perfis.

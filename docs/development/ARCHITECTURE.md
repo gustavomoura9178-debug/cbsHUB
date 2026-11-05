@@ -59,3 +59,8 @@ Preservar contratos de `src/types/cbshub.d.ts`, chaves do armazenamento, canais 
 ## Camada visual após REDESIGN-001
 
 WorkspaceRail + LeftSidebar + RoomTopBar compõem a navegação; MembersPanel é opcional. Sheet usa Radix Dialog existente. ResizeHandle controla somente a largura; useWorkspaceLayout persiste preferências em chave separada sem mudar o store de comunicação. Motores, tipos e IPC preservados. Design system em DESIGN_SYSTEM.md.
+
+
+## Atualização — STUDIO-001 — 05/11/2026
+
+StudioProvider envolve App; rascunho/salvo separados evitam remontar engines. theme.ts contém esquema restrito e presets; StudioDialog usa shadcn/Radix existentes; aplicação por allowlist de variáveis CSS. useWorkspaceLayout usa o provider visual. Persistência local com biblioteca; JSON v1 transferível. Ver STUDIO.md.

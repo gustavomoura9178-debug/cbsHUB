@@ -13,3 +13,8 @@ Desktop: rail permanente, navegação ajustável, conversa flexível e membros o
 Foco visível e ações com nomes acessíveis; tooltips nos controles; animações discretas e respeito a prefers-reduced-motion. Acessibilidade completa com leitor de tela permanece para validação manual.
 
 Telemetria: StreamDiagnostics organiza FPS/latência/bitrate/perda da transmissão já monitorada. CPU/GPU mostram indisponibilidade porque o contrato atual não oferece esses dados. Não há números simulados; ABR multipar permanece limitado pelo motor auditado.
+
+
+## Atualização — STUDIO-001 — 05/11/2026
+
+Studio agora permite substituir os tokens de aparência com valores validados e medidas limitadas. Seis presets claros/escuros, wallpaper em camada separada e preview independente. O editor preserva cores próprias legíveis durante experimentação. Movimentos respeitam preferência de sistema e configuração explícita. Modelo/contraste em src/studio/theme.ts; especificação STUDIO.md.
