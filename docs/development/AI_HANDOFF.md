@@ -127,3 +127,5 @@ Entrega STABILIZE-001: conteúdo em `f9df3e8`, branch fix/stabilization-2026-11-
 ## SECURITY-002 — 05/11/2026
 
 SECURITY-002 em fix/security-hardening-2026-11-05, base 7bede05. Ler SECURITY_UPDATE.md e BACKEND_PROPOSAL.md. Usuário escolheu proposta de backend próprio para revisão; não instalar/publicar serviço como se os contratos já estivessem aprovados. Preservar modo local/dados. Node >=22.12; Electron runtime lazy pode exigir install.js/proxy. Override de minimatch só cobre >=7 <11: não substituir versões de API antiga usadas por glob/asar. Renderer test helper filtra novos plugins Electron :dev/:prod. Nenhum push/merge autorizado nesta tarefa.
+
+Entrega SECURITY-002: commit de conteúdo `2f898b9`, candidato 2.0.0-rc.2. Instalação limpa/build/audit/empacotamento verificados; 15 testes passaram e 1 bloqueou por ICE; pacote Linux abriu com interface e CSP. Backend próprio proposto para revisão conforme escolha do mantenedor, não implementado. Reserva liberada; sem push/merge ou declaração de produção.

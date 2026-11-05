@@ -116,3 +116,5 @@ Codex/OpenAI · fix/security-hardening-2026-11-05 · base 7bede05 (PR #7 integra
 ## SECURITY-002 — 05/11/2026
 
 SECURITY-002 concluído para revisão, reserva liberada. Branch fix/security-hardening-2026-11-05, base 7bede05, candidato 2.0.0-rc.2. Segurança: audit 0 e políticas/perfis P2P reforçados. Backend próprio: proposta pronta, aguardando revisão do mantenedor; nenhuma implementação de servidor ativa. Pendências físicas e demais etapas em SECURITY_UPDATE.md/BACKEND_PROPOSAL.md.
+
+Entrega SECURITY-002: commit de conteúdo `2f898b9`, candidato 2.0.0-rc.2. Instalação limpa/build/audit/empacotamento verificados; 15 testes passaram e 1 bloqueou por ICE; pacote Linux abriu com interface e CSP. Backend próprio proposto para revisão conforme escolha do mantenedor, não implementado. Reserva liberada; sem push/merge ou declaração de produção.
