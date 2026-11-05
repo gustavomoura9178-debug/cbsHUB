@@ -38,4 +38,4 @@ Registrar ID, pessoa/agente, data, branch/base, arquivos exatos, objetivo, crit�
 
 ## Encerramento — REDESIGN-001
 
-Implementação concluída para revisão. Commit de conteúdo: REDESIGN_CONTENT_COMMIT. Reserva liberada. Componentes e testes descritos em REDESIGN_REVIEW.md. R3 continua não executado. Sem tarefa de personalização ativa.
+Implementação concluída para revisão. Commit de conteúdo: a29e4ca. Reserva liberada. Componentes e testes descritos em REDESIGN_REVIEW.md. R3 continua não executado. Sem tarefa de personalização ativa.

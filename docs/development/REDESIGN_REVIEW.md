@@ -1,7 +1,7 @@
 # Entrega para revisão — REDESIGN-001
 
 05/11/2026 · Codex/OpenAI · branch `feat/workspace-redesign-2026-11-05`.
-Base: `recovery/pre-redesign-2026-11-05` (2f54c07). Commit de conteúdo: REDESIGN_CONTENT_COMMIT.
+Base: `recovery/pre-redesign-2026-11-05` (2f54c07). Commit de conteúdo: a29e4ca.
 
 ## Entrega
 

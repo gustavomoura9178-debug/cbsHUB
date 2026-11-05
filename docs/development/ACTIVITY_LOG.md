@@ -39,7 +39,7 @@ Pendências para a outra IA: ler KNOWN_ISSUES; começar por K01/R1; preservar co
 
 ## 05/11/2026 — REDESIGN-001 — Codex/OpenAI
 
-- Branch `feat/workspace-redesign-2026-11-05`; base 2f54c07; tag `recovery/pre-redesign-2026-11-05`; commit UI REDESIGN_CONTENT_COMMIT.
+- Branch `feat/workspace-redesign-2026-11-05`; base 2f54c07; tag `recovery/pre-redesign-2026-11-05`; commit UI a29e4ca.
 - Solicitado pelo mantenedor após auditoria: redesign por componentes, mantendo stack. Documentos lidos e última alteração da outra IA em áudio/SDP revisada. Remoto permanece main em 5deab40; nenhuma mudança externa visível.
 - Arquivos modificados: App, index.css/index.html, componentes de navegação/chat/palco/controles/modais/Soundboard e tokens em button/badge/dropdown-menu; novos WorkspaceRail, MembersPanel, ParticipantAvatar, StreamDiagnostics, Sheet, ResizeHandle e useWorkspaceLayout. Relação detalhada em REDESIGN_REVIEW.md e diff Git.
 - Funcionalidades: navegação recolhível/redimensionável, membros opcionais, menus e diagnóstico, compositor/histórico offline, foco/teclado, adaptação móvel e design system. Sem personalização.
