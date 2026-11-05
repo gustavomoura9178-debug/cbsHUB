@@ -7,6 +7,7 @@ import {
   Maximize2,
   Minimize2,
   LayoutGrid,
+  ChevronDown,
   Zap,
   Volume2,
   VolumeX,
@@ -474,8 +475,8 @@ export const CallStagePanel: React.FC = () => {
       }}
       className="relative bg-surface border-b border-border flex flex-col justify-between overflow-hidden select-none shrink-0"
     >
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border text-xs">
-        <span>
+      <div className="call-stage-toolbar">
+        <span className="truncate min-w-0 text-muted-foreground">
           {inVoiceCount} participantes ·{" "}
           {participantsInVoice
             .filter((p) => p.isSpeaking && !p.isMuted)
@@ -484,19 +485,25 @@ export const CallStagePanel: React.FC = () => {
         </span>
         <div className="flex gap-1">
           <Button
-            size="sm"
+            size="icon-sm"
             variant="ghost"
+            className="call-toolbar-action"
+            aria-label={expanded ? "Reduzir painel" : "Expandir painel"}
+            title={expanded ? "Reduzir painel" : "Expandir painel"}
             aria-pressed={expanded}
             onClick={() => setExpanded(!expanded)}
           >
-            {expanded ? "Reduzir painel" : "Expandir painel"}
+            {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
           </Button>
           <Button
-            size="sm"
+            size="icon-sm"
             variant="ghost"
+            className="call-toolbar-action"
+            aria-label="Minimizar painel"
+            title="Minimizar painel"
             onClick={() => setCallStageMode("minimized")}
           >
-            Minimizar
+            <ChevronDown className="size-3.5" />
           </Button>
         </div>
       </div>

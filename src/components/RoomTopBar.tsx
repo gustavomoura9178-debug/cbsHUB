@@ -56,14 +56,7 @@ export function RoomTopBar({ membersOpen, onToggleMembers }: Props) {
         <Hash className="size-5" />
       </div>
       <div className="room-heading">
-        <p className="section-eyebrow">
-          Seu espaço{" "}
-          <span aria-hidden="true" className="mx-1">
-            /
-          </span>{" "}
-          Sala
-        </p>
-        <h2 className="truncate text-base font-semibold tracking-tight">
+        <h2 className="truncate text-sm font-semibold tracking-tight">
           {roomId}
         </h2>
         <p className="room-subtitle">

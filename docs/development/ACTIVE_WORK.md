@@ -118,3 +118,14 @@ Codex/OpenAI · fix/security-hardening-2026-11-05 · base 7bede05 (PR #7 integra
 SECURITY-002 concluído para revisão, reserva liberada. Branch fix/security-hardening-2026-11-05, base 7bede05, candidato 2.0.0-rc.2. Segurança: audit 0 e políticas/perfis P2P reforçados. Backend próprio: proposta pronta, aguardando revisão do mantenedor; nenhuma implementação de servidor ativa. Pendências físicas e demais etapas em SECURITY_UPDATE.md/BACKEND_PROPOSAL.md.
 
 Entrega SECURITY-002: commit de conteúdo `2f898b9`, candidato 2.0.0-rc.2. Instalação limpa/build/audit/empacotamento verificados; 15 testes passaram e 1 bloqueou por ICE; pacote Linux abriu com interface e CSP. Backend próprio proposto para revisão conforme escolha do mantenedor, não implementado. Reserva liberada; sem push/merge ou declaração de produção.
+
+## BRAND-001 — ativo — 05/11/2026
+
+Codex/OpenAI · feat/compact-bars-logo-2026-11-05 · base cb7b93f (PR #8 integrado). Checkout limpo; sem reservas concorrentes. Reserva: titlebar, RoomTopBar, barra de chamada, tokens de altura, estado da janela/IPC, testes/docs e assets oficiais quando fornecidos em arquivo. Referências visuais recebidas; geração de transparência alterou arte e foi descartada. Solicitado PNG/SVG original para preservar identidade exata. Sem mudança de motores de voz/chat ou backend. Recuperação recovery/pre-compact-bars-2026-11-05.
+
+
+## BRAND-001 — 05/11/2026 — Codex/OpenAI
+
+Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px titlebar, 60/56px sala, ~32px chamada); subtítulo removido e estado de maximização sincronizado com Electron. Build e testes compact-bars/window-controls/desktop-security/electron-smoke/redesign-smoke/media-smoke passaram localmente. Arraste e aparência real maximizada/restaurada exigem desktop gráfico. Logo/PNG/ICO ainda pendentes do arquivo original solicitado: tentativa generativa alterou arte e não foi integrada. Ler COMPACT_BARS.md para arquivos, evidências e retomada. Trabalho das barras pronto para revisão; não declarar integração da logo concluída. Reserva da identidade permanece aguardando entrada, sem mudanças de motores/backend. Sem push/merge.
+
+BRAND-001: barras em commit `7fd816d`; arquivo original da logo ainda necessário para concluir PNG/ICO e integração. Build e sete scripts locais passaram. Não declarar testes físicos de janela/arraste ou renderização da logo. Alterações locais preservadas, sem push.

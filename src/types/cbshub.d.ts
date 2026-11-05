@@ -162,6 +162,8 @@ export type SignalingPacket =
     };
 
 export interface CbsHubElectronAPI {
+  getWindowState: () => Promise<{isMaximized:boolean}>;
+  onWindowStateChanged: (listener:(state:{isMaximized:boolean})=>void) => ()=>void;
   getDesktopSources: () => Promise<DesktopSourceItem[]>;
   setCaptureSource: (
     sourceId: string,

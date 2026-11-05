@@ -2,6 +2,12 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopSourceItem, CbsHubElectronAPI } from '../src/types/cbshub';
 
 const api: CbsHubElectronAPI = {
+  getWindowState: () => ipcRenderer.invoke('cbs:window-state'),
+  onWindowStateChanged: listener => {
+    const handler = (_event: Electron.IpcRendererEvent, state: {isMaximized:boolean}) => { if (typeof state?.isMaximized === 'boolean') listener({isMaximized:state.isMaximized}); };
+    ipcRenderer.on('cbs:window-state-changed', handler);
+    return () => { ipcRenderer.removeListener('cbs:window-state-changed', handler); };
+  },
   getDesktopSources: (): Promise<DesktopSourceItem[]> => ipcRenderer.invoke('cbs:get-sources'),
   setCaptureSource: (sourceId: string, includeAudio: boolean): Promise<boolean> =>
     ipcRenderer.invoke('cbs:set-capture-source', sourceId, includeAudio),

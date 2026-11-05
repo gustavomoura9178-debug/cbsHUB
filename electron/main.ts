@@ -88,6 +88,11 @@ function createWindow(): void {
   });
 }
 
+ipcMain.handle('cbs:window-state', event => {
+  if (!allowedSender(event)) throw new Error('Origem IPC não autorizada.');
+  return {isMaximized:mainWindow!.isMaximized()};
+});
+
 // Interceptador IPC de busca de fontes de desktop
 ipcMain.handle('cbs:get-sources', async (event) => {
   if(!allowedSender(event)) throw new Error('Origem IPC não autorizada.');
