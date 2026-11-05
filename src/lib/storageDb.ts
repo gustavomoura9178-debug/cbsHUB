@@ -88,6 +88,7 @@ class StorageDb {
           this.trimRoomMessages(msg.roomId).finally(resolve);
         };
         tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('Gravação cancelada.'));
         tx.onabort = () => reject(tx.error);
       } catch (error) {
         reject(error);
@@ -311,6 +312,7 @@ class StorageDb {
         store.put(clip);
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error('Gravação cancelada.'));
       } catch (err) {
         reject(err);
       }

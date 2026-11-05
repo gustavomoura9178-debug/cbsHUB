@@ -88,3 +88,10 @@ PROFILE-001 · feat/user-profiles-2026-11-05 · 7a88783 · base 03217b8. Ler PRO
 ## Atualização — CHAT-002 — 05/11/2026
 
 CHAT-002 · feat/chat-v2-2026-11-05 · b74272e · base 206dc46. Ler CHAT_2.md antes de alterar journal, tombstones, ACK e sync. Banco novo de operações não substitui dados antigos. Não trocar estados explícitos por toggles em v2. Backend ausente; recuperação de operações depende do ator disponível ou journal já local. Sem garantia global/servidor. Soundboard preservado.
+
+
+## Atualização — MEDIA-001 — 05/11/2026
+
+MEDIA-001 · feat/media-experience-2026-11-05 · base 6a72051 · commit de conteúdo será registrado abaixo após criação. Ler MEDIA_EXPERIENCE.md antes de tocar mídia. Preservar handles separados de envio/recebimento, gerações de captura, gate de participação e mute do mic antes do Soundboard. Não voltar a anunciar boost de 200% na reprodução direta. Perfil/chat/Studio continuam local/P2P. Testes de handlers usam adapters; tentativa de WebRTC local ficou sem candidatos ICE e não comprova chamada remota. Próxima ação: revisão e matriz física, sem alegar aprovação de transporte. Sem push/merge nesta etapa.
+
+Atualização do mantenedor: publicação da branch autorizada após executar os testes disponíveis. Build e dez scripts de teste passaram; media-transport foi executado e está bloqueado por ausência de candidatos ICE. Publicação não equivale a aprovação da matriz física ou merge.

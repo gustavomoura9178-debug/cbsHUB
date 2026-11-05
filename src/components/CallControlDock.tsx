@@ -1,3 +1,4 @@
+import { useMediaState, supportsAudioOutput } from "../lib/mediaState";
 import React, { useState, useEffect } from "react";
 import {
   Mic,
@@ -42,6 +43,9 @@ export const CallControlDock: React.FC = () => {
     setIsScreenPickerOpen,
   } = useHubStore();
 
+  const microphoneBusy = useMediaState((s) => s.microphoneBusy);
+  const cameraBusy = useMediaState((s) => s.cameraBusy);
+  const screenBusy = useMediaState((s) => s.screenBusy);
   const [audioInputs, setAudioInputs] = useState<MediaDeviceInfo[]>([]);
   const [audioOutputs, setAudioOutputs] = useState<MediaDeviceInfo[]>([]);
   const [videoInputs, setVideoInputs] = useState<MediaDeviceInfo[]>([]);
@@ -70,8 +74,7 @@ export const CallControlDock: React.FC = () => {
   }, []);
 
   const handleSelectAudioInput = async (deviceId: string) => {
-    webrtcEngine.updateAudioSettings({ inputDeviceId: deviceId });
-    await webrtcEngine.setupLocalMicrophone();
+    await webrtcEngine.selectMicrophone(deviceId);
   };
 
   const handleSelectAudioOutput = (deviceId: string) => {
@@ -79,10 +82,7 @@ export const CallControlDock: React.FC = () => {
   };
 
   const handleSelectVideoInput = (deviceId: string) => {
-    webrtcEngine.updateAudioSettings({ videoDeviceId: deviceId });
-    if (isWebcamActive) {
-      webrtcEngine.toggleWebcam().then(() => webrtcEngine.toggleWebcam());
-    }
+    void webrtcEngine.selectCamera(deviceId);
   };
 
   return (
@@ -138,6 +138,7 @@ export const CallControlDock: React.FC = () => {
                   return (
                     <button
                       key={dev.deviceId || dev.label}
+                      disabled={microphoneBusy}
                       onClick={() => handleSelectAudioInput(dev.deviceId)}
                       className={`w-full px-2 py-1.5 rounded-md text-xs flex items-center justify-between text-left transition-colors ${
                         isSelected
@@ -169,6 +170,7 @@ export const CallControlDock: React.FC = () => {
               </div>
               <Slider
                 min={0}
+                aria-label="Ganho do microfone"
                 max={2}
                 step={0.05}
                 value={[audioConfig.micGain ?? 1.0]}
@@ -198,13 +200,14 @@ export const CallControlDock: React.FC = () => {
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
                 <div className="text-xs font-medium text-foreground">
-                  Supressão Neural (Filtro de ruído)
+                  Filtro de ruído
                 </div>
                 <div className="text-2xs text-muted-foreground">
                   Filtro de ruído via AudioWorklet
                 </div>
               </div>
               <Switch
+                aria-label="Filtro de ruído"
                 checked={audioConfig.neuralNoiseGate}
                 onCheckedChange={(checked) =>
                   webrtcEngine.updateAudioSettings({ neuralNoiseGate: checked })
@@ -264,27 +267,36 @@ export const CallControlDock: React.FC = () => {
                 Dispositivo de Saída (Fones)
               </span>
               <div className="space-y-1 max-h-36 overflow-y-auto">
-                {audioOutputs.map((dev) => {
-                  const isSelected =
-                    (audioConfig.outputDeviceId || "default") === dev.deviceId;
-                  return (
-                    <button
-                      key={dev.deviceId || dev.label}
-                      onClick={() => handleSelectAudioOutput(dev.deviceId)}
-                      className={`w-full px-2 py-1.5 rounded-md text-xs flex items-center justify-between text-left transition-colors ${
-                        isSelected
-                          ? "bg-primary text-primary-foreground font-medium"
-                          : "hover:bg-accent text-foreground"
-                      }`}
-                    >
-                      <span className="truncate pr-2">
-                        {dev.label ||
-                          `Alto-falante (${dev.deviceId.slice(0, 5)})`}
-                      </span>
-                      {isSelected && <Check className="w-3.5 h-3.5 shrink-0" />}
-                    </button>
-                  );
-                })}
+                {!supportsAudioOutput() && (
+                  <p className="text-xs text-muted-foreground">
+                    Seleção de saída indisponível neste navegador.
+                  </p>
+                )}
+                {supportsAudioOutput() &&
+                  audioOutputs.map((dev) => {
+                    const isSelected =
+                      (audioConfig.outputDeviceId || "default") ===
+                      dev.deviceId;
+                    return (
+                      <button
+                        key={dev.deviceId || dev.label}
+                        onClick={() => handleSelectAudioOutput(dev.deviceId)}
+                        className={`w-full px-2 py-1.5 rounded-md text-xs flex items-center justify-between text-left transition-colors ${
+                          isSelected
+                            ? "bg-primary text-primary-foreground font-medium"
+                            : "hover:bg-accent text-foreground"
+                        }`}
+                      >
+                        <span className="truncate pr-2">
+                          {dev.label ||
+                            `Alto-falante (${dev.deviceId.slice(0, 5)})`}
+                        </span>
+                        {isSelected && (
+                          <Check className="w-3.5 h-3.5 shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
               </div>
             </div>
 
@@ -303,6 +315,7 @@ export const CallControlDock: React.FC = () => {
               </div>
               <Slider
                 min={0}
+                aria-label="Volume da chamada"
                 max={1}
                 step={0.02}
                 value={[audioConfig.remoteStreamVolume ?? 1.0]}
@@ -321,6 +334,8 @@ export const CallControlDock: React.FC = () => {
           <TooltipTrigger asChild>
             <button
               aria-label={isWebcamActive ? "Desligar câmera" : "Ligar câmera"}
+              disabled={cameraBusy}
+              aria-busy={cameraBusy}
               aria-pressed={isWebcamActive}
               onClick={() => webrtcEngine.toggleWebcam()}
               className={`h-10 px-3 flex items-center justify-center transition-colors ${
@@ -365,6 +380,7 @@ export const CallControlDock: React.FC = () => {
                 return (
                   <button
                     key={dev.deviceId || dev.label}
+                    disabled={cameraBusy}
                     onClick={() => handleSelectVideoInput(dev.deviceId)}
                     className={`w-full px-2 py-1.5 rounded-md text-xs flex items-center justify-between text-left transition-colors ${
                       isSelected
@@ -395,7 +411,16 @@ export const CallControlDock: React.FC = () => {
           <TooltipTrigger asChild>
             <Button
               variant="secondary"
-              onClick={() => setIsScreenPickerOpen(true)}
+              aria-label="Compartilhar tela"
+              disabled={screenBusy || !navigator.mediaDevices?.getDisplayMedia}
+              onClick={() =>
+                window.cbsHubAPI
+                  ? setIsScreenPickerOpen(true)
+                  : void webrtcEngine.startScreenShare(
+                      "",
+                      useHubStore.getState().videoQualityConfig,
+                    )
+              }
               className="h-10 px-3.5 rounded-xl border border-border/60 hover:bg-accent text-foreground flex items-center gap-1.5 shadow-sm"
             >
               <MonitorUp className="w-4 h-4 text-primary" />
@@ -404,9 +429,7 @@ export const CallControlDock: React.FC = () => {
               </span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="top">
-            Compartilhar Tela (até 4K60)
-          </TooltipContent>
+          <TooltipContent side="top">Compartilhar tela</TooltipContent>
         </Tooltip>
       ) : (
         <DropdownMenu>

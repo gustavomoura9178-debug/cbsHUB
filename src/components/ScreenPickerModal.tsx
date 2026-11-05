@@ -105,10 +105,10 @@ export const ScreenPickerModal: React.FC = () => {
             </div>
             <div>
               <DialogTitle className="text-base font-bold text-foreground">
-                Compartilhar Tela de Ultra-Qualidade
+                Compartilhar tela
               </DialogTitle>
               <DialogDescription className="text-xs text-muted-foreground mt-0.5">
-                Selecione a tela ou janela, resolução de até 4K e áudio em estéreo a 60 FPS.
+                Escolha a fonte e a qualidade desejada. Resolução, FPS e áudio dependem do dispositivo e da rede.
               </DialogDescription>
             </div>
           </div>

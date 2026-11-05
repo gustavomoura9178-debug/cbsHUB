@@ -1,3 +1,4 @@
+import { supportsAudioOutput } from "../lib/mediaState";
 import React, { useState, useEffect } from "react";
 import {
   Sliders,
@@ -48,9 +49,6 @@ export const SettingsModal: React.FC = () => {
 
   const loadDevices = async () => {
     try {
-      await navigator.mediaDevices
-        .getUserMedia({ audio: true })
-        .catch(() => {});
       const devices = await navigator.mediaDevices.enumerateDevices();
 
       setMicrophones(devices.filter((d) => d.kind === "audioinput"));
@@ -71,10 +69,9 @@ export const SettingsModal: React.FC = () => {
     key: "inputDeviceId" | "outputDeviceId" | "videoDeviceId",
     value: string,
   ) => {
-    webrtcEngine.updateAudioSettings({ [key]: value });
-    if (key === "inputDeviceId") {
-      webrtcEngine.setupLocalMicrophone();
-    }
+    if (key === "inputDeviceId") void webrtcEngine.selectMicrophone(value);
+    else if (key === "videoDeviceId") void webrtcEngine.selectCamera(value);
+    else webrtcEngine.updateAudioSettings({ [key]: value });
   };
 
   const handleToggle = (
@@ -87,7 +84,8 @@ export const SettingsModal: React.FC = () => {
     const nextVal = !audioConfig[key];
     webrtcEngine.updateAudioSettings({ [key]: nextVal });
     if (key === "echoCancellation" || key === "autoGainControl") {
-      webrtcEngine.setupLocalMicrophone();
+      if (useHubStore.getState().inVoiceCall)
+        void webrtcEngine.setupLocalMicrophone().catch(() => {});
     }
   };
 
@@ -268,6 +266,12 @@ export const SettingsModal: React.FC = () => {
                     <Popover onOpenChange={(open) => open && loadDevices()}>
                       <PopoverTrigger asChild>
                         <Button
+                          disabled={!supportsAudioOutput()}
+                          title={
+                            !supportsAudioOutput()
+                              ? "Seleção de saída indisponível neste navegador"
+                              : undefined
+                          }
                           variant="secondary"
                           className="w-full justify-between h-9 px-3 text-xs bg-secondary/80 border border-border/60 hover:bg-accent font-normal"
                         >
@@ -478,9 +482,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="p-3 rounded-xl bg-secondary/30 border border-border/50 flex items-center justify-between gap-4">
                   <div>
                     <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                      <span>
-                        Supressão Neural de Ruído (Krisp-like Worklet)
-                      </span>
+                      <span>Filtro de ruído (Noise Gate + navegador)</span>
                       <span className="px-1.5 py-0.5 rounded text-micro font-bold bg-primary/20 text-primary uppercase">
                         48 kHz
                       </span>

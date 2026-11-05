@@ -1,3 +1,4 @@
+import { useSoundPreferences, setSoundMode } from "./soundPreferences";
 import { useShallow } from "zustand/react/shallow";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -100,14 +101,7 @@ export function ChatPanel() {
     [deleting, setDeleting] = useState<ChatMessage | null>(null),
     [activities, setActivities] = useState(false),
     [nearBottom, setNearBottom] = useState(true);
-  const [mode, setMode] = useState<SoundMode>(() => {
-    try {
-      const v = localStorage.getItem("cbshub-chat-sounds");
-      return v === "hidden" || v === "compact" ? v : "normal";
-    } catch {
-      return "normal";
-    }
-  });
+  const mode = useSoundPreferences(s => s.mode);
   const [compact, setCompact] = useState(() => {
     try {
       return localStorage.getItem("cbshub-chat-density") === "compact";
@@ -308,9 +302,8 @@ export function ChatPanel() {
               <DropdownMenuRadioGroup
                 value={mode}
                 onValueChange={(value) => {
-                  setMode(value as SoundMode);
                   try {
-                    localStorage.setItem("cbshub-chat-sounds", value);
+                    setSoundMode(value as SoundMode);
                   } catch {
                     setError("Não foi possível salvar a preferência.");
                   }

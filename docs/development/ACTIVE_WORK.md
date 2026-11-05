@@ -67,3 +67,14 @@ PROFILE-001 concluído para revisão; reserva liberada. Branch feat/user-profile
 ## Atualização — CHAT-002 — 05/11/2026
 
 CHAT-002 concluído para revisão; reserva liberada. feat/chat-v2-2026-11-05, base 206dc46, commit b74272e. Ver CHAT_2.md. Sem push/merge nesta tarefa.
+
+## MEDIA-001 — em execução
+
+05/11/2026 · Codex/OpenAI · feat/media-experience-2026-11-05 · base 6a72051. Preflight: Chat 2 integrado pelo PR #4; árvore limpa, sem reservas ativas ou alterações adicionais no remoto. Recuperação recovery/pre-media-experience-2026-11-05. Reserva: controles/palco/dispositivos, ciclo de vida de mídia no motor, Soundboard/persistência, testes e docs. Preservar PeerJS, pipeline de áudio, chat e shadcn/Tailwind. Aceite: build, regressões e mídia sintética local; dois dispositivos físicos e redes distintas exigem validação manual. Rede cloud não libera PeerJS externo.
+
+
+## Atualização — MEDIA-001 — 05/11/2026
+
+MEDIA-001 concluído para revisão; reserva liberada. Branch feat/media-experience-2026-11-05; base 6a72051. Ver MEDIA_EXPERIENCE.md para arquivos, testes reais e matriz pendente. Commits serão identificados no ACTIVITY_LOG após criação. Sem trabalho concorrente conhecido; main intacta.
+
+Atualização do mantenedor: publicação da branch autorizada após executar os testes disponíveis. Build e dez scripts de teste passaram; media-transport foi executado e está bloqueado por ausência de candidatos ICE. Publicação não equivale a aprovação da matriz física ou merge.
