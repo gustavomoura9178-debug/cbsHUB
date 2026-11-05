@@ -64,13 +64,17 @@
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "icon": "public/brand/app.ico"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
+    },
+    "linux": {
+      "icon": "public/brand/logo-512.png"
     }
   },
   "overrides": {

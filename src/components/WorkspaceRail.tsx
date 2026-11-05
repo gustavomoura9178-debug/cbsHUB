@@ -1,3 +1,4 @@
+import {OfficialLogo} from "./OfficialLogo";
 import {
   AudioLines,
   Palette,
@@ -32,7 +33,7 @@ export function WorkspaceRail({
   return (
     <nav className="workspace-rail" aria-label="Navegação principal">
       <div className="workspace-mark" aria-label="cbsHUB">
-        <AudioLines className="size-5" />
+        <OfficialLogo decorative />
       </div>
       <div className="rail-divider" />
       <Tooltip>

@@ -1,3 +1,4 @@
+import {OfficialLogo} from "./OfficialLogo";
 import React, { useState, useEffect } from "react";
 import { Minus, Square, X, Pin, Radio, SlidersHorizontal } from "lucide-react";
 import { useHubStore } from "../store/useHubStore";
@@ -53,6 +54,7 @@ export const TitleBar: React.FC = () => {
   return (
     <header className="native-titlebar drag-region">
       <div className="flex items-center gap-2 min-w-0">
+        <OfficialLogo />
         <span className="font-semibold tracking-tight text-caption text-foreground">
           cbs<span className="text-primary">HUB</span>
         </span>
