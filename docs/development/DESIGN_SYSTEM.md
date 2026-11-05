@@ -23,3 +23,8 @@ Studio agora permite substituir os tokens de aparência com valores validados e 
 ## Atualização — PROFILE-001 — 05/11/2026
 
 ProfileCard/ProfileDialog usam primitives shadcn/Radix existentes e tokens globais, com tema opcional limitado ao cartão. AvatarImage é reutilizado nos avatares compartilhados. Aparência aceita apenas enums e HEX validados; não recebe CSS livre. Menus de escolha do editor usam DropdownMenu, sem biblioteca adicional.
+
+
+## Atualização — CHAT-002 — 05/11/2026
+
+Chat 2.0 reutiliza Button/Input/Dialog/DropdownMenu e pickers existentes. Tokens globais, densidade confortável/compacta, perfis nos avatares/menções, ações por teclado/hover/clique direito e painéis de atividades. Sem trocar bibliotecas; Markdown é renderizado como elementos React.

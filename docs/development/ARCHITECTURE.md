@@ -69,3 +69,8 @@ StudioProvider envolve App; rascunho/salvo separados evitam remontar engines. th
 ## Atualização — PROFILE-001 — 05/11/2026
 
 ProfileProvider envolve App; repository local vincula perfil ao clientId e mantém bloqueios. Modelo UserProfile privado e PublicProfile separado. profile_update aditivo sobre DataConnection, associado à sessão e excluído do diretório/state_sync. Gates de mídia/reação/bloqueio ficam no motor. Sem backend ou mudança de autenticação. Ver PROFILES.md.
+
+
+## Atualização — CHAT-002 — 05/11/2026
+
+ChatPanel/MessageRow/SafeMarkdown substituem somente a camada de chat anterior. ChatLedger serializa operações no banco cbshub_chat_ledger; storageDb continua com mensagens/clips. Protocolo aditivo chat_operation/chat_operations_sync/chat_ack; histórico/mutação filtrados por sala/sessão/autoria local. Janela DOM de 100 e retenção 500. Ver CHAT_2.md.

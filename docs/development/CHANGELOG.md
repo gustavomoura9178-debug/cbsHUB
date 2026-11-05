@@ -33,3 +33,8 @@ STUDIO-001 · Codex/OpenAI · feat/cbshub-studio-2026-11-05 · 19d316f. Adiciona
 ## Atualização — PROFILE-001 — 05/11/2026
 
 PROFILE-001 · Codex/OpenAI · feat/user-profiles-2026-11-05 · 7a88783. Perfis locais completos/editáveis, avatar/banner, status, temas de cartão, privacidade e bloqueios; projeção pública e integração P2P validadas. Sem mudança de autenticação nem dependências. Detalhes/testes/limites em PROFILES.md.
+
+
+## Atualização — CHAT-002 — 05/11/2026
+
+CHAT-002 · Codex/OpenAI · feat/chat-v2-2026-11-05 · CHAT_CONTENT_COMMIT. Chat com edição/exclusão/resposta/pin, reações idempotentes, Markdown/código/links seguros, drafts, ACK, reconciliação lógica, busca/janela limitada e três modos de eventos Soundboard. Sem dependências novas. Resultados/limites em CHAT_2.md.

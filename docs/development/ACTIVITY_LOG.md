@@ -71,3 +71,15 @@ Pendências para a outra IA: ler KNOWN_ISSUES; começar por K01/R1; preservar co
 - Testes executados: build passou; 7 grupos de validação passaram; edição/raster/persistência/reload/cancel e visão por outro contexto via handler real/ponte local passaram; bloqueio de mensagem/mídia persistiu; chamadas/reações negadas em sessão conhecida passaram; móvel passou. Studio e redesign smoke passaram; core de chat/DB/modal/reação/WAV/mixagem/stopAll e API Electron passou.
 - Não executados: transporte remoto real/ICE, autorização de servidor, unicidade global, testes Windows/hardware e acessibilidade completa. Sem credenciais/backend inventados.
 - Pendências e passagem: revisão multipar, definição futura de backend; preservar filtro de campos privados e associação à sessão. Dados já enviados não são revogáveis. Ver PROFILES.md. Sem push, merge ou alteração de main nesta tarefa.
+
+
+## 05/11/2026 — CHAT-002 — Codex/OpenAI
+
+- Branch feat/chat-v2-2026-11-05; base 206dc46; tag recovery/pre-chat-v2-2026-11-05; commit CHAT_CONTENT_COMMIT.
+- Preflight: checkout limpo, docs/fluxo de mensagens revisados; main atualizada com PR #3 por fast-forward. Escopo P2P anterior preservado, backend não criado.
+- Arquivos: novos módulos src/chat/model, ledger, ChatPanel, MessageRow, SafeMarkdown; wrapper TextChatSection; protocolo cbshub.d.ts; handlers e métodos de chat no webrtcEngine; persistência/ordem em storageDb e useHubStore; CSS. Testes chat-model/chat-smoke/chat-drafts, readiness do probe de perfis, README de testes e documentação compartilhada.
+- Funcionalidades: edição/exclusão/resposta/pin, reação set/unset, menção/digitação/não lidas, copy/context menus, Markdown/código/link local seguro, rascunhos por sala, estados de persistência/ACK/erro, busca e janela de 100/retention500. Soundboard normal/compacto/atividade sem remover áudio.
+- Testes reais executados: 7 grupos de modelo; smoke de dois contextos via ponte local (envio/ACK, edição, exclusão persistente, reação/replay, resposta/pin e reconexão lógica); drafts/erro de disco/retry/retention/não lidas; Studio/perfis/navegação/core passaram. Build validado. Sem alegar teste de ICE/internet, backend, Windows ou seis participantes reais.
+- Falhas investigadas: singleton duplicado por HMR nos probes, preparação de fixture de perfil antes de readiness e comparador tipado de clip; preparação/tipagem corrigidas, não registradas como passes antes da correção.
+- Preservação: Electron, áudio, SoundboardEngine, Studio/perfis e dependências sem alteração funcional; alterações do motor focadas em mensagens.
+- Pendências: backend/ACL, histórico de ator ausente, clientes antigos, limites/quota de journal e K01. Ver CHAT_2.md antes de integrar. Sem push ou merge.

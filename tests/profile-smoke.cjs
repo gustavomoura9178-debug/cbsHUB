@@ -24,6 +24,10 @@ const assert = require("node:assert/strict");
     );
     await p.goto("http://127.0.0.1:5173");
     await p.getByRole("button", { name: "Meu perfil", exact: true }).waitFor();
+    await p.waitForFunction(async () => {
+      const { webrtcEngine } = await import("/src/lib/webrtcEngine.ts");
+      return webrtcEngine.localPeer !== null;
+    });
     return p;
   }
   try {
@@ -52,13 +56,11 @@ const assert = require("node:assert/strict");
       return c.toDataURL("image/png").split(",")[1];
     });
     for (const kind of ["avatar", "banner"])
-      await a
-        .getByLabel(`Upload de ${kind}`, { exact: true })
-        .setInputFiles({
-          name: "image.png",
-          mimeType: "image/png",
-          buffer: Buffer.from(image, "base64"),
-        });
+      await a.getByLabel(`Upload de ${kind}`, { exact: true }).setInputFiles({
+        name: "image.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(image, "base64"),
+      });
     await a.getByRole("button", { name: "Salvar perfil", exact: true }).click();
     await a.getByRole("dialog").waitFor({ state: "hidden" });
     await a.reload();
@@ -118,12 +120,10 @@ const assert = require("node:assert/strict");
         screenCall: null,
         remoteSpeakingInterval: null,
       };
-      useHubStore
-        .getState()
-        .setParticipants({
-          ...useHubStore.getState().participants,
-          [peerId]: p,
-        });
+      useHubStore.getState().setParticipants({
+        ...useHubStore.getState().participants,
+        [peerId]: p,
+      });
       webrtcEngine.sessions.set(peerId, session);
       webrtcEngine.handleIncomingSignalingPacket(session, {
         type: "profile_update",

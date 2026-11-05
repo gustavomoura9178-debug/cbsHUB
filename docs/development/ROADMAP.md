@@ -46,3 +46,8 @@ STUDIO-001 implementado por nova autorização do mantenedor após redesign inte
 ## Atualização — PROFILE-001 — 05/11/2026
 
 PROFILE-001 implementado no escopo local/P2P aprovado. Próximos passos: revisão multipar real, identidade/autorização de backend quando definido e reserva global de username. Não anunciar conta autenticada/sync remoto com base em clientId local. Ver PROFILES.md.
+
+
+## Atualização — CHAT-002 — 05/11/2026
+
+CHAT-002 implementado no escopo local/P2P; próxima revisão deve validar compatibilidade multipar real, ledger/retention e migração para ACL/backend quando existir. Não anunciar histórico offline global ou exclusão de cópias remotas. CHAT_2.md contém requisitos pendentes.
