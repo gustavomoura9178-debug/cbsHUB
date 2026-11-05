@@ -1,6 +1,7 @@
 import {
   AudioLines,
   Palette,
+  UserRound,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -12,6 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { useHubStore } from "../store/useHubStore";
 import { SoundboardPopover } from "./SoundboardPopover";
 import { useStudio } from "../studio/StudioProvider";
+import { useProfiles } from "../profiles/ProfileProvider";
 interface Props {
   sidebarOpen: boolean;
   membersOpen: boolean;
@@ -25,6 +27,7 @@ export function WorkspaceRail({
   onToggleMembers,
 }: Props) {
   const studio = useStudio();
+  const profiles = useProfiles();
   const openSettings = useHubStore((state) => state.setIsSettingsOpen);
   return (
     <nav className="workspace-rail" aria-label="Navegação principal">
@@ -87,6 +90,16 @@ export function WorkspaceRail({
         <TooltipContent side="right">Membros da sala</TooltipContent>
       </Tooltip>
       <div className="flex-1" />
+      <Button
+        variant="ghost"
+        size="icon"
+        className="rail-button"
+        aria-label="Meu perfil"
+        title="Meu perfil"
+        onClick={() => profiles.view("self")}
+      >
+        <UserRound className="size-5" />
+      </Button>
       <Tooltip>
         <TooltipTrigger asChild>
           <Button

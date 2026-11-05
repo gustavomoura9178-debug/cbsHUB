@@ -1,10 +1,12 @@
-import Peer, { type MediaConnection, type DataConnection } from 'peerjs';
-import { useHubStore } from '../store/useHubStore';
-import { sounds } from './sounds';
-import { VoiceAudioPipeline } from './audioPipeline';
-import { soundboardEngine } from './soundboardEngine';
-import { storageDb } from './storageDb';
-import { enhanceOpusSdp, configureVideoSender } from './sdpMunger';
+import { publicProfile, validatePublicProfile } from "../profiles/model";
+import { readOwnProfile, isBlocked } from "../profiles/repository";
+import Peer, { type MediaConnection, type DataConnection } from "peerjs";
+import { useHubStore } from "../store/useHubStore";
+import { sounds } from "./sounds";
+import { VoiceAudioPipeline } from "./audioPipeline";
+import { soundboardEngine } from "./soundboardEngine";
+import { storageDb } from "./storageDb";
+import { enhanceOpusSdp, configureVideoSender } from "./sdpMunger";
 import type {
   VideoQualityConfig,
   AudioProcessingConfig,
@@ -12,27 +14,31 @@ import type {
   ChatMessage,
   SoundboardClip,
   SignalingPacket,
-} from '../types/cbshub';
+} from "../types/cbshub";
 
 const MAX_ROOM_PEERS = 6;
 
 function buildPeerIceServers(): RTCIceServer[] {
   const servers: RTCIceServer[] = [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" },
+    { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:global.stun.twilio.com:3478" },
   ];
 
   const username = import.meta.env.VITE_METERED_USERNAME;
   const credential = import.meta.env.VITE_METERED_CREDENTIAL;
-  const turnUrl = import.meta.env.VITE_METERED_TURN_URL || 'turn:standard.relay.metered.ca:80';
-  const turnsUrl = import.meta.env.VITE_METERED_TURNS_URL || 'turns:standard.relay.metered.ca:443?transport=tcp';
+  const turnUrl =
+    import.meta.env.VITE_METERED_TURN_URL ||
+    "turn:standard.relay.metered.ca:80";
+  const turnsUrl =
+    import.meta.env.VITE_METERED_TURNS_URL ||
+    "turns:standard.relay.metered.ca:443?transport=tcp";
 
   if (username && credential) {
     servers.push(
       { urls: turnUrl, username, credential },
-      { urls: turnsUrl, username, credential }
+      { urls: turnsUrl, username, credential },
     );
   }
 
@@ -70,7 +76,7 @@ class WebRTCEngine {
   private beaconPeer: Peer | null = null;
   private isBeaconOwner = false;
   private beaconHealTimeout: number | null = null;
-  private currentRoomSlug = '';
+  private currentRoomSlug = "";
 
   // Malha de sessões ativas (chave: peerId)
   private sessions: Map<string, PeerMediaSession> = new Map();
@@ -95,33 +101,36 @@ class WebRTCEngine {
 
   // Sanitizador de slug de sala (Seção 5.1 SDD.md)
   public sanitizeSlug(input: string): string {
-    const slug = input.toLowerCase().replace(/[^a-z0-9-]/g, '');
-    return slug || 'cbs-irmandade';
+    const slug = input.toLowerCase().replace(/[^a-z0-9-]/g, "");
+    return slug || "cbs-irmandade";
   }
 
   private generateShortId(clientId: string): string {
-    const clean = clientId.replace(/[^a-z0-9]/gi, '').toLowerCase();
-    return (clean.substring(0, 6) || Math.random().toString(36).substring(2, 8));
+    const clean = clientId.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    return clean.substring(0, 6) || Math.random().toString(36).substring(2, 8);
   }
 
   /* ========================================================================= */
   /* CONEXÃO NA SALA (TEXTO + PRESENÇA + BEACON MESH)                          */
   /* ========================================================================= */
 
-  public async joinRoom(roomInput: string, autoJoinVoice = false): Promise<void> {
+  public async joinRoom(
+    roomInput: string,
+    autoJoinVoice = false,
+  ): Promise<void> {
     this.leaveRoom();
 
     const slug = this.sanitizeSlug(roomInput);
     this.currentRoomSlug = slug;
     useHubStore.getState().setRoomId(slug);
-    useHubStore.getState().setStatusText('Conectando à sala...');
+    useHubStore.getState().setStatusText("Conectando à sala...");
 
     // Carrega mensagens salvas localmente no IndexedDB
     try {
       const savedMessages = await storageDb.getMessagesByRoom(slug);
       useHubStore.getState().setMessages(savedMessages);
     } catch (err) {
-      console.warn('[WebRTC Engine] Erro ao carregar histórico local:', err);
+      console.warn("[WebRTC Engine] Erro ao carregar histórico local:", err);
     }
 
     // Carrega efeitos do Soundboard
@@ -158,8 +167,16 @@ class WebRTCEngine {
     // Inicializa localPeer
     this.localPeer = new Peer(localPeerId, PEER_CONFIG);
 
-    this.localPeer.on('open', (id) => {
-      useHubStore.getState().setConnectionStatus(true, false, id, null, 'Conectado à sala de texto e presença!');
+    this.localPeer.on("open", (id) => {
+      useHubStore
+        .getState()
+        .setConnectionStatus(
+          true,
+          false,
+          id,
+          null,
+          "Conectado à sala de texto e presença!",
+        );
       sounds.playJoin();
 
       // Configura escuta de conexões de dados e chamadas de mídia entrantes
@@ -169,23 +186,27 @@ class WebRTCEngine {
       this.attemptClaimBeacon(slug);
 
       if (autoJoinVoice) {
-        this.joinVoiceCall().catch((e) => console.warn('[WebRTC Engine] Auto-join voice falhou:', e));
+        this.joinVoiceCall().catch((e) =>
+          console.warn("[WebRTC Engine] Auto-join voice falhou:", e),
+        );
       }
     });
 
-    this.localPeer.on('error', (err: { type?: string }) => {
-      console.error('[WebRTC Engine] Erro no localPeer:', err);
-      useHubStore.getState().setStatusText(`Aviso de rede: ${err.type || 'desconhecido'}`);
+    this.localPeer.on("error", (err: { type?: string }) => {
+      console.error("[WebRTC Engine] Erro no localPeer:", err);
+      useHubStore
+        .getState()
+        .setStatusText(`Aviso de rede: ${err.type || "desconhecido"}`);
     });
 
-    this.localPeer.on('disconnected', () => {
+    this.localPeer.on("disconnected", () => {
       if (this.localPeer && !this.localPeer.destroyed) {
-        useHubStore.getState().setStatusText('Reconectando sinalização...');
+        useHubStore.getState().setStatusText("Reconectando sinalização...");
         this.localPeer.reconnect();
       }
     });
 
-    this.localPeer.on('close', () => {
+    this.localPeer.on("close", () => {
       // Executa saída apenas se o peer não foi fechado intencionalmente pelo leaveRoom
       if (useHubStore.getState().isConnected) {
         this.leaveRoom();
@@ -197,12 +218,12 @@ class WebRTCEngine {
     if (!this.localPeer) return;
 
     // Conexões de dados entrantes (Chat, Presença, Sincronização)
-    this.localPeer.on('connection', (conn) => {
+    this.localPeer.on("connection", (conn) => {
       this.handleIncomingDataConnection(conn);
     });
 
     // Chamadas de mídia entrantes (Voz, Webcam, Compartilhamento de Tela)
-    this.localPeer.on('call', (call) => {
+    this.localPeer.on("call", (call) => {
       this.handleIncomingMediaCall(call);
     });
   }
@@ -217,18 +238,20 @@ class WebRTCEngine {
     try {
       this.beaconPeer = new Peer(beaconId, PEER_CONFIG);
 
-      this.beaconPeer.on('open', () => {
+      this.beaconPeer.on("open", () => {
         // Cenário A: Este cliente assumiu com sucesso o papel de Beacon (Diretório)
         this.isBeaconOwner = true;
-        useHubStore.getState().setStatusText('Conectado como Diretório da sala.');
+        useHubStore
+          .getState()
+          .setStatusText("Conectado como Diretório da sala.");
 
-        this.beaconPeer!.on('connection', (conn) => {
+        this.beaconPeer!.on("connection", (conn) => {
           this.handleBeaconDirectoryConnection(conn);
         });
       });
 
-      this.beaconPeer.on('error', (err: { type?: string }) => {
-        if (err.type === 'unavailable-id') {
+      this.beaconPeer.on("error", (err: { type?: string }) => {
+        if (err.type === "unavailable-id") {
           // Cenário B: Já existe um Beacon ativo na sala! Conectar a ele para descobrir os irmãos
           this.isBeaconOwner = false;
           try {
@@ -239,11 +262,11 @@ class WebRTCEngine {
           this.beaconPeer = null;
           this.queryBeaconDirectory(beaconId);
         } else {
-          console.warn('[WebRTC Beacon] Erro no beacon peer:', err);
+          console.warn("[WebRTC Beacon] Erro no beacon peer:", err);
         }
       });
     } catch (err) {
-      console.warn('[WebRTC Beacon] Falha ao instanciar beacon:', err);
+      console.warn("[WebRTC Beacon] Falha ao instanciar beacon:", err);
     }
   }
 
@@ -251,14 +274,16 @@ class WebRTCEngine {
    * Responde a novos membros que conectam ao Beacon para pedir a lista de participantes
    */
   private handleBeaconDirectoryConnection(conn: DataConnection): void {
-    conn.on('data', (data) => {
+    conn.on("data", (data) => {
       const packet = data as SignalingPacket;
-      if (packet && packet.type === 'directory_request') {
+      if (packet && packet.type === "directory_request") {
         const state = useHubStore.getState();
         // Coleta participantes conhecidos (limite de 6)
-        const knownPeers: Array<Omit<Participant, 'isLocal'>> = Object.values(state.participants)
+        const knownPeers: Array<Omit<Participant, "isLocal">> = Object.values(
+          state.participants,
+        )
           .map((p) => {
-            const { isLocal, ...rest } = p;
+            const { isLocal, profile: _profile, ...rest } = p;
             return rest;
           })
           .slice(0, MAX_ROOM_PEERS);
@@ -266,11 +291,14 @@ class WebRTCEngine {
         // Responde com o diretório completo
         try {
           conn.send({
-            type: 'directory_response',
+            type: "directory_response",
             peers: knownPeers,
           } as SignalingPacket);
         } catch (err) {
-          console.warn('[WebRTC Beacon] Falha ao enviar directory_response:', err);
+          console.warn(
+            "[WebRTC Beacon] Falha ao enviar directory_response:",
+            err,
+          );
         }
 
         // O visitante já discará para os membros recebidos na lista; não discamos de volta para evitar colisão
@@ -287,10 +315,10 @@ class WebRTCEngine {
 
     const conn = this.localPeer.connect(beaconId, { reliable: true });
 
-    conn.on('open', () => {
+    conn.on("open", () => {
       const state = useHubStore.getState();
-      const localParticipant = state.participants[this.localPeer?.id || ''];
-      const myInfo: Omit<Participant, 'isLocal'> = localParticipant
+      const localParticipant = state.participants[this.localPeer?.id || ""];
+      const myInfo: Omit<Participant, "isLocal"> = localParticipant
         ? {
             peerId: localParticipant.peerId,
             clientId: localParticipant.clientId,
@@ -317,14 +345,18 @@ class WebRTCEngine {
           };
 
       conn.send({
-        type: 'directory_request',
+        type: "directory_request",
         peerInfo: myInfo,
       } as SignalingPacket);
     });
 
-    conn.on('data', (data) => {
+    conn.on("data", (data) => {
       const packet = data as SignalingPacket;
-      if (packet && packet.type === 'directory_response' && Array.isArray(packet.peers)) {
+      if (
+        packet &&
+        packet.type === "directory_response" &&
+        Array.isArray(packet.peers)
+      ) {
         // Conecta a todos os irmãos retornados pelo diretório
         packet.peers.forEach((peer) => {
           if (peer.peerId && peer.peerId !== this.localPeer?.id) {
@@ -342,7 +374,7 @@ class WebRTCEngine {
       }
     });
 
-    conn.on('error', () => {
+    conn.on("error", () => {
       // Beacon pode ter caído, agenda auto-heal
       this.scheduleBeaconElection();
     });
@@ -377,7 +409,12 @@ class WebRTCEngine {
   /* ========================================================================= */
 
   private connectToPeer(remotePeerId: string, clientId?: string): void {
-    if (!this.localPeer || this.localPeer.destroyed || remotePeerId === this.localPeer.id) return;
+    if (
+      !this.localPeer ||
+      this.localPeer.destroyed ||
+      remotePeerId === this.localPeer.id
+    )
+      return;
     if (this.sessions.has(remotePeerId)) return;
 
     const conn = this.localPeer.connect(remotePeerId, { reliable: true });
@@ -395,13 +432,16 @@ class WebRTCEngine {
     this.setupDataConnection(conn);
   }
 
-  private setupDataConnection(conn: DataConnection, initialClientId?: string): void {
+  private setupDataConnection(
+    conn: DataConnection,
+    initialClientId?: string,
+  ): void {
     const remotePeerId = conn.peer;
 
     const session: PeerMediaSession = {
       peerId: remotePeerId,
-      clientId: initialClientId || '',
-      nickname: 'Irmão Conectando...',
+      clientId: initialClientId || "",
+      nickname: "Irmão Conectando...",
       dataConn: conn,
       voiceCall: null,
       webcamCall: null,
@@ -416,18 +456,20 @@ class WebRTCEngine {
 
     this.sessions.set(remotePeerId, session);
 
-    conn.on('open', () => {
+    conn.on("open", () => {
       const state = useHubStore.getState();
-      const localParticipant = state.participants[this.localPeer?.id || ''];
+      const localParticipant = state.participants[this.localPeer?.id || ""];
 
       // Envia nosso estado completo para o irmão
       if (localParticipant) {
-        const { isLocal, ...myState } = localParticipant;
+        const { isLocal, profile: _profile, ...myState } = localParticipant;
         conn.send({
-          type: 'peer_state_sync',
+          type: "peer_state_sync",
           state: myState,
         } as SignalingPacket);
       }
+
+      this.sendProfileToSession(session);
 
       // Sincroniza chat recente (IndexedDB)
       this.requestChatSync(conn);
@@ -438,16 +480,19 @@ class WebRTCEngine {
       }
     });
 
-    conn.on('data', (data) => {
+    conn.on("data", (data) => {
       this.handleIncomingSignalingPacket(session, data as SignalingPacket);
     });
 
-    conn.on('close', () => {
+    conn.on("close", () => {
       this.handlePeerDisconnected(session);
     });
 
-    conn.on('error', (err) => {
-      console.warn(`[WebRTC Engine] Erro no dataConn com ${remotePeerId}:`, err);
+    conn.on("error", (err) => {
+      console.warn(
+        `[WebRTC Engine] Erro no dataConn com ${remotePeerId}:`,
+        err,
+      );
     });
   }
 
@@ -456,13 +501,25 @@ class WebRTCEngine {
     this.teardownPeerVoiceAudio(session);
 
     if (session.voiceCall) {
-      try { session.voiceCall.close(); } catch { /* ignore */ }
+      try {
+        session.voiceCall.close();
+      } catch {
+        /* ignore */
+      }
     }
     if (session.webcamCall) {
-      try { session.webcamCall.close(); } catch { /* ignore */ }
+      try {
+        session.webcamCall.close();
+      } catch {
+        /* ignore */
+      }
     }
     if (session.screenCall) {
-      try { session.screenCall.close(); } catch { /* ignore */ }
+      try {
+        session.screenCall.close();
+      } catch {
+        /* ignore */
+      }
     }
 
     this.sessions.delete(session.peerId);
@@ -475,7 +532,7 @@ class WebRTCEngine {
       if (remainingSessions.length > 0) {
         useHubStore.getState().setRemoteNickname(remainingSessions[0].nickname);
       } else {
-        useHubStore.getState().setRemoteNickname('Aguardando irmão...');
+        useHubStore.getState().setRemoteNickname("Aguardando irmão...");
         useHubStore.getState().setRemoteVoiceStream(null);
         useHubStore.getState().setRemoteScreenStream(null);
         this.stopReceiverStats();
@@ -490,12 +547,44 @@ class WebRTCEngine {
   /* TRATAMENTO DE PACOTES DE SINALIZAÇÃO P2P                                  */
   /* ========================================================================= */
 
-  private handleIncomingSignalingPacket(session: PeerMediaSession, packet: SignalingPacket): void {
+  private handleIncomingSignalingPacket(
+    session: PeerMediaSession,
+    packet: SignalingPacket,
+  ): void {
     if (!packet || !packet.type) return;
 
+    if (packet.type !== "peer_state_sync" && isBlocked(session.clientId))
+      return;
     switch (packet.type) {
-      case 'peer_state_sync': {
-        const remote = packet.state;
+      case "profile_update": {
+        if (
+          !session.clientId ||
+          !useHubStore.getState().participants[session.peerId]
+        )
+          return;
+        try {
+          const profile =
+            packet.profile === null
+              ? null
+              : validatePublicProfile(packet.profile);
+          useHubStore.getState().updateParticipant(session.peerId, { profile });
+        } catch {
+          /* Malformed remote profile is ignored, not merged. */
+        }
+        break;
+      }
+      case "peer_state_sync": {
+        const input = packet.state;
+        if (
+          !input ||
+          input.peerId !== session.peerId ||
+          typeof input.clientId !== "string" ||
+          input.clientId.length > 100
+        )
+          return;
+        // A session cannot change identity after its initial handshake.
+        if (session.clientId && session.clientId !== input.clientId) return;
+        const { profile: _untrustedProfile, ...remote } = input;
         session.clientId = remote.clientId;
         session.nickname = remote.nickname;
 
@@ -512,12 +601,21 @@ class WebRTCEngine {
           });
         }
 
+        if (isBlocked(remote.clientId)) {
+          this.closeBlockedMedia(session);
+          return;
+        }
+        this.sendProfileToSession(session);
         // Compatibilidade legada
         useHubStore.getState().setRemoteNickname(remote.nickname);
 
         // Se ambos estiverem em chamada de voz e a chamada ainda não tiver chegado após 400ms:
         const localState = useHubStore.getState();
-        if (localState.inVoiceCall && remote.inVoiceCall && !session.voiceCall) {
+        if (
+          localState.inVoiceCall &&
+          remote.inVoiceCall &&
+          !session.voiceCall
+        ) {
           window.setTimeout(() => {
             const currentSession = this.sessions.get(session.peerId);
             const stillInVoice = useHubStore.getState().inVoiceCall;
@@ -528,21 +626,33 @@ class WebRTCEngine {
         }
 
         // Se local estiver compartilhando tela e o irmão estiver em call de voz
-        if (localState.isScreenSharing && this.localScreenStream && remote.inVoiceCall && !session.screenCall) {
+        if (
+          localState.isScreenSharing &&
+          this.localScreenStream &&
+          remote.inVoiceCall &&
+          !session.screenCall
+        ) {
           this.initiateScreenCallWithPeer(session);
         }
         break;
       }
 
-      case 'speaking': {
-        useHubStore.getState().updateParticipant(packet.peerId, { isSpeaking: packet.isSpeaking });
+      case "speaking": {
+        useHubStore
+          .getState()
+          .updateParticipant(packet.peerId, { isSpeaking: packet.isSpeaking });
         useHubStore.getState().setIsRemoteSpeaking(packet.isSpeaking);
         break;
       }
 
-      case 'screen_stopped': {
-        useHubStore.getState().updateParticipant(packet.peerId, { isScreenSharing: false, screenQualityLabel: undefined });
-        useHubStore.getState().setRemoteStream(packet.peerId, 'screen', null);
+      case "screen_stopped": {
+        useHubStore
+          .getState()
+          .updateParticipant(packet.peerId, {
+            isScreenSharing: false,
+            screenQualityLabel: undefined,
+          });
+        useHubStore.getState().setRemoteStream(packet.peerId, "screen", null);
         useHubStore.getState().setRemoteScreenStream(null);
         useHubStore.getState().setTelemetry({ active: false });
         this.stopReceiverStats();
@@ -550,7 +660,13 @@ class WebRTCEngine {
         break;
       }
 
-      case 'chat_message': {
+      case "chat_message": {
+        if (
+          packet.message &&
+          (packet.message.authorClientId !== session.clientId ||
+            packet.message.roomId !== useHubStore.getState().roomId)
+        )
+          return;
         if (packet.message) {
           storageDb.saveMessage(packet.message).catch(() => {});
           useHubStore.getState().addMessage(packet.message);
@@ -559,24 +675,55 @@ class WebRTCEngine {
         break;
       }
 
-      case 'chat_reaction_toggle': {
-        storageDb.toggleReaction(packet.messageId, packet.emoji, packet.clientId, packet.nickname).catch(() => {});
-        useHubStore.getState().updateMessageReaction(packet.messageId, packet.emoji, packet.clientId, packet.nickname);
+      case "chat_reaction_toggle": {
+        const ownerState = useHubStore.getState();
+        const message = ownerState.messages.find(
+          (m) => m.id === packet.messageId,
+        );
+        if (
+          packet.clientId !== session.clientId ||
+          (message?.authorClientId === ownerState.clientId &&
+            !readOwnProfile(ownerState.clientId, ownerState.nickname).privacy
+              .allowReactions)
+        )
+          return;
+        storageDb
+          .toggleReaction(
+            packet.messageId,
+            packet.emoji,
+            packet.clientId,
+            packet.nickname,
+          )
+          .catch(() => {});
+        useHubStore
+          .getState()
+          .updateMessageReaction(
+            packet.messageId,
+            packet.emoji,
+            packet.clientId,
+            packet.nickname,
+          );
         break;
       }
 
-      case 'chat_typing': {
-        useHubStore.getState().setTypingUser(packet.clientId, packet.nickname, packet.isTyping);
+      case "chat_typing": {
+        useHubStore
+          .getState()
+          .setTypingUser(packet.clientId, packet.nickname, packet.isTyping);
         break;
       }
 
-      case 'chat_sync_request': {
+      case "chat_sync_request": {
         storageDb.getMessagesByRoom(packet.roomId).then((allMsgs) => {
           const knownSet = new Set(packet.knownIds || []);
-          const missing = allMsgs.filter((m) => !knownSet.has(m.id) && m.createdAt >= (packet.sinceTimestamp || 0));
+          const missing = allMsgs.filter(
+            (m) =>
+              !knownSet.has(m.id) &&
+              m.createdAt >= (packet.sinceTimestamp || 0),
+          );
           if (missing.length > 0) {
             session.dataConn.send({
-              type: 'chat_sync_response',
+              type: "chat_sync_response",
               roomId: packet.roomId,
               messages: missing,
             } as SignalingPacket);
@@ -585,16 +732,18 @@ class WebRTCEngine {
         break;
       }
 
-      case 'chat_sync_response': {
+      case "chat_sync_response": {
         if (packet.messages && packet.messages.length > 0) {
-          storageDb.saveMessageBatch(packet.roomId, packet.messages).then((merged) => {
-            useHubStore.getState().setMessages(merged);
-          });
+          storageDb
+            .saveMessageBatch(packet.roomId, packet.messages)
+            .then((merged) => {
+              useHubStore.getState().setMessages(merged);
+            });
         }
         break;
       }
 
-      case 'soundboard_triggered': {
+      case "soundboard_triggered": {
         // Exibe animação flutuante no card do participante que tocou o som
         useHubStore.getState().updateParticipant(packet.peerId, {
           activeSoundEffect: {
@@ -608,7 +757,9 @@ class WebRTCEngine {
         window.setTimeout(() => {
           const current = useHubStore.getState().participants[packet.peerId];
           if (current?.activeSoundEffect?.name === packet.soundName) {
-            useHubStore.getState().updateParticipant(packet.peerId, { activeSoundEffect: null });
+            useHubStore
+              .getState()
+              .updateParticipant(packet.peerId, { activeSoundEffect: null });
           }
         }, 3600);
         break;
@@ -629,7 +780,7 @@ class WebRTCEngine {
       const oldest = localMsgs.length > 0 ? localMsgs[0].createdAt : 0;
 
       conn.send({
-        type: 'chat_sync_request',
+        type: "chat_sync_request",
         roomId: slug,
         sinceTimestamp: oldest,
         knownIds,
@@ -642,17 +793,27 @@ class WebRTCEngine {
   /* ========================================================================= */
 
   private handleIncomingMediaCall(call: MediaConnection): void {
-    const channel = call.metadata?.channel || 'voice';
+    const channel = call.metadata?.channel || "voice";
     const remotePeerId = call.peer;
     const session = this.sessions.get(remotePeerId);
+    const ownState = useHubStore.getState();
+    if (
+      !session ||
+      isBlocked(session.clientId) ||
+      !readOwnProfile(ownState.clientId, ownState.nickname).privacy.allowCalls
+    ) {
+      call.close();
+      return;
+    }
 
-    if (channel === 'voice') {
+    if (channel === "voice") {
       const state = useHubStore.getState();
       if (!state.inVoiceCall) {
         // Se o usuário local NÃO está na call de voz, não envia microfone
         call.answer();
       } else {
-        const localVoiceStream = this.audioPipeline?.getProcessedStream() || this.rawMicStream;
+        const localVoiceStream =
+          this.audioPipeline?.getProcessedStream() || this.rawMicStream;
         call.answer(localVoiceStream || undefined);
       }
 
@@ -662,22 +823,22 @@ class WebRTCEngine {
 
       this.patchCallSdp(call, false);
 
-      call.on('stream', (stream) => {
+      call.on("stream", (stream) => {
         if (session) {
           this.setupPeerVoiceAudio(session, stream);
         }
-        useHubStore.getState().setRemoteStream(remotePeerId, 'voice', stream);
+        useHubStore.getState().setRemoteStream(remotePeerId, "voice", stream);
         useHubStore.getState().setRemoteVoiceStream(stream);
       });
 
-      call.on('close', () => {
+      call.on("close", () => {
         if (session) {
           this.teardownPeerVoiceAudio(session);
           session.voiceCall = null;
         }
-        useHubStore.getState().setRemoteStream(remotePeerId, 'voice', null);
+        useHubStore.getState().setRemoteStream(remotePeerId, "voice", null);
       });
-    } else if (channel === 'screen') {
+    } else if (channel === "screen") {
       call.answer(); // Atende tela sem enviar vídeo de volta
       if (session) {
         session.screenCall = call;
@@ -685,85 +846,112 @@ class WebRTCEngine {
 
       this.patchCallSdp(call, true);
 
-      call.on('stream', (stream) => {
+      call.on("stream", (stream) => {
         sounds.playStreamStart();
-        useHubStore.getState().setRemoteStream(remotePeerId, 'screen', stream);
+        useHubStore.getState().setRemoteStream(remotePeerId, "screen", stream);
         useHubStore.getState().setRemoteScreenStream(stream);
-        useHubStore.getState().updateParticipant(remotePeerId, { isScreenSharing: true });
-        useHubStore.getState().setTelemetry({ active: true, abrStatus: 'optimal' });
+        useHubStore
+          .getState()
+          .updateParticipant(remotePeerId, { isScreenSharing: true });
+        useHubStore
+          .getState()
+          .setTelemetry({ active: true, abrStatus: "optimal" });
 
         this.startReceiverStats(call.peerConnection, stream);
       });
 
-      call.on('close', () => {
+      call.on("close", () => {
         if (session) session.screenCall = null;
-        useHubStore.getState().setRemoteStream(remotePeerId, 'screen', null);
+        useHubStore.getState().setRemoteStream(remotePeerId, "screen", null);
         useHubStore.getState().setRemoteScreenStream(null);
-        useHubStore.getState().updateParticipant(remotePeerId, { isScreenSharing: false });
+        useHubStore
+          .getState()
+          .updateParticipant(remotePeerId, { isScreenSharing: false });
         useHubStore.getState().setTelemetry({ active: false });
         this.stopReceiverStats();
         sounds.playStreamStop();
       });
-    } else if (channel === 'webcam') {
+    } else if (channel === "webcam") {
       call.answer();
       if (session) {
         session.webcamCall = call;
       }
 
-      call.on('stream', (stream) => {
-        useHubStore.getState().setRemoteStream(remotePeerId, 'webcam', stream);
-        useHubStore.getState().updateParticipant(remotePeerId, { isWebcamActive: true });
+      call.on("stream", (stream) => {
+        useHubStore.getState().setRemoteStream(remotePeerId, "webcam", stream);
+        useHubStore
+          .getState()
+          .updateParticipant(remotePeerId, { isWebcamActive: true });
       });
 
-      call.on('close', () => {
+      call.on("close", () => {
         if (session) session.webcamCall = null;
-        useHubStore.getState().setRemoteStream(remotePeerId, 'webcam', null);
-        useHubStore.getState().updateParticipant(remotePeerId, { isWebcamActive: false });
+        useHubStore.getState().setRemoteStream(remotePeerId, "webcam", null);
+        useHubStore
+          .getState()
+          .updateParticipant(remotePeerId, { isWebcamActive: false });
       });
     }
   }
 
   private initiateVoiceCallWithPeer(session: PeerMediaSession): void {
-    if (!this.localPeer || session.voiceCall) return;
+    if (!this.localPeer || session.voiceCall || !this.canCallSession(session))
+      return;
 
-    const voiceStream = this.audioPipeline?.getProcessedStream() || this.rawMicStream;
+    const voiceStream =
+      this.audioPipeline?.getProcessedStream() || this.rawMicStream;
     if (!voiceStream) return;
 
     const call = this.localPeer.call(session.peerId, voiceStream, {
-      metadata: { channel: 'voice' },
+      metadata: { channel: "voice" },
     });
 
     session.voiceCall = call;
     this.patchCallSdp(call, false);
 
-    call.on('stream', (stream) => {
+    call.on("stream", (stream) => {
       this.setupPeerVoiceAudio(session, stream);
-      useHubStore.getState().setRemoteStream(session.peerId, 'voice', stream);
+      useHubStore.getState().setRemoteStream(session.peerId, "voice", stream);
       useHubStore.getState().setRemoteVoiceStream(stream);
     });
 
-    call.on('close', () => {
+    call.on("close", () => {
       this.teardownPeerVoiceAudio(session);
       session.voiceCall = null;
-      useHubStore.getState().setRemoteStream(session.peerId, 'voice', null);
+      useHubStore.getState().setRemoteStream(session.peerId, "voice", null);
     });
   }
 
   private initiateScreenCallWithPeer(session: PeerMediaSession): void {
-    if (!this.localPeer || !this.localScreenStream || session.screenCall) return;
+    if (
+      !this.localPeer ||
+      !this.localScreenStream ||
+      session.screenCall ||
+      !this.canCallSession(session)
+    )
+      return;
 
     const call = this.localPeer.call(session.peerId, this.localScreenStream, {
-      metadata: { channel: 'screen' },
+      metadata: { channel: "screen" },
     });
 
     session.screenCall = call;
     this.patchCallSdp(call, true);
 
     const senders = call.peerConnection.getSenders();
-    const videoSender = senders.find((s) => s.track && s.track.kind === 'video');
+    const videoSender = senders.find(
+      (s) => s.track && s.track.kind === "video",
+    );
     if (videoSender) {
-      configureVideoSender(videoSender, useHubStore.getState().videoQualityConfig.maxBitrateBps);
-      this.startAbrLoop(call.peerConnection, videoSender, useHubStore.getState().videoQualityConfig);
+      configureVideoSender(
+        videoSender,
+        useHubStore.getState().videoQualityConfig.maxBitrateBps,
+      );
+      this.startAbrLoop(
+        call.peerConnection,
+        videoSender,
+        useHubStore.getState().videoQualityConfig,
+      );
     }
   }
 
@@ -771,32 +959,47 @@ class WebRTCEngine {
   /* ÁUDIO INDIVIDUAL POR IRMÃO (0% A 200%) & SINK ID                          */
   /* ========================================================================= */
 
-  private setupPeerVoiceAudio(session: PeerMediaSession, stream: MediaStream): void {
+  private setupPeerVoiceAudio(
+    session: PeerMediaSession,
+    stream: MediaStream,
+  ): void {
     this.teardownPeerVoiceAudio(session);
 
     try {
       // Zera o jitter buffer extra nos receivers de áudio do WebRTC para latência mínima
       const pc = session.voiceCall?.peerConnection;
-      if (pc && typeof pc.getReceivers === 'function') {
+      if (pc && typeof pc.getReceivers === "function") {
         pc.getReceivers().forEach((receiver) => {
-          if (receiver.track?.kind === 'audio' && 'playoutDelayHint' in receiver) {
-            (receiver as unknown as { playoutDelayHint: number }).playoutDelayHint = 0.01;
+          if (
+            receiver.track?.kind === "audio" &&
+            "playoutDelayHint" in receiver
+          ) {
+            (
+              receiver as unknown as { playoutDelayHint: number }
+            ).playoutDelayHint = 0.01;
           }
         });
       }
 
       // Reprodução direta na tag <audio> sem intermediário WebAudio (elimina ~250ms de atraso)
-      let audioEl = document.getElementById(`audio-peer-${session.peerId}`) as HTMLAudioElement | null;
+      let audioEl = document.getElementById(
+        `audio-peer-${session.peerId}`,
+      ) as HTMLAudioElement | null;
       if (!audioEl) {
-        audioEl = document.createElement('audio');
+        audioEl = document.createElement("audio");
         audioEl.id = `audio-peer-${session.peerId}`;
-        audioEl.style.display = 'none';
+        audioEl.style.display = "none";
         document.body.appendChild(audioEl);
       }
 
       const state = useHubStore.getState();
       const peerVol = state.peerVolumes[session.clientId] ?? 1.0;
-      const effVol = state.isDeafened ? 0 : Math.max(0, Math.min(1.0, peerVol * state.audioConfig.remoteStreamVolume));
+      const effVol = state.isDeafened
+        ? 0
+        : Math.max(
+            0,
+            Math.min(1.0, peerVol * state.audioConfig.remoteStreamVolume),
+          );
 
       audioEl.autoplay = true;
       audioEl.muted = state.isDeafened;
@@ -804,18 +1007,23 @@ class WebRTCEngine {
       audioEl.srcObject = stream;
 
       const outputId = state.audioConfig.outputDeviceId;
-      if (outputId && outputId !== 'default' && 'setSinkId' in audioEl) {
+      if (outputId && outputId !== "default" && "setSinkId" in audioEl) {
         (audioEl as unknown as { setSinkId: (id: string) => Promise<void> })
           .setSinkId(outputId)
-          .catch((e) => console.warn('[WebRTC Audio] setSinkId falhou:', e));
+          .catch((e) => console.warn("[WebRTC Audio] setSinkId falhou:", e));
       }
 
-      audioEl.play().catch((e) => console.warn('[WebRTC Audio] Falha ao iniciar play:', e));
+      audioEl
+        .play()
+        .catch((e) => console.warn("[WebRTC Audio] Falha ao iniciar play:", e));
 
       session.voiceAudioEl = audioEl;
       this.startRemoteVoiceDetection(session, stream);
     } catch (err) {
-      console.warn(`[WebRTC Audio] Falha ao configurar áudio para ${session.peerId}:`, err);
+      console.warn(
+        `[WebRTC Audio] Falha ao configurar áudio para ${session.peerId}:`,
+        err,
+      );
     }
   }
 
@@ -825,11 +1033,19 @@ class WebRTCEngine {
       session.remoteSpeakingInterval = null;
     }
     if (session.voiceSourceNode) {
-      try { session.voiceSourceNode.disconnect(); } catch { /* ignore */ }
+      try {
+        session.voiceSourceNode.disconnect();
+      } catch {
+        /* ignore */
+      }
       session.voiceSourceNode = null;
     }
     if (session.voiceGainNode) {
-      try { session.voiceGainNode.disconnect(); } catch { /* ignore */ }
+      try {
+        session.voiceGainNode.disconnect();
+      } catch {
+        /* ignore */
+      }
       session.voiceGainNode = null;
     }
     if (session.voiceAudioEl) {
@@ -838,7 +1054,7 @@ class WebRTCEngine {
       session.voiceAudioEl.remove();
       session.voiceAudioEl = null;
     }
-    if (session.voiceAudioCtx && session.voiceAudioCtx.state !== 'closed') {
+    if (session.voiceAudioCtx && session.voiceAudioCtx.state !== "closed") {
       session.voiceAudioCtx.close().catch(() => {});
       session.voiceAudioCtx = null;
     }
@@ -851,15 +1067,26 @@ class WebRTCEngine {
 
     for (const session of this.sessions.values()) {
       if (session.clientId === clientId && session.voiceAudioEl) {
-        const effVol = state.isDeafened ? 0 : Math.max(0, Math.min(1.0, clamped * state.audioConfig.remoteStreamVolume));
+        const effVol = state.isDeafened
+          ? 0
+          : Math.max(
+              0,
+              Math.min(1.0, clamped * state.audioConfig.remoteStreamVolume),
+            );
         session.voiceAudioEl.volume = effVol;
       }
     }
   }
 
-  private startRemoteVoiceDetection(session: PeerMediaSession, stream: MediaStream): void {
+  private startRemoteVoiceDetection(
+    session: PeerMediaSession,
+    stream: MediaStream,
+  ): void {
     try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext;
       const ctx = new AudioCtx();
       const source = ctx.createMediaStreamSource(stream);
       const analyser = ctx.createAnalyser();
@@ -884,7 +1111,9 @@ class WebRTCEngine {
         const db = rms > 0.0001 ? 20 * Math.log10(rms) : -100;
         const isSpeaking = db > -42;
 
-        useHubStore.getState().updateParticipant(session.peerId, { isSpeaking });
+        useHubStore
+          .getState()
+          .updateParticipant(session.peerId, { isSpeaking });
       }, 50);
     } catch {
       /* ignore */
@@ -904,7 +1133,9 @@ class WebRTCEngine {
 
     useHubStore.getState().setInVoiceCall(true);
     if (this.localPeer) {
-      useHubStore.getState().updateParticipant(this.localPeer.id, { inVoiceCall: true });
+      useHubStore
+        .getState()
+        .updateParticipant(this.localPeer.id, { inVoiceCall: true });
     }
 
     // Notifica todos os irmãos da sala via peer_state_sync
@@ -936,7 +1167,11 @@ class WebRTCEngine {
     // Encerra todas as chamadas de voz com os irmãos
     for (const session of this.sessions.values()) {
       if (session.voiceCall) {
-        try { session.voiceCall.close(); } catch { /* ignore */ }
+        try {
+          session.voiceCall.close();
+        } catch {
+          /* ignore */
+        }
         session.voiceCall = null;
       }
       this.teardownPeerVoiceAudio(session);
@@ -946,11 +1181,70 @@ class WebRTCEngine {
     useHubStore.getState().setRemoteVoiceStream(null);
 
     if (this.localPeer) {
-      useHubStore.getState().updateParticipant(this.localPeer.id, { inVoiceCall: false });
+      useHubStore
+        .getState()
+        .updateParticipant(this.localPeer.id, { inVoiceCall: false });
     }
 
     // Notifica todos os irmãos mantendo o chat ativo!
     this.broadcastLocalState();
+  }
+
+  private canCallSession(session: PeerMediaSession): boolean {
+    const state = useHubStore.getState();
+    return (
+      !isBlocked(session.clientId) &&
+      readOwnProfile(state.clientId, state.nickname).privacy.allowCalls &&
+      state.participants[session.peerId]?.profile?.interactions.calls !== false
+    );
+  }
+
+  private closeBlockedMedia(session: PeerMediaSession): void {
+    this.teardownPeerVoiceAudio(session);
+    for (const call of [
+      session.voiceCall,
+      session.webcamCall,
+      session.screenCall,
+    ]) {
+      try {
+        call?.close();
+      } catch {}
+    }
+    session.voiceCall = null;
+    session.webcamCall = null;
+    session.screenCall = null;
+    useHubStore.getState().removeRemoteStreams(session.peerId);
+  }
+
+  private sendProfileToSession(session: PeerMediaSession): void {
+    if (!session.dataConn.open || isBlocked(session.clientId)) return;
+    const state = useHubStore.getState();
+    session.dataConn.send({
+      type: "profile_update",
+      profile: publicProfile(readOwnProfile(state.clientId, state.nickname)),
+    } as SignalingPacket);
+  }
+
+  public refreshLocalProfile(): void {
+    const state = useHubStore.getState();
+    const profile = readOwnProfile(state.clientId, state.nickname);
+    state.setNickname(profile.displayName);
+    state.setAvatarColor(profile.appearance.color);
+    if (this.localPeer)
+      state.updateParticipant(this.localPeer.id, {
+        nickname: profile.displayName,
+        avatarColor: profile.appearance.color,
+      });
+    this.broadcastLocalState();
+    for (const session of this.sessions.values()) {
+      if (isBlocked(session.clientId) || !profile.privacy.allowCalls)
+        this.closeBlockedMedia(session);
+      if (isBlocked(session.clientId)) {
+        useHubStore
+          .getState()
+          .updateParticipant(session.peerId, { profile: null });
+      } else this.sendProfileToSession(session);
+    }
   }
 
   private broadcastLocalState(): void {
@@ -959,20 +1253,27 @@ class WebRTCEngine {
     const local = state.participants[this.localPeer.id];
     if (!local) return;
 
-    const { isLocal, ...rest } = local;
+    const { isLocal, profile: _profile, ...rest } = local;
     this.broadcast({
-      type: 'peer_state_sync',
+      type: "peer_state_sync",
       state: rest,
     });
   }
 
   public broadcast(packet: SignalingPacket): void {
     for (const session of this.sessions.values()) {
-      if (session.dataConn && session.dataConn.open) {
+      if (
+        !isBlocked(session.clientId) &&
+        session.dataConn &&
+        session.dataConn.open
+      ) {
         try {
           session.dataConn.send(packet);
         } catch (err) {
-          console.warn(`[WebRTC Broadcast] Falha ao enviar para ${session.peerId}:`, err);
+          console.warn(
+            `[WebRTC Broadcast] Falha ao enviar para ${session.peerId}:`,
+            err,
+          );
         }
       }
     }
@@ -980,16 +1281,18 @@ class WebRTCEngine {
 
   // Compatibilidade legada
   public sendData(msg: { type: string; [key: string]: unknown }): void {
-    if (msg.type === 'nickname' && typeof msg.name === 'string') {
+    if (msg.type === "nickname" && typeof msg.name === "string") {
       useHubStore.getState().setNickname(msg.name);
       if (this.localPeer) {
-        useHubStore.getState().updateParticipant(this.localPeer.id, { nickname: msg.name });
+        useHubStore
+          .getState()
+          .updateParticipant(this.localPeer.id, { nickname: msg.name });
       }
       this.broadcastLocalState();
-    } else if (msg.type === 'speaking') {
+    } else if (msg.type === "speaking") {
       this.broadcast({
-        type: 'speaking',
-        peerId: this.localPeer?.id || '',
+        type: "speaking",
+        peerId: this.localPeer?.id || "",
         isSpeaking: Boolean(msg.isSpeaking),
       });
     }
@@ -1014,7 +1317,9 @@ class WebRTCEngine {
     }
 
     if (this.localPeer) {
-      useHubStore.getState().updateParticipant(this.localPeer.id, { isMuted: nextMuted });
+      useHubStore
+        .getState()
+        .updateParticipant(this.localPeer.id, { isMuted: nextMuted });
     }
     this.broadcastLocalState();
   }
@@ -1031,7 +1336,10 @@ class WebRTCEngine {
         session.voiceAudioEl.muted = nextDeafened;
         session.voiceAudioEl.volume = nextDeafened
           ? 0
-          : Math.max(0, Math.min(1.0, peerVol * state.audioConfig.remoteStreamVolume));
+          : Math.max(
+              0,
+              Math.min(1.0, peerVol * state.audioConfig.remoteStreamVolume),
+            );
       }
     }
 
@@ -1041,7 +1349,9 @@ class WebRTCEngine {
     }
 
     if (this.localPeer) {
-      useHubStore.getState().updateParticipant(this.localPeer.id, { isDeafened: nextDeafened });
+      useHubStore
+        .getState()
+        .updateParticipant(this.localPeer.id, { isDeafened: nextDeafened });
     }
     this.broadcastLocalState();
   }
@@ -1059,13 +1369,19 @@ class WebRTCEngine {
 
       for (const session of this.sessions.values()) {
         if (session.webcamCall) {
-          try { session.webcamCall.close(); } catch { /* ignore */ }
+          try {
+            session.webcamCall.close();
+          } catch {
+            /* ignore */
+          }
           session.webcamCall = null;
         }
       }
 
       if (this.localPeer) {
-        useHubStore.getState().updateParticipant(this.localPeer.id, { isWebcamActive: false });
+        useHubStore
+          .getState()
+          .updateParticipant(this.localPeer.id, { isWebcamActive: false });
       }
       this.broadcastLocalState();
     } else {
@@ -1073,7 +1389,10 @@ class WebRTCEngine {
         const videoDeviceId = useHubStore.getState().audioConfig.videoDeviceId;
         const constraints: MediaStreamConstraints = {
           video: {
-            deviceId: videoDeviceId && videoDeviceId !== 'default' ? { exact: videoDeviceId } : undefined,
+            deviceId:
+              videoDeviceId && videoDeviceId !== "default"
+                ? { exact: videoDeviceId }
+                : undefined,
             width: { ideal: 1280 },
             height: { ideal: 720 },
             frameRate: { ideal: 30 },
@@ -1086,30 +1405,42 @@ class WebRTCEngine {
         useHubStore.getState().setWebcamActive(true);
 
         if (this.localPeer) {
-          useHubStore.getState().updateParticipant(this.localPeer.id, { isWebcamActive: true });
+          useHubStore
+            .getState()
+            .updateParticipant(this.localPeer.id, { isWebcamActive: true });
         }
         this.broadcastLocalState();
 
         // Envia chamada de webcam para irmãos em call de voz
         for (const session of this.sessions.values()) {
           const p = useHubStore.getState().participants[session.peerId];
-          if (p?.inVoiceCall && this.localPeer) {
+          if (
+            p?.inVoiceCall &&
+            this.localPeer &&
+            this.canCallSession(session)
+          ) {
             const call = this.localPeer.call(session.peerId, stream, {
-              metadata: { channel: 'webcam' },
+              metadata: { channel: "webcam" },
             });
             session.webcamCall = call;
           }
         }
       } catch (err) {
-        console.error('[WebRTC Engine] Erro ao acessar webcam:', err);
+        console.error("[WebRTC Engine] Erro ao acessar webcam:", err);
       }
     }
   }
 
-  public async startScreenShare(sourceId: string, qualityConfig: VideoQualityConfig): Promise<void> {
+  public async startScreenShare(
+    sourceId: string,
+    qualityConfig: VideoQualityConfig,
+  ): Promise<void> {
     try {
       if (window.cbsHubAPI) {
-        await window.cbsHubAPI.setCaptureSource(sourceId, qualityConfig.includeSystemAudio);
+        await window.cbsHubAPI.setCaptureSource(
+          sourceId,
+          qualityConfig.includeSystemAudio,
+        );
       }
 
       const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -1125,8 +1456,9 @@ class WebRTCEngine {
           frameRate: { ideal: qualityConfig.fps, max: qualityConfig.fps },
         });
 
-        if ('contentHint' in videoTrack) {
-          videoTrack.contentHint = qualityConfig.fps >= 60 ? 'motion' : 'detail';
+        if ("contentHint" in videoTrack) {
+          videoTrack.contentHint =
+            qualityConfig.fps >= 60 ? "motion" : "detail";
         }
 
         videoTrack.onended = () => {
@@ -1155,7 +1487,10 @@ class WebRTCEngine {
         }
       }
     } catch (err) {
-      console.error('[WebRTC Engine] Erro ao iniciar compartilhamento de tela:', err);
+      console.error(
+        "[WebRTC Engine] Erro ao iniciar compartilhamento de tela:",
+        err,
+      );
       this.stopScreenShare();
     }
   }
@@ -1173,7 +1508,11 @@ class WebRTCEngine {
 
     for (const session of this.sessions.values()) {
       if (session.screenCall) {
-        try { session.screenCall.close(); } catch { /* ignore */ }
+        try {
+          session.screenCall.close();
+        } catch {
+          /* ignore */
+        }
         session.screenCall = null;
       }
     }
@@ -1188,7 +1527,7 @@ class WebRTCEngine {
         screenQualityLabel: undefined,
       });
       this.broadcast({
-        type: 'screen_stopped',
+        type: "screen_stopped",
         peerId: this.localPeer.id,
       });
     }
@@ -1213,7 +1552,10 @@ class WebRTCEngine {
       const useSuppression = Boolean(audioConfig.neuralNoiseGate);
       const constraints: MediaStreamConstraints = {
         audio: {
-          deviceId: audioConfig.inputDeviceId !== 'default' ? { exact: audioConfig.inputDeviceId } : undefined,
+          deviceId:
+            audioConfig.inputDeviceId !== "default"
+              ? { exact: audioConfig.inputDeviceId }
+              : undefined,
           echoCancellation: audioConfig.echoCancellation,
           autoGainControl: audioConfig.autoGainControl,
           noiseSuppression: useSuppression,
@@ -1222,19 +1564,26 @@ class WebRTCEngine {
         },
       };
 
-      this.rawMicStream = await navigator.mediaDevices.getUserMedia(constraints);
+      this.rawMicStream =
+        await navigator.mediaDevices.getUserMedia(constraints);
 
-      this.audioPipeline = new VoiceAudioPipeline(this.rawMicStream, audioConfig, (isSpeaking, level) => {
-        useHubStore.getState().setIsLocalSpeaking(isSpeaking, level);
-        if (this.localPeer) {
-          useHubStore.getState().updateParticipant(this.localPeer.id, { isSpeaking });
-          this.broadcast({
-            type: 'speaking',
-            peerId: this.localPeer.id,
-            isSpeaking,
-          });
-        }
-      });
+      this.audioPipeline = new VoiceAudioPipeline(
+        this.rawMicStream,
+        audioConfig,
+        (isSpeaking, level) => {
+          useHubStore.getState().setIsLocalSpeaking(isSpeaking, level);
+          if (this.localPeer) {
+            useHubStore
+              .getState()
+              .updateParticipant(this.localPeer.id, { isSpeaking });
+            this.broadcast({
+              type: "speaking",
+              peerId: this.localPeer.id,
+              isSpeaking,
+            });
+          }
+        },
+      );
 
       // Aplica estado de mute inicial no pipeline
       this.audioPipeline.setMicMuted(useHubStore.getState().isMuted);
@@ -1248,7 +1597,9 @@ class WebRTCEngine {
         for (const session of this.sessions.values()) {
           const pc = session.voiceCall?.peerConnection;
           if (pc) {
-            const audioSender = pc.getSenders().find((s) => s.track?.kind === 'audio');
+            const audioSender = pc
+              .getSenders()
+              .find((s) => s.track?.kind === "audio");
             if (audioSender) {
               audioSender.replaceTrack(newAudioTrack).catch(() => {});
             }
@@ -1259,10 +1610,10 @@ class WebRTCEngine {
       // Registra hooks no soundboardEngine para que os clipes injetem no WebRTC
       soundboardEngine.registerPipelineHooks(
         () => this.audioPipeline?.getAudioContext() ?? null,
-        () => this.audioPipeline?.getSoundboardInputNode() ?? null
+        () => this.audioPipeline?.getSoundboardInputNode() ?? null,
       );
     } catch (err) {
-      console.error('[WebRTC Engine] Erro ao configurar microfone:', err);
+      console.error("[WebRTC Engine] Erro ao configurar microfone:", err);
     }
   }
 
@@ -1273,25 +1624,38 @@ class WebRTCEngine {
     }
 
     // Se o usuário ligou/desligou a supressão de ruído, aplica ao vivo na trilha do microfone
-    if (typeof partial.neuralNoiseGate === 'boolean' && this.rawMicStream) {
+    if (typeof partial.neuralNoiseGate === "boolean" && this.rawMicStream) {
       const audioTrack = this.rawMicStream.getAudioTracks()[0];
-      if (audioTrack && typeof audioTrack.applyConstraints === 'function') {
-        audioTrack.applyConstraints({ noiseSuppression: partial.neuralNoiseGate }).catch(() => {});
+      if (audioTrack && typeof audioTrack.applyConstraints === "function") {
+        audioTrack
+          .applyConstraints({ noiseSuppression: partial.neuralNoiseGate })
+          .catch(() => {});
       }
     }
 
     // Se atualizou remoteStreamVolume ou outputDeviceId, aplica em todas as sessões
     const state = useHubStore.getState();
     for (const session of this.sessions.values()) {
-      if (session.voiceAudioEl && typeof partial.remoteStreamVolume === 'number') {
+      if (
+        session.voiceAudioEl &&
+        typeof partial.remoteStreamVolume === "number"
+      ) {
         const peerVol = state.peerVolumes[session.clientId] ?? 1.0;
         session.voiceAudioEl.volume = state.isDeafened
           ? 0
           : Math.max(0, Math.min(1.0, peerVol * partial.remoteStreamVolume));
       }
 
-      if (partial.outputDeviceId && session.voiceAudioEl && 'setSinkId' in session.voiceAudioEl) {
-        (session.voiceAudioEl as unknown as { setSinkId: (id: string) => Promise<void> })
+      if (
+        partial.outputDeviceId &&
+        session.voiceAudioEl &&
+        "setSinkId" in session.voiceAudioEl
+      ) {
+        (
+          session.voiceAudioEl as unknown as {
+            setSinkId: (id: string) => Promise<void>;
+          }
+        )
           .setSinkId(partial.outputDeviceId)
           .catch(() => {});
       }
@@ -1308,18 +1672,27 @@ class WebRTCEngine {
       if (!pc) return;
 
       const origSetLocalDescription = pc.setLocalDescription.bind(pc);
-      pc.setLocalDescription = async (desc?: RTCLocalSessionDescriptionInit) => {
+      pc.setLocalDescription = async (
+        desc?: RTCLocalSessionDescriptionInit,
+      ) => {
         if (desc && desc.sdp) {
           desc.sdp = enhanceOpusSdp(desc.sdp, isStereo);
         }
         return origSetLocalDescription(desc);
       };
     } catch (err) {
-      console.warn('[WebRTC Engine] Interceptação de setLocalDescription falhou:', err);
+      console.warn(
+        "[WebRTC Engine] Interceptação de setLocalDescription falhou:",
+        err,
+      );
     }
   }
 
-  private startAbrLoop(pc: RTCPeerConnection, sender: RTCRtpSender, config: VideoQualityConfig): void {
+  private startAbrLoop(
+    pc: RTCPeerConnection,
+    sender: RTCRtpSender,
+    config: VideoQualityConfig,
+  ): void {
     if (this.abrIntervalId !== null) clearInterval(this.abrIntervalId);
 
     this.currentMaxBitrate = config.maxBitrateBps;
@@ -1338,61 +1711,85 @@ class WebRTCEngine {
         let packetsLostPercent = 0;
 
         stats.forEach((report) => {
-          if (report.type === 'outbound-rtp' && report.kind === 'video') {
-            if (typeof report.framesPerSecond === 'number' && report.framesPerSecond > 0) {
+          if (report.type === "outbound-rtp" && report.kind === "video") {
+            if (
+              typeof report.framesPerSecond === "number" &&
+              report.framesPerSecond > 0
+            ) {
               fps = report.framesPerSecond;
             }
             const now = performance.now();
             const deltaMs = now - this.prevSenderTimestamp;
             if (this.prevSenderBytes > 0 && deltaMs > 0 && report.bytesSent) {
               const bytesDiff = report.bytesSent - this.prevSenderBytes;
-              bitrateMbps = Math.max(0, Number(((bytesDiff * 8) / (deltaMs / 1000) / 1_000_000).toFixed(2)));
+              bitrateMbps = Math.max(
+                0,
+                Number(
+                  ((bytesDiff * 8) / (deltaMs / 1000) / 1_000_000).toFixed(2),
+                ),
+              );
             }
             this.prevSenderBytes = report.bytesSent || 0;
             this.prevSenderTimestamp = now;
           }
 
-          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-            if (typeof report.currentRoundTripTime === 'number') {
+          if (
+            report.type === "candidate-pair" &&
+            report.state === "succeeded"
+          ) {
+            if (typeof report.currentRoundTripTime === "number") {
               rttMs = Math.round(report.currentRoundTripTime * 1000);
             }
           }
 
-          if (report.type === 'remote-inbound-rtp' && report.kind === 'video') {
+          if (report.type === "remote-inbound-rtp" && report.kind === "video") {
             const packetsLost = report.packetsLost || 0;
             const packetsReceived = report.packetsReceived || 0;
             const total = packetsLost + packetsReceived;
             if (total > 0) {
-              packetsLostPercent = Math.max(0, Number(((packetsLost / total) * 100).toFixed(1)));
+              packetsLostPercent = Math.max(
+                0,
+                Number(((packetsLost / total) * 100).toFixed(1)),
+              );
             }
           }
         });
 
-        let abrStatus: 'optimal' | 'throttled' | 'recovering' = useHubStore.getState().telemetry.abrStatus;
+        let abrStatus: "optimal" | "throttled" | "recovering" =
+          useHubStore.getState().telemetry.abrStatus;
 
         if (packetsLostPercent > 4.0 || rttMs > 120) {
           this.consecutiveBadCycles++;
           this.consecutiveGoodCycles = 0;
 
           if (this.consecutiveBadCycles >= 2) {
-            const throttled = Math.max(1_500_000, Math.round(this.currentMaxBitrate * 0.8));
+            const throttled = Math.max(
+              1_500_000,
+              Math.round(this.currentMaxBitrate * 0.8),
+            );
             if (throttled !== this.currentMaxBitrate) {
               this.currentMaxBitrate = throttled;
               await configureVideoSender(sender, this.currentMaxBitrate);
             }
-            abrStatus = 'throttled';
+            abrStatus = "throttled";
           }
         } else if (packetsLostPercent < 0.5 && rttMs <= 100) {
           this.consecutiveBadCycles = 0;
           this.consecutiveGoodCycles++;
 
           if (this.consecutiveGoodCycles >= 6) {
-            const recovered = Math.min(this.targetMaxBitrate, Math.round(this.currentMaxBitrate * 1.15));
+            const recovered = Math.min(
+              this.targetMaxBitrate,
+              Math.round(this.currentMaxBitrate * 1.15),
+            );
             if (recovered !== this.currentMaxBitrate) {
               this.currentMaxBitrate = recovered;
               await configureVideoSender(sender, this.currentMaxBitrate);
             }
-            abrStatus = this.currentMaxBitrate >= this.targetMaxBitrate ? 'optimal' : 'recovering';
+            abrStatus =
+              this.currentMaxBitrate >= this.targetMaxBitrate
+                ? "optimal"
+                : "recovering";
           }
         } else {
           this.consecutiveBadCycles = 0;
@@ -1409,7 +1806,7 @@ class WebRTCEngine {
           abrStatus,
         });
       } catch (err) {
-        console.warn('[ABR Loop] Erro na leitura de stats:', err);
+        console.warn("[ABR Loop] Erro na leitura de stats:", err);
       }
     }, 1500);
   }
@@ -1426,7 +1823,7 @@ class WebRTCEngine {
         let bitrateMbps = 0;
         let rttMs = 18;
         let packetsLostPercent = 0;
-        let resolution = '1080p';
+        let resolution = "1080p";
 
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
@@ -1437,15 +1834,27 @@ class WebRTCEngine {
         }
 
         stats.forEach((report) => {
-          if (report.type === 'inbound-rtp' && report.kind === 'video') {
-            if (typeof report.framesPerSecond === 'number' && report.framesPerSecond > 0) {
+          if (report.type === "inbound-rtp" && report.kind === "video") {
+            if (
+              typeof report.framesPerSecond === "number" &&
+              report.framesPerSecond > 0
+            ) {
               fps = report.framesPerSecond;
             }
             const now = performance.now();
             const deltaMs = now - this.prevReceiverTimestamp;
-            if (this.prevReceiverBytes > 0 && deltaMs > 0 && report.bytesReceived) {
+            if (
+              this.prevReceiverBytes > 0 &&
+              deltaMs > 0 &&
+              report.bytesReceived
+            ) {
               const bytesDiff = report.bytesReceived - this.prevReceiverBytes;
-              bitrateMbps = Math.max(0, Number(((bytesDiff * 8) / (deltaMs / 1000) / 1_000_000).toFixed(2)));
+              bitrateMbps = Math.max(
+                0,
+                Number(
+                  ((bytesDiff * 8) / (deltaMs / 1000) / 1_000_000).toFixed(2),
+                ),
+              );
             }
             this.prevReceiverBytes = report.bytesReceived || 0;
             this.prevReceiverTimestamp = now;
@@ -1454,12 +1863,18 @@ class WebRTCEngine {
             const packetsReceived = report.packetsReceived || 0;
             const total = packetsLost + packetsReceived;
             if (total > 0) {
-              packetsLostPercent = Math.max(0, Number(((packetsLost / total) * 100).toFixed(1)));
+              packetsLostPercent = Math.max(
+                0,
+                Number(((packetsLost / total) * 100).toFixed(1)),
+              );
             }
           }
 
-          if (report.type === 'candidate-pair' && report.state === 'succeeded') {
-            if (typeof report.currentRoundTripTime === 'number') {
+          if (
+            report.type === "candidate-pair" &&
+            report.state === "succeeded"
+          ) {
+            if (typeof report.currentRoundTripTime === "number") {
               rttMs = Math.round(report.currentRoundTripTime * 1000);
             }
           }
@@ -1472,10 +1887,10 @@ class WebRTCEngine {
           bitrateMbps,
           rttMs,
           packetsLostPercent,
-          abrStatus: packetsLostPercent > 4 ? 'throttled' : 'optimal',
+          abrStatus: packetsLostPercent > 4 ? "throttled" : "optimal",
         });
       } catch (err) {
-        console.warn('[Receiver Stats] Erro:', err);
+        console.warn("[Receiver Stats] Erro:", err);
       }
     }, 1500);
   }
@@ -1496,12 +1911,15 @@ class WebRTCEngine {
     if (!trimmed) return null;
 
     const state = useHubStore.getState();
-    const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'msg-' + Date.now();
+    const id =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : "msg-" + Date.now();
 
     const msg: ChatMessage = {
       id,
       roomId: state.roomId,
-      type: 'user',
+      type: "user",
       authorClientId: state.clientId,
       authorNickname: state.nickname,
       authorAvatarColor: state.avatarColor,
@@ -1514,20 +1932,40 @@ class WebRTCEngine {
     useHubStore.getState().addMessage(msg);
 
     this.broadcast({
-      type: 'chat_message',
+      type: "chat_message",
       message: msg,
     });
 
     return msg;
   }
 
-  public async toggleMessageReaction(messageId: string, emoji: string): Promise<void> {
+  public async toggleMessageReaction(
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
     const state = useHubStore.getState();
-    await storageDb.toggleReaction(messageId, emoji, state.clientId, state.nickname);
-    useHubStore.getState().updateMessageReaction(messageId, emoji, state.clientId, state.nickname);
+    const message = state.messages.find((m) => m.id === messageId);
+    const author = Object.values(state.participants).find(
+      (p) => p.clientId === message?.authorClientId,
+    );
+    if (
+      author &&
+      (isBlocked(author.clientId) ||
+        author.profile?.interactions.reactions === false)
+    )
+      return;
+    await storageDb.toggleReaction(
+      messageId,
+      emoji,
+      state.clientId,
+      state.nickname,
+    );
+    useHubStore
+      .getState()
+      .updateMessageReaction(messageId, emoji, state.clientId, state.nickname);
 
     this.broadcast({
-      type: 'chat_reaction_toggle',
+      type: "chat_reaction_toggle",
       messageId,
       emoji,
       clientId: state.clientId,
@@ -1538,7 +1976,7 @@ class WebRTCEngine {
   public sendTypingState(isTyping: boolean): void {
     const state = useHubStore.getState();
     this.broadcast({
-      type: 'chat_typing',
+      type: "chat_typing",
       clientId: state.clientId,
       nickname: state.nickname,
       isTyping,
@@ -1563,7 +2001,7 @@ class WebRTCEngine {
 
       // Notifica todos os irmãos para exibirem o badge animado
       this.broadcast({
-        type: 'soundboard_triggered',
+        type: "soundboard_triggered",
         peerId: this.localPeer.id,
         clientId: state.clientId,
         nickname: state.nickname,
@@ -1572,11 +2010,14 @@ class WebRTCEngine {
       });
 
       // Registra mensagem de soundboard no chat
-      const msgId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : 'sb-' + Date.now();
+      const msgId =
+        typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : "sb-" + Date.now();
       const soundMsg: ChatMessage = {
         id: msgId,
         roomId: state.roomId,
-        type: 'soundboard',
+        type: "soundboard",
         authorClientId: state.clientId,
         authorNickname: state.nickname,
         authorAvatarColor: state.avatarColor,
@@ -1592,14 +2033,17 @@ class WebRTCEngine {
       await storageDb.saveMessage(soundMsg);
       useHubStore.getState().addMessage(soundMsg);
       this.broadcast({
-        type: 'chat_message',
+        type: "chat_message",
         message: soundMsg,
       });
 
       window.setTimeout(() => {
-        const current = useHubStore.getState().participants[this.localPeer?.id || ''];
+        const current =
+          useHubStore.getState().participants[this.localPeer?.id || ""];
         if (current?.activeSoundEffect?.name === clip.name) {
-          useHubStore.getState().updateParticipant(this.localPeer!.id, { activeSoundEffect: null });
+          useHubStore
+            .getState()
+            .updateParticipant(this.localPeer!.id, { activeSoundEffect: null });
         }
       }, 3600);
     }
@@ -1642,28 +2086,52 @@ class WebRTCEngine {
     for (const session of this.sessions.values()) {
       this.teardownPeerVoiceAudio(session);
       if (session.voiceCall) {
-        try { session.voiceCall.close(); } catch { /* ignore */ }
+        try {
+          session.voiceCall.close();
+        } catch {
+          /* ignore */
+        }
       }
       if (session.webcamCall) {
-        try { session.webcamCall.close(); } catch { /* ignore */ }
+        try {
+          session.webcamCall.close();
+        } catch {
+          /* ignore */
+        }
       }
       if (session.screenCall) {
-        try { session.screenCall.close(); } catch { /* ignore */ }
+        try {
+          session.screenCall.close();
+        } catch {
+          /* ignore */
+        }
       }
       if (session.dataConn) {
-        try { session.dataConn.close(); } catch { /* ignore */ }
+        try {
+          session.dataConn.close();
+        } catch {
+          /* ignore */
+        }
       }
     }
     this.sessions.clear();
 
     if (this.beaconPeer) {
-      try { this.beaconPeer.destroy(); } catch { /* ignore */ }
+      try {
+        this.beaconPeer.destroy();
+      } catch {
+        /* ignore */
+      }
       this.beaconPeer = null;
       this.isBeaconOwner = false;
     }
 
     if (this.localPeer) {
-      try { this.localPeer.destroy(); } catch { /* ignore */ }
+      try {
+        this.localPeer.destroy();
+      } catch {
+        /* ignore */
+      }
       this.localPeer = null;
     }
 

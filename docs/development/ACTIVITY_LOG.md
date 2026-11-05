@@ -60,3 +60,14 @@ Pendências para a outra IA: ler KNOWN_ISSUES; começar por K01/R1; preservar co
 - Preservação: motores src/lib, store/tipos de comunicação, Electron, manifest/lock e config build sem mudanças.
 - Pendências: revisão humana das paletas/contraste, testes reais multipar e Windows, CI, quota local, ausência de backend de sincronização e defeitos K01 etc. Ver STUDIO.md. Nenhuma validação de chamadas reais alegada.
 - Passagem: não avançar para perfis. Mudanças prontas para revisão na branch de Studio; sem push/merge nesta tarefa.
+
+
+## 05/11/2026 — PROFILE-001 — Codex/OpenAI
+
+- Branch feat/user-profiles-2026-11-05; base 03217b8; recuperação recovery/pre-profiles-2026-11-05; commit 7a88783.
+- Preflight: docs/modelos revisados, main com merge do PR #2 incorporada por fast-forward. Sem alterações locais preexistentes. Mantenedor confirmou continuar local/P2P e backend depois.
+- Arquivos: src/profiles/{model,repository,ProfileProvider,ProfileDialog}; main/App; ParticipantAvatar, MembersPanel, LeftSidebar, SettingsModal, UserCallCard, TextChatSection, WorkspaceRail e index.css; contrato cbshub.d.ts e integrações/gates em webrtcEngine; testes profile-validation/profile-smoke; README de testes e docs compartilhadas.
+- Implementado: identidade/username/bio/status/emoji/links/data local; imagens validadas e normalizadas; aparência de cartão; visão rápida/completa e editor com preview/save/cancel; privacidade por projeção pública, bloqueio local persistente e permissões de chamadas/reações.
+- Testes executados: build passou; 7 grupos de validação passaram; edição/raster/persistência/reload/cancel e visão por outro contexto via handler real/ponte local passaram; bloqueio de mensagem/mídia persistiu; chamadas/reações negadas em sessão conhecida passaram; móvel passou. Studio e redesign smoke passaram; core de chat/DB/modal/reação/WAV/mixagem/stopAll e API Electron passou.
+- Não executados: transporte remoto real/ICE, autorização de servidor, unicidade global, testes Windows/hardware e acessibilidade completa. Sem credenciais/backend inventados.
+- Pendências e passagem: revisão multipar, definição futura de backend; preservar filtro de campos privados e associação à sessão. Dados já enviados não são revogáveis. Ver PROFILES.md. Sem push, merge ou alteração de main nesta tarefa.

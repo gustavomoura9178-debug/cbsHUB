@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState } from "react";
 import {
   MicOff,
   Headphones,
@@ -8,17 +8,18 @@ import {
   Radio,
   Sliders,
   Tv,
-} from 'lucide-react';
-import { useHubStore } from '../store/useHubStore';
-import { webrtcEngine } from '../lib/webrtcEngine';
-import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
-import { Slider } from './ui/slider';
-import { Button } from './ui/button';
-import { Separator } from './ui/separator';
-import type { Participant } from '../types/cbshub';
+} from "lucide-react";
+import { useHubStore } from "../store/useHubStore";
+import { webrtcEngine } from "../lib/webrtcEngine";
+import { Popover, PopoverTrigger, PopoverContent } from "./ui/popover";
+import { Slider } from "./ui/slider";
+import { Button } from "./ui/button";
+import { Separator } from "./ui/separator";
+import { ParticipantAvatar } from "./ParticipantAvatar";
+import type { Participant } from "../types/cbshub";
 
 function getInitials(name: string): string {
-  if (!name) return '?';
+  if (!name) return "?";
   const parts = name.trim().split(/\s+/);
   if (parts.length >= 2) {
     return (parts[0][0] + parts[1][0]).toUpperCase();
@@ -31,13 +32,18 @@ interface UserCallCardProps {
   isCompact?: boolean;
 }
 
-export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompact = false }) => {
+export const UserCallCard: React.FC<UserCallCardProps> = ({
+  participant,
+  isCompact = false,
+}) => {
   const { localWebcamStream, remoteStreams, peerVolumes } = useHubStore();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   const isLocal = participant.isLocal;
-  const webcamStream = isLocal ? localWebcamStream : remoteStreams[participant.peerId]?.webcam;
+  const webcamStream = isLocal
+    ? localWebcamStream
+    : remoteStreams[participant.peerId]?.webcam;
   const hasActiveWebcam = participant.isWebcamActive && Boolean(webcamStream);
   const isSpeakingNow = participant.isSpeaking && !participant.isMuted;
   const volume = peerVolumes[participant.clientId] ?? 1.0;
@@ -55,11 +61,13 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
   return (
     <div
       className={`relative rounded-xl border transition-all duration-200 overflow-hidden flex items-center justify-center select-none group bg-card ${
-        isCompact ? 'h-20 w-32 shrink-0' : 'w-full h-full min-h-[140px] aspect-video'
+        isCompact
+          ? "h-20 w-32 shrink-0"
+          : "w-full h-full min-h-[140px] aspect-video"
       } ${
         isSpeakingNow
-          ? 'border-success ring-2 ring-success/30 shadow-lg shadow-emerald-500/10'
-          : 'border-white/[0.07] hover:border-white/20'
+          ? "border-success ring-2 ring-success/30 shadow-lg shadow-emerald-500/10"
+          : "border-white/[0.07] hover:border-white/20"
       }`}
     >
       {/* 1. Vídeo da Webcam ou Avatar Centralizado */}
@@ -73,18 +81,13 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
         />
       ) : (
         <div className="flex flex-col items-center justify-center gap-2 p-2">
-          <div
-            className={`rounded-full flex items-center justify-center font-bold text-white uppercase shadow-md transition-all duration-200 ${
-              isCompact ? 'w-10 h-10 text-xs' : 'w-16 h-16 text-lg'
-            } ${
-              isSpeakingNow
-                ? 'ring-4 ring-success shadow-xl shadow-emerald-500/40 animate-pulse'
-                : 'ring-1 ring-white/10'
-            }`}
-            style={{ backgroundColor: participant.avatarColor || 'var(--primary)' }}
-          >
-            {getInitials(participant.nickname)}
-          </div>
+          <ParticipantAvatar
+            clientId={participant.clientId}
+            name={participant.nickname}
+            color={participant.avatarColor}
+            speaking={isSpeakingNow}
+            className={isCompact ? "size-10" : "size-16"}
+          />
         </div>
       )}
 
@@ -130,7 +133,11 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
                   <Sliders className="w-3 h-3" />
                 </button>
               </PopoverTrigger>
-              <PopoverContent side="top" align="end" className="w-60 p-3 space-y-2 pointer-events-auto">
+              <PopoverContent
+                side="top"
+                align="end"
+                className="w-60 p-3 space-y-2 pointer-events-auto"
+              >
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-foreground flex items-center gap-1">
                     <Volume2 className="w-3.5 h-3.5 text-primary" />
@@ -145,21 +152,30 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant, isCompa
                   max={2}
                   step={0.05}
                   value={[volume]}
-                  onValueChange={([val]) => webrtcEngine.setPeerVolume(participant.clientId, val)}
+                  onValueChange={([val]) =>
+                    webrtcEngine.setPeerVolume(participant.clientId, val)
+                  }
                 />
                 <div className="flex justify-between items-center pt-1">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => webrtcEngine.setPeerVolume(participant.clientId, volume === 0 ? 1 : 0)}
+                    onClick={() =>
+                      webrtcEngine.setPeerVolume(
+                        participant.clientId,
+                        volume === 0 ? 1 : 0,
+                      )
+                    }
                     className="h-6 text-2xs px-2 text-muted-foreground"
                   >
-                    {volume === 0 ? 'Desmutar' : 'Mutar'}
+                    {volume === 0 ? "Desmutar" : "Mutar"}
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => webrtcEngine.setPeerVolume(participant.clientId, 1.0)}
+                    onClick={() =>
+                      webrtcEngine.setPeerVolume(participant.clientId, 1.0)
+                    }
                     className="h-6 text-2xs px-2 text-muted-foreground"
                   >
                     100%
@@ -202,10 +218,15 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
       role="button"
       tabIndex={0}
       aria-label={`Focar tela de ${participant.nickname}`}
-      onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onFocus(); } }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onFocus();
+        }
+      }}
       onClick={onFocus}
       className={`relative rounded-xl border border-border bg-black overflow-hidden flex items-center justify-center select-none group cursor-pointer aspect-video w-full h-full min-h-[140px] shadow-lg transition-all ${
-        isFocused ? 'ring-2 ring-primary' : 'hover:border-primary/50'
+        isFocused ? "ring-2 ring-primary" : "hover:border-primary/50"
       }`}
     >
       <video
@@ -246,4 +267,3 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
     </div>
   );
 };
-

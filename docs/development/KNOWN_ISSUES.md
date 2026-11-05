@@ -45,3 +45,8 @@ K21 parcialmente tratado na apresentação: histórico local agora permanece vis
 ## Atualização — STUDIO-001 — 05/11/2026
 
 Studio: sem backend de sincronização; transferir JSON manualmente. LocalStorage pode exceder quota com imagens; gravação falha com aviso e export continua disponível. Cálculo AA cobre pares sólidos, não certifica fundos compostos. Dados locais inválidos usam padrão seguro. Sem validação completa de leitor de tela/Windows/mídia real. Aviso de bundle >500kB e K01 permanecem.
+
+
+## Atualização — PROFILE-001 — 05/11/2026
+
+Perfis: username só verifica participantes conhecidos, sem reserva global; data é de perfil local; presença manual/invisível não esconde transporte P2P. Sem autorização/criptografia de servidor; bloqueio por clientId pode ser evadido recriando identidade. Campos já compartilhados não podem ser retirados de outros clientes. Teste remoto de perfis usou ponte local, sem ICE real. Quota local e riscos K01 etc permanecem. Novo editor atualiza cor via refreshLocalProfile; helper legado sendData(peer_state_sync) continua ignorando esse formato.

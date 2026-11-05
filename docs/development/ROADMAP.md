@@ -41,3 +41,8 @@ Em 05/11/2026 o mantenedor solicitou explicitamente a implementação do redesig
 ## Atualização — STUDIO-001 — 05/11/2026
 
 STUDIO-001 implementado por nova autorização do mantenedor após redesign integrado. Antes de integrar, revisar presets e testes descritos em STUDIO.md. Sync remoto depende de backend autenticado ainda inexistente; perfis não iniciados. R1/R2/R3 e defeitos anteriores continuam pendentes.
+
+
+## Atualização — PROFILE-001 — 05/11/2026
+
+PROFILE-001 implementado no escopo local/P2P aprovado. Próximos passos: revisão multipar real, identidade/autorização de backend quando definido e reserva global de username. Não anunciar conta autenticada/sync remoto com base em clientId local. Ver PROFILES.md.

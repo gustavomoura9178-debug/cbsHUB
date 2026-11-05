@@ -40,3 +40,8 @@ Redesign implementado a pedido explícito do mantenedor na branch `feat/workspac
 ## Atualização — STUDIO-001 — 05/11/2026
 
 Studio implementado para revisão: editor de temas, seis presets, preview/cancelamento, biblioteca local, JSON v1 validado, fundos/layout/contraste/movimento reduzido. Ver STUDIO.md. Sincronização automática indisponível por ausência de backend adequado. Sem perfis.
+
+
+## Atualização — PROFILE-001 — 05/11/2026
+
+Perfis locais/P2P implementados: identidade, cartão rápido/completo, editor/prévia, imagens normalizadas, aparência, privacidade e bloqueio. Backend/autorização de servidor e reserva global de username continuam indisponíveis. Escopo local aprovado explicitamente; PROFILES.md registra garantias e limites.

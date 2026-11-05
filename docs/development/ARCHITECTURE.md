@@ -64,3 +64,8 @@ WorkspaceRail + LeftSidebar + RoomTopBar compõem a navegação; MembersPanel é
 ## Atualização — STUDIO-001 — 05/11/2026
 
 StudioProvider envolve App; rascunho/salvo separados evitam remontar engines. theme.ts contém esquema restrito e presets; StudioDialog usa shadcn/Radix existentes; aplicação por allowlist de variáveis CSS. useWorkspaceLayout usa o provider visual. Persistência local com biblioteca; JSON v1 transferível. Ver STUDIO.md.
+
+
+## Atualização — PROFILE-001 — 05/11/2026
+
+ProfileProvider envolve App; repository local vincula perfil ao clientId e mantém bloqueios. Modelo UserProfile privado e PublicProfile separado. profile_update aditivo sobre DataConnection, associado à sessão e excluído do diretório/state_sync. Gates de mídia/reação/bloqueio ficam no motor. Sem backend ou mudança de autenticação. Ver PROFILES.md.

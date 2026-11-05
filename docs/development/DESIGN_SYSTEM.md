@@ -18,3 +18,8 @@ Telemetria: StreamDiagnostics organiza FPS/latência/bitrate/perda da transmiss�
 ## Atualização — STUDIO-001 — 05/11/2026
 
 Studio agora permite substituir os tokens de aparência com valores validados e medidas limitadas. Seis presets claros/escuros, wallpaper em camada separada e preview independente. O editor preserva cores próprias legíveis durante experimentação. Movimentos respeitam preferência de sistema e configuração explícita. Modelo/contraste em src/studio/theme.ts; especificação STUDIO.md.
+
+
+## Atualização — PROFILE-001 — 05/11/2026
+
+ProfileCard/ProfileDialog usam primitives shadcn/Radix existentes e tokens globais, com tema opcional limitado ao cartão. AvatarImage é reutilizado nos avatares compartilhados. Aparência aceita apenas enums e HEX validados; não recebe CSS livre. Menus de escolha do editor usam DropdownMenu, sem biblioteca adicional.

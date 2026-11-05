@@ -20,13 +20,14 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+
+import { useProfiles } from "../profiles/ProfileProvider";
 
 export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const {
@@ -40,14 +41,12 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
     inVoiceCall,
     isConnected,
     setIsSettingsOpen,
-    setNickname,
   } = useHubStore();
+  const profiles = useProfiles();
   const [slug, setSlug] = useState("");
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState("");
   const [copyError, setCopyError] = useState(false);
-  const [nickInput, setNickInput] = useState(nickname);
-  const [editingNick, setEditingNick] = useState(false);
   const rooms = [...new Set([roomId, ...recentRooms])].filter((room) =>
     room.includes(query.toLowerCase()),
   );
@@ -67,14 +66,6 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
     } catch {
       setCopyError(true);
     }
-  };
-  const saveNickname = () => {
-    const next = nickInput.trim();
-    if (next && next !== nickname) {
-      setNickname(next);
-      webrtcEngine.sendData({ type: "nickname", name: next });
-    }
-    setEditingNick(false);
   };
   return (
     <aside id="room-navigation" className="room-navigation" aria-label="Salas">
@@ -233,51 +224,19 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
       </div>
       <div className="local-user-panel">
         <div className="flex items-center gap-2.5 min-w-0">
-          <Popover
-            open={editingNick}
-            onOpenChange={(open) => {
-              setEditingNick(open);
-              if (open) setNickInput(nickname);
-            }}
+          <button
+            type="button"
+            aria-label="Editar meu perfil"
+            onClick={() => profiles.view("self")}
           >
-            <PopoverTrigger asChild>
-              <button
-                aria-label="Editar meu perfil"
-                className="rounded-full shrink-0"
-              >
-                <ParticipantAvatar
-                  name={nickname}
-                  color={avatarColor}
-                  speaking={isLocalSpeaking && !isMuted}
-                />
-              </button>
-            </PopoverTrigger>
-            <PopoverContent className="space-y-3">
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  saveNickname();
-                }}
-                className="space-y-3"
-              >
-                <label
-                  htmlFor="profile-nickname"
-                  className="text-sm font-medium"
-                >
-                  Como quer ser chamado?
-                </label>
-                <Input
-                  id="profile-nickname"
-                  value={nickInput}
-                  onChange={(e) => setNickInput(e.target.value)}
-                  maxLength={40}
-                />
-                <Button type="submit" className="w-full">
-                  Salvar nome
-                </Button>
-              </form>
-            </PopoverContent>
-          </Popover>
+            <ParticipantAvatar
+              clientId={profiles.own.ownerId}
+              interactive={false}
+              name={nickname}
+              color={avatarColor}
+              speaking={isLocalSpeaking && !isMuted}
+            />
+          </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">{nickname}</p>
             <p className="flex items-center gap-1 text-caption text-muted-foreground">

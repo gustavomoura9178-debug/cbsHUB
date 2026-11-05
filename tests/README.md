@@ -11,3 +11,7 @@ Os probes de persistência/mixagem/Electron usados na auditoria permanecem em `/
 `node tests/theme-validation.cjs`: usa o TypeScript já instalado para carregar o modelo e validar oito grupos de segurança/contraste/roundtrip. Não requer navegador.
 
 `node tests/studio-smoke.cjs`: usa os mesmos pré-requisitos de Playwright/Chromium e servidor local. Exercita preview/rollback, persistência, biblioteca, JSON, cores, fundo raster/gradiente, layout, acessibilidade e móvel. Perfis efêmeros e destinos externos bloqueados. Não testa backend nem chamadas entre máquinas. Arquivo de exemplo versionado em docs/themes/dark-modern.cbshub.json; especificação em docs/development/STUDIO.md.
+
+# Perfis
+
+`node tests/profile-validation.cjs` executa sete grupos de validação/projeção com o TypeScript existente. `node tests/profile-smoke.cjs` usa Playwright/Chromium e renderer local, dois contextos isolados e ponte de pacotes através do handler real. Exercita edição/persistência, upload raster, cancelamento, visão remota/privacidade, bloqueio e permissões. Não comprova sinalização/ICE pela internet nem autorização em backend. Ver docs/development/PROFILES.md.
