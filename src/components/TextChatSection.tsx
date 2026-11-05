@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { useProfiles } from "../profiles/ProfileProvider";
 import type { ChatMessage } from "../types/cbshub";
 
 const QUICK_REACTIONS = ["👍", "😂", "🔥", "❤️"];
@@ -126,6 +127,7 @@ function renderMessageText(content: string) {
 }
 
 export const TextChatSection: React.FC = () => {
+  const profiles = useProfiles();
   const {
     messages,
     roomId,
@@ -270,9 +272,12 @@ export const TextChatSection: React.FC = () => {
 
   // Usuários digitando atualmente (excluindo usuário local)
   const typingEntries = Object.entries(typingUsers).filter(
-    ([id]) => id !== localClientId,
+    ([id]) => id !== localClientId && !profiles.blocked.includes(id),
   );
 
+  const visibleMessages = messages.filter(
+    (msg) => !profiles.blocked.includes(msg.authorClientId),
+  );
   return (
     <div className="chat-panel relative">
       <div className="chat-heading">
@@ -333,8 +338,8 @@ export const TextChatSection: React.FC = () => {
         ) : (
           /* Renderização das Mensagens Agrupadas */
           <div className="space-y-0.5 pt-2">
-            {messages.map((msg, index) => {
-              const prevMsg = index > 0 ? messages[index - 1] : null;
+            {visibleMessages.map((msg, index) => {
+              const prevMsg = index > 0 ? visibleMessages[index - 1] : null;
 
               // Separador de Data
               const showDateSeparator =
@@ -401,6 +406,7 @@ export const TextChatSection: React.FC = () => {
                       {/* Avatar apenas no cabeçalho do bloco */}
                       {!isGrouped && (
                         <ParticipantAvatar
+                          clientId={msg.authorClientId}
                           name={msg.authorNickname}
                           color={msg.authorAvatarColor}
                         />

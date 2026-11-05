@@ -25,6 +25,7 @@ import {
   SIDEBAR_MAX,
 } from "./hooks/useWorkspaceLayout";
 
+import { ProfileDialog } from "./profiles/ProfileDialog";
 import { StudioDialog } from "./studio/StudioDialog";
 
 export const App: React.FC = () => {
@@ -152,6 +153,7 @@ export const App: React.FC = () => {
         <ScreenPickerModal />
         <SettingsModal />
         <StudioDialog />
+        <ProfileDialog />
       </div>
     </TooltipProvider>
   );

@@ -49,3 +49,12 @@ Preflight: redesign integrado pelo PR #1; main remota revisada e incorporada por
 ## Atualização — STUDIO-001 — 05/11/2026
 
 STUDIO-001 concluído para revisão; reserva liberada. Commit 19d316f; base 08f0c51. Componentes, testes e limites em STUDIO.md. Sem perfis, push ou merge nesta tarefa.
+
+## PROFILE-001 — em execução
+
+05/11/2026 · Codex/OpenAI · feat/user-profiles-2026-11-05 · base 03217b8 (Studio integrado pelo PR #2). Checkout limpo; main incorporada por fast-forward. Reserva: src/profiles, pontos de presença/permissões no motor, contrato aditivo, avatares/cartões/editor e documentação/testes. Sem alteração de autenticação (não há autenticação de contas no repositório). Backend global e unicidade de nomes dependem de infraestrutura ainda inexistente; implementar limites locais/P2P explicitamente, sem alegar autorização de servidor.
+
+
+## Atualização — PROFILE-001 — 05/11/2026
+
+PROFILE-001 concluído para revisão; reserva liberada. Branch feat/user-profiles-2026-11-05; base 03217b8; commit PROFILE_CONTENT_COMMIT. Escopo local/P2P aprovado pelo mantenedor, backend depois. Ver PROFILES.md.

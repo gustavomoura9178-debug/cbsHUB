@@ -14,6 +14,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Slider } from "./ui/slider";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { PRESENCES } from "../profiles/model";
 import type { Participant } from "../types/cbshub";
 
 function MemberRow({ participant: p }: { participant: Participant }) {
@@ -21,6 +22,7 @@ function MemberRow({ participant: p }: { participant: Participant }) {
   return (
     <div className="member-row">
       <ParticipantAvatar
+        clientId={p.clientId}
         name={p.nickname}
         color={p.avatarColor}
         speaking={p.isSpeaking && !p.isMuted}
@@ -40,6 +42,8 @@ function MemberRow({ participant: p }: { participant: Participant }) {
             </>
           ) : p.inVoiceCall ? (
             "Na chamada"
+          ) : p.profile ? (
+            PRESENCES[p.profile.presence]
           ) : (
             "Na conversa"
           )}

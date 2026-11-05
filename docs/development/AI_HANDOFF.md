@@ -78,3 +78,8 @@ Branch `feat/workspace-redesign-2026-11-05`, base `recovery/pre-redesign-2026-11
 ## Atualização — STUDIO-001 — 05/11/2026
 
 STUDIO-001 usa branch feat/cbshub-studio-2026-11-05, base 08f0c51 (PR #1 integrado). Ler STUDIO.md antes de alterar formato/provider. Preferências de layout migradas para cbshub-studio-v1; motores e dados de chat/Soundboard intactos. Não adicionar sync P2P de preferências como se fosse backend autenticado. Sem perfis nesta etapa. Commit de conteúdo: 19d316f.
+
+
+## Atualização — PROFILE-001 — 05/11/2026
+
+PROFILE-001 · feat/user-profiles-2026-11-05 · PROFILE_CONTENT_COMMIT · base 03217b8. Ler PROFILES.md antes de modificar identidade, perfil público e gates de interação. Não enviar objeto UserProfile privado pelo transporte. Não tratar clientId local como autenticação de conta. Mantenedor escolheu local/P2P e backend depois. Nenhum push/merge desta tarefa.

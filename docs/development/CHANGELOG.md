@@ -28,3 +28,8 @@ Codex/OpenAI · feat/workspace-redesign-2026-11-05 · a29e4ca. Novo workspace, s
 ## Atualização — STUDIO-001 — 05/11/2026
 
 STUDIO-001 · Codex/OpenAI · feat/cbshub-studio-2026-11-05 · 19d316f. Adicionados presets/editor/preview/library/JSON v1, imagens raster locais, layout e contraste. Slider com nome no Thumb; foco inicial de Sheet ajustado. Sem dependências novas, perfis ou backend de sincronização. Detalhes e testes em STUDIO.md.
+
+
+## Atualização — PROFILE-001 — 05/11/2026
+
+PROFILE-001 · Codex/OpenAI · feat/user-profiles-2026-11-05 · PROFILE_CONTENT_COMMIT. Perfis locais completos/editáveis, avatar/banner, status, temas de cartão, privacidade e bloqueios; projeção pública e integração P2P validadas. Sem mudança de autenticação nem dependências. Detalhes/testes/limites em PROFILES.md.
