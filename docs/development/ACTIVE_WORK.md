@@ -78,3 +78,5 @@ CHAT-002 concluído para revisão; reserva liberada. feat/chat-v2-2026-11-05, ba
 MEDIA-001 concluído para revisão; reserva liberada. Branch feat/media-experience-2026-11-05; base 6a72051. Ver MEDIA_EXPERIENCE.md para arquivos, testes reais e matriz pendente. Commits serão identificados no ACTIVITY_LOG após criação. Sem trabalho concorrente conhecido; main intacta.
 
 Atualização do mantenedor: publicação da branch autorizada após executar os testes disponíveis. Build e dez scripts de teste passaram; media-transport foi executado e está bloqueado por ausência de candidatos ICE. Publicação não equivale a aprovação da matriz física ou merge.
+
+Commit de conteúdo MEDIA-001: `de8a914`. Dez scripts passaram e um teste de transporte ficou bloqueado (não aprovado). Alterações preparadas para publicação na branch `feat/media-experience-2026-11-05` conforme autorização do mantenedor; main não modificada. Este registro é o commit documental posterior, identificável pelo histórico Git.

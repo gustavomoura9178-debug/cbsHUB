@@ -96,3 +96,5 @@ Testes executados: npm run build passou (avisos preexistentes de bundle/preload)
 Pendências: matriz física, K07/ABR multipar, K01/preload e K16/dependências. Outra IA: conferir MEDIA_EXPERIENCE e commits antes de editar áreas de mídia; reservas liberadas. Entrega local para revisão, sem push/merge.
 
 Atualização do mantenedor: publicação da branch autorizada após executar os testes disponíveis. Build e dez scripts de teste passaram; media-transport foi executado e está bloqueado por ausência de candidatos ICE. Publicação não equivale a aprovação da matriz física ou merge.
+
+Commit de conteúdo MEDIA-001: `de8a914`. Dez scripts passaram e um teste de transporte ficou bloqueado (não aprovado). Alterações preparadas para publicação na branch `feat/media-experience-2026-11-05` conforme autorização do mantenedor; main não modificada. Este registro é o commit documental posterior, identificável pelo histórico Git.

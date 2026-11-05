@@ -63,3 +63,5 @@ Não foram testados: dois dispositivos físicos, saída em fone específico, hot
 5. Conferir RTT/perda contra getStats e testar degradação real. ABR de tela e telemetria de recepção continuam globais (K07); não declarar adaptação individual multipar.
 
 A entrega está pronta para revisão de código e validação manual; aprovação de integração/distribuição de mídia depende dessa matriz. Não altera dependências nem resolve K01/K16.
+
+Commit de conteúdo MEDIA-001: `de8a914`. Dez scripts passaram e um teste de transporte ficou bloqueado (não aprovado). Alterações preparadas para publicação na branch `feat/media-experience-2026-11-05` conforme autorização do mantenedor; main não modificada. Este registro é o commit documental posterior, identificável pelo histórico Git.
