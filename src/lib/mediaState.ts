@@ -4,6 +4,7 @@ export interface CallQuality {
   state: RTCPeerConnectionState;
   rttMs: number | null;
   loss: number | null;
+  jitterMs?: number | null;
 }
 interface MediaState {
   error: string | null;

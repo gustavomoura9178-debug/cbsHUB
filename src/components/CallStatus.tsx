@@ -15,6 +15,24 @@ export function MediaNotice() {
         {error ||
           "Reconectando à sala. As chamadas existentes serão preservadas enquanto possível."}
       </span>
+      {error && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => webrtcEngine.retryConnection()}
+        >
+          Tentar novamente
+        </Button>
+      )}
+      {reconnecting && (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => webrtcEngine.cancelRecovery()}
+        >
+          Cancelar reconexão
+        </Button>
+      )}
       {error ? (
         <Button
           size="sm"
