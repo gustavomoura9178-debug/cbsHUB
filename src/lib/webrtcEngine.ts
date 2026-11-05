@@ -1,3 +1,4 @@
+import {peerState} from "./signalingValidation";
 import {soundActivity} from "../chat/activities";
 import { chatLedger } from "../chat/ledger";
 import {
@@ -662,17 +663,8 @@ class WebRTCEngine {
         break;
       }
       case "peer_state_sync": {
-        const input = packet.state;
-        if (
-          !input ||
-          input.peerId !== session.peerId ||
-          typeof input.clientId !== "string" ||
-          input.clientId.length > 100
-        )
-          return;
-        // A session cannot change identity after its initial handshake.
-        if (session.clientId && session.clientId !== input.clientId) return;
-        const { profile: _untrustedProfile, ...remote } = input;
+        const remote = peerState(packet.state, session.peerId, session.clientId);
+        if (!remote) return;
         session.clientId = remote.clientId;
         session.nickname = remote.nickname;
 

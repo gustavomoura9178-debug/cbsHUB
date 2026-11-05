@@ -1,3 +1,5 @@
+> Atualização atual: **2.0.0-rc.2 / SECURITY-002**. Leia [SECURITY_UPDATE.md](SECURITY_UPDATE.md). Estados anteriores são históricos.
+
 > Estado atual em 05/11/2026: candidato **2.0.0-rc.1**, estabilização STABILIZE-001. Consulte [STABILIZATION.md](STABILIZATION.md). As seções anteriores abaixo são históricas.
 
 # Passagem entre pessoas e agentes de IA
@@ -120,3 +122,8 @@ Entrega VISUAL-002: commit de conteúdo `27d6c15`; reserva liberada, branch limp
 Branch fix/stabilization-2026-11-05, base 89dc1bb; recuperação recovery/pre-stabilization-2026-11-05. Ler STABILIZATION.md, VERSIONING.md e README antes de continuar. Não reintroduzir lib/formats no preload (merge concatena ES/CJS). IPC exige renderer principal; captura não deve cair na primeira tela quando fonte inválida. Rodar npm run build, servidor npm run dev:renderer e npm test. Bloqueio ambiental também gera exit 1, com classificação BLOCKED. Sem push/merge ou tag estável nesta tarefa. Artefatos ignorados locais não são compartilhados automaticamente.
 
 Entrega STABILIZE-001: conteúdo em `f9df3e8`, branch fix/stabilization-2026-11-05, candidato 2.0.0-rc.1. 14 scripts aprovados e media-transport bloqueado, build/Electron/pacote Linux verificados. Reserva liberada; este é o registro documental posterior. Nenhum push, merge ou declaração de produção.
+
+
+## SECURITY-002 — 05/11/2026
+
+SECURITY-002 em fix/security-hardening-2026-11-05, base 7bede05. Ler SECURITY_UPDATE.md e BACKEND_PROPOSAL.md. Usuário escolheu proposta de backend próprio para revisão; não instalar/publicar serviço como se os contratos já estivessem aprovados. Preservar modo local/dados. Node >=22.12; Electron runtime lazy pode exigir install.js/proxy. Override de minimatch só cobre >=7 <11: não substituir versões de API antiga usadas por glob/asar. Renderer test helper filtra novos plugins Electron :dev/:prod. Nenhum push/merge autorizado nesta tarefa.

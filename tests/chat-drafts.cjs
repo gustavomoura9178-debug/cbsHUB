@@ -85,7 +85,7 @@ const assert = require("node:assert/strict");
     await p
       .getByRole("button", { name: "Enviar mensagem", exact: true })
       .click();
-    await p.getByText("Rascunho da primeira sala", { exact: true }).waitFor();
+    await p.getByLabel("Mensagens da sala").getByText("Rascunho da primeira sala", { exact: true }).waitFor();
     console.log(
       "PASS falha de persistência mantém rascunho e permite nova tentativa",
     );

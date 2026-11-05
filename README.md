@@ -2,16 +2,19 @@
 
 Aplicativo Electron de comunicação P2P com React, TypeScript, shadcn/ui e Tailwind CSS.
 
-Versão de revisão: **2.0.0-rc.1**. Não há aprovação para produção. Leia [o relatório de estabilização](docs/development/STABILIZATION.md) e [a política de versões](docs/development/VERSIONING.md).
+Versão de revisão: **2.0.0-rc.2**. Não há aprovação para produção. Leia [o relatório de estabilização](docs/development/SECURITY_UPDATE.md) e [a política de versões](docs/development/VERSIONING.md).
 
 ## Instalação e execução
 
-Testado neste ambiente com Node 24.22.1 e npm 11.9.0. Requer acesso aos registries e ao download do Electron; preserve certificados e configurações de proxy da sua organização.
+Requer Node >=22.12 (Electron 45). Testado neste ambiente com Node 24.22.1 e npm 11.9.0. Requer acesso aos registries e ao download do Electron; preserve certificados e configurações de proxy da sua organização.
 
 ```sh
 npm ci --legacy-peer-deps
+node node_modules/electron/install.js
 npm run dev
 ```
+
+Electron 45 baixa o runtime sob demanda; o comando install.js acima permite prepará-lo antes de executar os testes. No cloud, prefixe esse comando com ELECTRON_GET_USE_PROXY=1.
 
 O lockfile atual exige `--legacy-peer-deps`; não foi refeito nem houve atualização incidental de dependências. No ambiente cloud com proxy, use `ELECTRON_GET_USE_PROXY=1 npm ci --legacy-peer-deps`. `npm run dev` requer sessão gráfica para abrir Electron.
 

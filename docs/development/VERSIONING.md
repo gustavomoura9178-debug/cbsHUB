@@ -7,3 +7,5 @@ Não foi encontrada política formal de releases anterior; o pacote estava em 1.
 - Criar um candidato não autoriza publicar release, tag estável ou modificar main.
 - A versão 2.0.0 estável depende da matriz física, avaliação de segurança/dependências, revisão e autorização do mantenedor.
 - Novas correções no candidato recebem rc.2 etc. Não reutilizar um artefato já distribuído sob o mesmo identificador de release.
+
+SECURITY-002 identifica o próximo candidato como **2.0.0-rc.2**. rc.1 permanece histórico, sem reutilização do identificador de artefato. Versão estável ainda depende dos gates de release.

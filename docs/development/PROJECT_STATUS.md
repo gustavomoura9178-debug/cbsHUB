@@ -1,3 +1,5 @@
+> Atualização atual: **2.0.0-rc.2 / SECURITY-002**. Leia [SECURITY_UPDATE.md](SECURITY_UPDATE.md). Estados anteriores são históricos.
+
 > Estado atual em 05/11/2026: candidato **2.0.0-rc.1**, estabilização STABILIZE-001. Consulte [STABILIZATION.md](STABILIZATION.md). As seções anteriores abaixo são históricas.
 
 # Estado do projeto
@@ -74,3 +76,8 @@ Pendências: validação visual fina contra as capturas, acessibilidade completa
 ## STABILIZE-001 — 05/11/2026
 
 Candidato de revisão 2.0.0-rc.1, base 89dc1bb. Todos os testes disponíveis executados: 14 aprovados, media-transport bloqueado por ICE. Electron produção/reload e pacote Linux testados headless. 19 vulnerabilidades de dependências continuam. Arquivos/pastas/GIFs compartilhados e autenticação de contas ausentes. Chamadas entre usuários reais e Windows não aprovados. Ver STABILIZATION.md para matriz completa.
+
+
+## SECURITY-002 — 05/11/2026
+
+Candidato atual 2.0.0-rc.2: dependências atualizadas e npm audit sem ocorrências conhecidas; CSP/capacidades Electron e presença P2P validadas. Suite: 15 aprovados, media-transport bloqueado por ICE. Pacote Linux e interface/CSP/mic sintético testados. Não aprovado para produção. Backend próprio foi proposto para revisão; contas/sync/global rooms/arquivos/pastas/GIFs permanecem não implementados.

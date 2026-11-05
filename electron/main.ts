@@ -1,4 +1,4 @@
-import {trustedRenderer,externalLink,validCaptureSource} from './security';
+import {trustedRenderer,externalLink,validCaptureSource,permittedCapability} from './security';
 import {pathToFileURL} from 'node:url';
 import { app, BrowserWindow, ipcMain, desktopCapturer, session, shell } from 'electron';
 import path from 'node:path';
@@ -108,7 +108,7 @@ ipcMain.handle('cbs:get-sources', async (event) => {
 
 // Interceptador IPC para configurar a fonte escolhida pelo usuário
 ipcMain.handle('cbs:set-capture-source', (event, sourceId: string, includeAudio: boolean) => {
-  if(!allowedSender(event) || !validCaptureSource(sourceId,includeAudio)) return false;
+  if(!allowedSender(event) || !validCaptureSource(sourceId,includeAudio)) { pendingSourceId = null; return false; }
   pendingSourceId = sourceId;
   pendingSystemAudio = includeAudio;
   return true;
@@ -152,11 +152,18 @@ ipcMain.on('cbs:always-on-top', (event, flag: boolean) => {
 });
 
 app.whenReady().then(() => {
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+    callback(contents === mainWindow?.webContents && permittedCapability(permission, details.requestingUrl || contents.getURL(), rendererUrl, details.isMainFrame !== false));
+  });
+  session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => {
+    return contents === mainWindow?.webContents && permittedCapability(permission, details.requestingUrl || contents?.getURL() || '', rendererUrl, details.isMainFrame !== false);
+  });
   // Interceptador oficial do Electron para getDisplayMedia (Seção 4.1 do SDD.md)
   session.defaultSession.setDisplayMediaRequestHandler(async (request, callback) => {
     const sourceId = pendingSourceId; pendingSourceId = null;
     if (!request.frame || request.frame !== mainWindow?.webContents.mainFrame || !trustedRenderer(request.frame.url,rendererUrl) || !sourceId) { callback({}); return; }
-    const sources = await desktopCapturer.getSources({ types: ['screen', 'window'] });
+    let sources: Electron.DesktopCapturerSource[];
+    try { sources = await desktopCapturer.getSources({ types: ['screen', 'window'] }); } catch { callback({}); return; }
     const chosen = sources.find((s) => s.id === sourceId);
 
     if (!chosen) {

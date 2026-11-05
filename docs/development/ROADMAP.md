@@ -65,3 +65,8 @@ CHAT-002 implementado no escopo local/P2P; próxima revisão deve validar compat
 ## STABILIZE-001 — 05/11/2026
 
 Próximo gate: revisão do candidato 2.0.0-rc.1, plano de atualização das 19 vulnerabilidades, matriz física em 2 e depois 3–6 dispositivos, ABR/telemetria por par, acessibilidade completa e instaladores na plataforma-alvo. Cada etapa depende de evidência própria. 2.0.0 estável somente após revisão/autorização; backend e recursos ausentes exigem escopo separado.
+
+
+## SECURITY-002 — 05/11/2026
+
+Após SECURITY-002, revisar BACKEND_PROPOSAL antes de implementar contas e infraestrutura. Sequência proposta: serviço/DB → sessões → perfis/preferências/migração → salas/WebSocket/chat → tickets de mídia → arquivos/pastas → GIFs. Em paralelo, ABR por par e matriz de mídia física, acessibilidade completa, EXIF/memória e instaladores na plataforma-alvo. Audit 0 não substitui testes de release.
