@@ -1,0 +1,38 @@
+# Roadmap técnico e dependências
+
+Data: 05/11/2026 (America/Sao_Paulo). Responsável: Codex/OpenAI.
+Branch: `audit/cbshub-v2-2026-11-05`. Base auditada: `5deab40aa1629a975dc72588b658569b21494c23`.
+
+Este roadmap propõe tarefas; não autoriza trocar bibliotecas nem marca trabalho futuro como concluído. Escopos pequenos em branches próprias, com revisão da outra pessoa.
+
+| Etapa | Dependências | Entrega e critério de aceite | Arquivos/área provável |
+| --- | --- | --- | --- |
+| R0 — Auditoria e proteção | Nenhuma | Concluída nesta fase: nove docs, branch, tag, bundle e evidências locais | docs/ e configuração cloud |
+| R1 — Execução reproduzível | R0 | Corrigir K01; uma saída CJS, build e startup dev/produção repetíveis, seis métodos IPC; formalizar versão Node/npm e opção de instalação sem atualização incidental | vite.config.ts, configuração de ambiente; manifests só se aprovados |
+| R2a — Baseline de regressão | R1 | Introduzir estratégia/testes versionados de persistência, reação, mixagem/mute/stopAll, lifecycle e erros; fixtures isoladas; testes devem falhar quando contrato quebrar | Infra de testes e testes dedicados, bibliotecas novas mediante aprovação |
+| R2b — Correções essenciais | R1 e casos correspondentes de R2a | Resolver K02–K06 e K09/K10; validação runtime/sala, teardown, falha de permissão, mídia bidirecional e late join, favoritos/identidade | webrtcEngine, audioPipeline, storageDb, SettingsModal |
+| R2c — Dependências e desktop | R1 | Revisar K16/K15, propor versões compatíveis e obter aprovação; corrigir em mudanças pequenas com build, IPC e mídia. Não usar audit fix force | package/lock, Electron e revisão de políticas |
+| R3 — Gate funcional multipar | R2a/R2b; rede compatível e perfis/dispositivos | Demonstrar matriz abaixo; tratar regressões P1 abertas; registrar versão, SO, pares, evidência e limitações; revisar riscos de R2c | Testes funcionais e docs de resultados |
+| R4 — Planejamento visual | R0; implementação aguarda R3 | Inventário de tokens/primitivos, proposta de fluxos/estados, acessibilidade e prioridades; aprovação das duas pessoas | Especificação e proposta, sem troca de stack |
+| R5 — Redesign incremental | R3 + R4 aprovado | Um grupo de componentes por PR: shell → chat → palco/controles → Soundboard/modais. Regressões essenciais a cada mudança; preservar APIs/estado | components e index.css; motores fora de escopo visual |
+| R6 — Performance e consistência | R3, coordenado com R5 | K07/K08/K11–K14/K19/K20: ABR por par, volume real, convergência, VAD, deafen, teclado; métricas antes/depois | Motores e UI em tarefas separadas |
+| R7 — Distribuição | R2c + R5/R6 | Empacotar Windows, testar instalação/atualização/desinstalação, permissões, diferentes NATs e hardware; versionamento coerente | electron-builder, release e documentação |
+
+## Matriz mínima de R3
+
+1. Três perfis independentes na mesma sala: descoberta, nickname/cor, chat bidirecional, reações, digitação e histórico tardio; ampliar a seis.
+2. Sala de texto sem voz; entrar/sair apenas da voz mantendo chat; trocar de sala sem ressuscitar sessões antigas.
+3. Microfone permitido/negado, troca de dispositivos, mute/deafen e volume; nenhum vazamento de tracks após saída.
+4. Webcam bidirecional, participante que entra depois e reconexão.
+5. Tela com áudio, dois transmissores, foco/grade, stop e fim da fonte; presets e 4K60 medidos em hardware compatível, sem inferir desempenho pelo rótulo.
+6. Soundboard nativo e arquivo customizado: retorno local, remoto, mic mudo, deafen, favorito e stopAll; nenhum corte indevido pelo gate.
+7. Saída do dono do beacon, perda/retorno da sinalização e entradas simultâneas; nenhuma perda de chamadas remanescentes.
+8. Reinício: preferências/histórico/clips persistem; privacidade entre salas e payloads inválidos tratados.
+
+## Ordem para duas pessoas/IAs
+
+Pessoa A pode assumir R1/motores e Pessoa B R4/documentação após registro explícito em ACTIVE_WORK. Isso é sugestão, não atribuição ativa. Evitar edição concorrente de store, contratos, webrtcEngine, App, CSS global, manifesto/lockfile e arquivos compartilhados. R2a e R2b precisam combinar casos e contratos antes de dividir arquivos. Design visual só começa após o aceite de R3, sem reescrever o aplicativo.
+
+## Atualização de escopo pelo mantenedor
+
+Em 05/11/2026 o mantenedor solicitou explicitamente a implementação do redesign. R4/R5 foram executados com regressões locais nesta branch; R3 continua pendente e é requisito de validação para integração segura, não um resultado já obtido. A etapa seguinte não é personalização. Ver REDESIGN_REVIEW.md.

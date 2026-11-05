@@ -120,7 +120,7 @@ export const SoundboardPopover: React.FC<SoundboardPopoverProps> = ({
         <PopoverContent
           side={side}
           align={align}
-          className="w-80 md:w-96 p-3 space-y-3 bg-zinc-900/95 backdrop-blur-md border border-white/10 shadow-2xl z-50"
+          className="w-80 md:w-96 p-3 space-y-3 bg-card/95 backdrop-blur-md border border-border shadow-2xl z-50"
         >
           {/* Cabeçalho */}
           <div className="flex items-center justify-between pb-1 border-b border-border/50">
@@ -134,7 +134,7 @@ export const SoundboardPopover: React.FC<SoundboardPopoverProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => setIsAddDialogOpen(true)}
-                className="h-7 px-2 text-[11px] font-medium border-primary/40 hover:bg-primary/10 text-primary hover:text-primary flex items-center gap-1"
+                className="h-7 px-2 text-caption font-medium border-primary/40 hover:bg-primary/10 text-primary hover:text-primary flex items-center gap-1"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Adicionar</span>
@@ -182,14 +182,14 @@ export const SoundboardPopover: React.FC<SoundboardPopoverProps> = ({
             className="w-full"
           >
             <TabsList className="w-full grid grid-cols-3 h-7 p-0.5 bg-secondary/80">
-              <TabsTrigger value="all" className="text-[11px] h-6">
+              <TabsTrigger value="all" className="text-caption h-6">
                 Todos ({soundboardClips.length})
               </TabsTrigger>
-              <TabsTrigger value="favorites" className="text-[11px] h-6 flex items-center gap-1">
-                <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
+              <TabsTrigger value="favorites" className="text-caption h-6 flex items-center gap-1">
+                <Star className="w-3 h-3 text-warning fill-amber-400" />
                 <span>Favoritos ({favoritesCount})</span>
               </TabsTrigger>
-              <TabsTrigger value="custom" className="text-[11px] h-6">
+              <TabsTrigger value="custom" className="text-caption h-6">
                 Meus Sons ({customCount})
               </TabsTrigger>
             </TabsList>
@@ -218,7 +218,7 @@ export const SoundboardPopover: React.FC<SoundboardPopoverProps> = ({
                       <span className="text-xs font-semibold text-foreground truncate block leading-tight">
                         {clip.name}
                       </span>
-                      <span className="text-[10px] text-muted-foreground block truncate">
+                      <span className="text-2xs text-muted-foreground block truncate">
                         {clip.isBuiltIn ? 'Nativo' : 'Custom'}
                       </span>
                     </div>
@@ -230,7 +230,7 @@ export const SoundboardPopover: React.FC<SoundboardPopoverProps> = ({
                         onClick={(e) => handleToggleFavorite(e, clip.id)}
                         title={clip.isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
                         className={`p-1 rounded hover:bg-secondary transition-colors ${
-                          clip.isFavorite ? 'text-amber-400' : 'text-muted-foreground hover:text-amber-400'
+                          clip.isFavorite ? 'text-warning' : 'text-muted-foreground hover:text-warning'
                         }`}
                       >
                         <Star className={`w-3.5 h-3.5 ${clip.isFavorite ? 'fill-amber-400' : ''}`} />
@@ -251,7 +251,7 @@ export const SoundboardPopover: React.FC<SoundboardPopoverProps> = ({
                     {/* Indicador de Favorito sempre visível se marcado */}
                     {clip.isFavorite && (
                       <div className="absolute right-1.5 top-1.5 group-hover:hidden">
-                        <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
+                        <Star className="w-2.5 h-2.5 text-warning fill-amber-400" />
                       </div>
                     )}
                   </div>
@@ -261,7 +261,7 @@ export const SoundboardPopover: React.FC<SoundboardPopoverProps> = ({
               <div className="col-span-2 py-8 flex flex-col items-center justify-center text-center text-muted-foreground">
                 <Music className="w-7 h-7 mb-2 opacity-40" />
                 <p className="text-xs font-medium">Nenhum som encontrado</p>
-                <p className="text-[11px] text-muted-foreground/70 mt-0.5">
+                <p className="text-caption text-muted-foreground/70 mt-0.5">
                   {activeTab === 'favorites'
                     ? 'Marque uma estrela nos seus sons favoritos para vê-los aqui.'
                     : activeTab === 'custom'
@@ -285,7 +285,7 @@ export const SoundboardPopover: React.FC<SoundboardPopoverProps> = ({
 
           {/* Rodapé: Volume Master do Soundboard */}
           <div className="pt-2 border-t border-border/50 space-y-1.5">
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <div className="flex items-center justify-between text-caption text-muted-foreground">
               <span className="flex items-center gap-1">
                 {soundboardVolume === 0 ? (
                   <VolumeX className="w-3.5 h-3.5 text-destructive" />

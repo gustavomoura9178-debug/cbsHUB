@@ -163,9 +163,9 @@ export const SettingsModal: React.FC = () => {
 
   return (
     <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-      <DialogContent className="max-w-2xl bg-zinc-950 border border-white/10 text-foreground p-0 overflow-hidden shadow-2xl flex flex-col max-h-[88vh]">
+      <DialogContent className="max-w-2xl bg-surface border border-border text-foreground p-0 overflow-hidden shadow-2xl flex flex-col max-h-[88vh]">
         {/* Cabeçalho */}
-        <DialogHeader className="p-5 border-b border-border/60 bg-zinc-900/40 shrink-0">
+        <DialogHeader className="p-5 border-b border-border/60 bg-card/40 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-primary/15 border border-primary/30 flex items-center justify-center text-primary">
               <Sliders className="w-4 h-4" />
@@ -183,7 +183,7 @@ export const SettingsModal: React.FC = () => {
 
         {/* Abas e Conteúdo */}
         <Tabs defaultValue="audio" className="flex-1 flex flex-col min-h-0">
-          <div className="px-5 pt-3 border-b border-border/50 bg-zinc-900/20 shrink-0">
+          <div className="px-5 pt-3 border-b border-border/50 bg-card/20 shrink-0">
             <TabsList className="bg-secondary/70 h-8 p-0.5">
               <TabsTrigger value="profile" className="text-xs h-7 px-3 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5" />
@@ -215,8 +215,8 @@ export const SettingsModal: React.FC = () => {
                   <div className="text-xs text-muted-foreground font-mono truncate">
                     ID: {clientId.slice(0, 18)}...
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <div className="flex items-center gap-1.5 text-caption text-success font-medium">
+                    <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
                     <span>Perfil ativo na sala</span>
                   </div>
                 </div>
@@ -245,7 +245,7 @@ export const SettingsModal: React.FC = () => {
                     Salvar
                   </Button>
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Seus irmãos na sala verão este apelido na lista de participantes, no chat e nas chamadas.
                 </p>
               </div>
@@ -275,7 +275,7 @@ export const SettingsModal: React.FC = () => {
                     );
                   })}
                 </div>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   Escolha a cor distintiva que acompanhará suas mensagens de texto e seu avatar na chamada.
                 </p>
               </div>
@@ -343,7 +343,7 @@ export const SettingsModal: React.FC = () => {
                   {/* Fones / Alto-falantes */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                      <Headphones className="w-3.5 h-3.5 text-emerald-400" />
+                      <Headphones className="w-3.5 h-3.5 text-success" />
                       <span>Alto-falante / Fone de Ouvido (Saída)</span>
                     </label>
 
@@ -448,18 +448,18 @@ export const SettingsModal: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-foreground flex items-center gap-1.5">
-                      <Activity className={`w-4 h-4 ${isLocalSpeaking ? 'text-emerald-400 animate-pulse' : 'text-muted-foreground'}`} />
+                      <Activity className={`w-4 h-4 ${isLocalSpeaking ? 'text-success animate-pulse' : 'text-muted-foreground'}`} />
                       <span>Nível do Microfone (VU Meter)</span>
                     </span>
-                    <span className="text-[11px] font-mono text-muted-foreground">
+                    <span className="text-caption font-mono text-muted-foreground">
                       {isLocalSpeaking ? 'Falando' : 'Silêncio'}
                     </span>
                   </div>
 
-                  <div className="w-full h-2.5 bg-zinc-900 rounded-full overflow-hidden p-0.5 border border-border/40">
+                  <div className="w-full h-2.5 bg-card rounded-full overflow-hidden p-0.5 border border-border/40">
                     <div
                       className={`h-full rounded-full transition-all duration-75 ${
-                        micLevel > 70 ? 'bg-destructive' : micLevel > 20 ? 'bg-emerald-500' : 'bg-primary'
+                        micLevel > 70 ? 'bg-destructive' : micLevel > 20 ? 'bg-success' : 'bg-primary'
                       }`}
                       style={{ width: `${Math.min(100, Math.max(0, micLevel))}%` }}
                     />
@@ -515,11 +515,11 @@ export const SettingsModal: React.FC = () => {
                   <div>
                     <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
                       <span>Supressão Neural de Ruído (Krisp-like Worklet)</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-primary/20 text-primary uppercase">
+                      <span className="px-1.5 py-0.5 rounded text-micro font-bold bg-primary/20 text-primary uppercase">
                         48 kHz
                       </span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                    <p className="text-caption text-muted-foreground mt-0.5 leading-snug">
                       Noise Gate com envelope de 2ms de ataque e 120ms de liberação para suprimir digitação de teclado mecânico e ruídos de fundo.
                     </p>
                   </div>
@@ -533,10 +533,10 @@ export const SettingsModal: React.FC = () => {
                 <div className="p-3 rounded-xl bg-secondary/30 border border-border/50 flex items-center justify-between gap-4">
                   <div>
                     <div className="text-xs font-bold text-foreground flex items-center gap-1.5">
-                      <Filter className="w-3.5 h-3.5 text-amber-400" />
+                      <Filter className="w-3.5 h-3.5 text-warning" />
                       <span>Filtro Passa-Alta (High-Pass 80Hz, Q=0.707)</span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                    <p className="text-caption text-muted-foreground mt-0.5 leading-snug">
                       Corta vibrações mecânicas da mesa, zumbidos da rede elétrica e ruído de coolers de PC sem degradar o timbre da voz.
                     </p>
                   </div>
@@ -550,7 +550,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="p-3 rounded-xl bg-secondary/30 border border-border/50 flex items-center justify-between gap-4">
                   <div>
                     <div className="text-xs font-bold text-foreground">Cancelamento Acústico de Eco (AEC)</div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                    <p className="text-caption text-muted-foreground mt-0.5 leading-snug">
                       Elimina o retorno de voz proveniente de alto-falantes abertos para evitar realimentação.
                     </p>
                   </div>
@@ -564,7 +564,7 @@ export const SettingsModal: React.FC = () => {
                 <div className="p-3 rounded-xl bg-secondary/30 border border-border/50 flex items-center justify-between gap-4">
                   <div>
                     <div className="text-xs font-bold text-foreground">Controle Automático de Ganho (AGC)</div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-snug">
+                    <p className="text-caption text-muted-foreground mt-0.5 leading-snug">
                       Normaliza falas distantes ou sussurros e previne clipagem quando você falar mais alto.
                     </p>
                   </div>
@@ -579,8 +579,8 @@ export const SettingsModal: React.FC = () => {
         </Tabs>
 
         {/* Rodapé */}
-        <DialogFooter className="p-4 border-t border-border/60 bg-zinc-900/40 flex items-center justify-between shrink-0">
-          <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+        <DialogFooter className="p-4 border-t border-border/60 bg-card/40 flex items-center justify-between shrink-0">
+          <div className="text-caption text-muted-foreground flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-primary" />
             <span>Configurações sincronizadas localmente</span>
           </div>
