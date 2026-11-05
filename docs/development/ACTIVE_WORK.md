@@ -57,4 +57,4 @@ STUDIO-001 concluído para revisão; reserva liberada. Commit 19d316f; base 08f0
 
 ## Atualização — PROFILE-001 — 05/11/2026
 
-PROFILE-001 concluído para revisão; reserva liberada. Branch feat/user-profiles-2026-11-05; base 03217b8; commit PROFILE_CONTENT_COMMIT. Escopo local/P2P aprovado pelo mantenedor, backend depois. Ver PROFILES.md.
+PROFILE-001 concluído para revisão; reserva liberada. Branch feat/user-profiles-2026-11-05; base 03217b8; commit 7a88783. Escopo local/P2P aprovado pelo mantenedor, backend depois. Ver PROFILES.md.

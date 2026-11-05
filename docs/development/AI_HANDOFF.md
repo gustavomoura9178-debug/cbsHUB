@@ -82,4 +82,4 @@ STUDIO-001 usa branch feat/cbshub-studio-2026-11-05, base 08f0c51 (PR #1 integra
 
 ## Atualização — PROFILE-001 — 05/11/2026
 
-PROFILE-001 · feat/user-profiles-2026-11-05 · PROFILE_CONTENT_COMMIT · base 03217b8. Ler PROFILES.md antes de modificar identidade, perfil público e gates de interação. Não enviar objeto UserProfile privado pelo transporte. Não tratar clientId local como autenticação de conta. Mantenedor escolheu local/P2P e backend depois. Nenhum push/merge desta tarefa.
+PROFILE-001 · feat/user-profiles-2026-11-05 · 7a88783 · base 03217b8. Ler PROFILES.md antes de modificar identidade, perfil público e gates de interação. Não enviar objeto UserProfile privado pelo transporte. Não tratar clientId local como autenticação de conta. Mantenedor escolheu local/P2P e backend depois. Nenhum push/merge desta tarefa.

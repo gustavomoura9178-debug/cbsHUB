@@ -64,7 +64,7 @@ Pendências para a outra IA: ler KNOWN_ISSUES; começar por K01/R1; preservar co
 
 ## 05/11/2026 — PROFILE-001 — Codex/OpenAI
 
-- Branch feat/user-profiles-2026-11-05; base 03217b8; recuperação recovery/pre-profiles-2026-11-05; commit PROFILE_CONTENT_COMMIT.
+- Branch feat/user-profiles-2026-11-05; base 03217b8; recuperação recovery/pre-profiles-2026-11-05; commit 7a88783.
 - Preflight: docs/modelos revisados, main com merge do PR #2 incorporada por fast-forward. Sem alterações locais preexistentes. Mantenedor confirmou continuar local/P2P e backend depois.
 - Arquivos: src/profiles/{model,repository,ProfileProvider,ProfileDialog}; main/App; ParticipantAvatar, MembersPanel, LeftSidebar, SettingsModal, UserCallCard, TextChatSection, WorkspaceRail e index.css; contrato cbshub.d.ts e integrações/gates em webrtcEngine; testes profile-validation/profile-smoke; README de testes e docs compartilhadas.
 - Implementado: identidade/username/bio/status/emoji/links/data local; imagens validadas e normalizadas; aparência de cartão; visão rápida/completa e editor com preview/save/cancel; privacidade por projeção pública, bloqueio local persistente e permissões de chamadas/reações.

@@ -32,4 +32,4 @@ STUDIO-001 · Codex/OpenAI · feat/cbshub-studio-2026-11-05 · 19d316f. Adiciona
 
 ## Atualização — PROFILE-001 — 05/11/2026
 
-PROFILE-001 · Codex/OpenAI · feat/user-profiles-2026-11-05 · PROFILE_CONTENT_COMMIT. Perfis locais completos/editáveis, avatar/banner, status, temas de cartão, privacidade e bloqueios; projeção pública e integração P2P validadas. Sem mudança de autenticação nem dependências. Detalhes/testes/limites em PROFILES.md.
+PROFILE-001 · Codex/OpenAI · feat/user-profiles-2026-11-05 · 7a88783. Perfis locais completos/editáveis, avatar/banner, status, temas de cartão, privacidade e bloqueios; projeção pública e integração P2P validadas. Sem mudança de autenticação nem dependências. Detalhes/testes/limites em PROFILES.md.
