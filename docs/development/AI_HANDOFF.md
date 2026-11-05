@@ -55,7 +55,7 @@ Base segura: `5deab40aa1629a975dc72588b658569b21494c23`.
 Branch: `audit/cbshub-v2-2026-11-05`.
 Tag local: `recovery/pre-audit-2026-11-05`.
 Bundle: `/workspace/cbshub-onboarding/pre-audit-2026-11-05.bundle`, verificado e contendo histórico completo disponível.
-Commit de conteúdo: PENDING_CONTENT_COMMIT (será registrado antes da entrega final).
+Commit de conteúdo: 724abeaec50df76bffecb3dcd5e48a8ad6d163ba.
 
 Nenhum push ocorreu. A tag/bundle e os scripts externos são locais ao ambiente; não pressupor que a outra pessoa os possui. Para inspecionar recuperação sem sobrescrever trabalho: `git show recovery/pre-audit-2026-11-05`; se o checkout for perdido, verificar bundle e clonar para um diretório novo. Não aplicar reset --hard para “restaurar” uma árvore que tenha trabalho novo.
 

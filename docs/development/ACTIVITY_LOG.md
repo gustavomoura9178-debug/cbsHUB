@@ -5,7 +5,7 @@
 - Branch: `audit/cbshub-v2-2026-11-05`.
 - Base/recuperação: `5deab40aa1629a975dc72588b658569b21494c23`; tag `recovery/pre-audit-2026-11-05`; bundle completo verificado em `/workspace/cbshub-onboarding/pre-audit-2026-11-05.bundle`.
 - Git inicial: branch `work`, sem mudanças tracked/untracked; consulta remota mostrou somente main, no mesmo commit. Nenhum push/force push/alteração direta em main.
-- Commit de conteúdo da entrega: `PENDING_CONTENT_COMMIT`. Commit posterior de passagem registra esse hash; consultar `git log` para o HEAD final.
+- Commit de conteúdo da entrega: `724abeaec50df76bffecb3dcd5e48a8ad6d163ba`. Commit posterior de passagem registra esse hash; consultar `git log` para o HEAD final.
 - Arquivos criados: `docs/PROJECT_AUDIT.md`; `docs/development/PROJECT_STATUS.md`, `ACTIVITY_LOG.md`, `CHANGELOG.md`, `ROADMAP.md`, `ARCHITECTURE.md`, `KNOWN_ISSUES.md`, `AI_HANDOFF.md`, `ACTIVE_WORK.md`.
 - Funcionalidades implementadas: nenhuma. Auditoria/documentação/protocolo e preparação de ambiente; bibliotecas, estilos, chamadas, mensagens e Soundboard não foram editados.
 - Setup externo ao Git: dependências ignoradas, builds ignorados, helper dev, install.sh, probes/resultados/perfis e backup em `/workspace/cbshub-onboarding`.

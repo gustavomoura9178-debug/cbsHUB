@@ -3,7 +3,7 @@
 ## Não lançado — 05/11/2026
 
 Responsável: Codex/OpenAI. Branch `audit/cbshub-v2-2026-11-05`.
-Base: `5deab40aa1629a975dc72588b658569b21494c23`. Commit de documentação: `PENDING_CONTENT_COMMIT`.
+Base: `5deab40aa1629a975dc72588b658569b21494c23`. Commit de documentação: `724abeaec50df76bffecb3dcd5e48a8ad6d163ba`.
 
 ### Adicionado
 

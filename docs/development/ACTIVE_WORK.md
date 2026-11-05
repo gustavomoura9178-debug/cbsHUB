@@ -12,7 +12,7 @@ Branch: `audit/cbshub-v2-2026-11-05`. Base auditada: `5deab40aa1629a975dc72588b6
 | Objetivo | Auditoria, proteção Git, documentação e setup cloud; sem redesign |
 | Branch | audit/cbshub-v2-2026-11-05 |
 | Base | 5deab40aa1629a975dc72588b658569b21494c23 |
-| Commit de conteúdo | PENDING_CONTENT_COMMIT |
+| Commit de conteúdo | 724abeaec50df76bffecb3dcd5e48a8ad6d163ba |
 | Estado | Concluído; aguardando revisão humana da entrega |
 | Reserva | docs/PROJECT_AUDIT.md e oito arquivos em docs/development; liberada ao concluir entrega |
 | Áreas de produto alteradas | Nenhuma |
