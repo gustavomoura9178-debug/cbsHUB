@@ -15,3 +15,10 @@ Os probes de persistência/mixagem/Electron usados na auditoria permanecem em `/
 # Perfis
 
 `node tests/profile-validation.cjs` executa sete grupos de validação/projeção com o TypeScript existente. `node tests/profile-smoke.cjs` usa Playwright/Chromium e renderer local, dois contextos isolados e ponte de pacotes através do handler real. Exercita edição/persistência, upload raster, cancelamento, visão remota/privacidade, bloqueio e permissões. Não comprova sinalização/ICE pela internet nem autorização em backend. Ver docs/development/PROFILES.md.
+
+# Chat 2.0
+
+`node tests/chat-model.cjs`: sete grupos de autorização local, operações idempotentes, tombstone, ordenação e segurança.
+`node tests/chat-smoke.cjs`: dois contextos e ponte local através dos handlers reais; envio/ACK, edição/exclusão, resposta/pin/reação, reconexão lógica, Soundboard, busca e paginação.
+`node tests/chat-drafts.cjs`: rascunhos por sala, erro de disco injetado/retry, retenção, janela limitada e não lidas.
+Requer os mesmos pré-requisitos de navegador/renderer. Reinicie o helper dev após modificar store/motor para evitar módulos duplicados do HMR nos imports dinâmicos dos probes. O teste de perfis aguarda readiness da sala antes de inserir sua sessão sintética. Limitações de autorização/recuperação P2P em docs/development/CHAT_2.md.

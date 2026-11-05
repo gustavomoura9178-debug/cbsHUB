@@ -45,3 +45,8 @@ Studio implementado para revisão: editor de temas, seis presets, preview/cancel
 ## Atualização — PROFILE-001 — 05/11/2026
 
 Perfis locais/P2P implementados: identidade, cartão rápido/completo, editor/prévia, imagens normalizadas, aparência, privacidade e bloqueio. Backend/autorização de servidor e reserva global de username continuam indisponíveis. Escopo local aprovado explicitamente; PROFILES.md registra garantias e limites.
+
+
+## Atualização — CHAT-002 — 05/11/2026
+
+Chat 2.0 implementado: operações, ACK, edit/delete/reply/pin/reação, Markdown seguro, links locais, rascunhos, busca, janela limitada e modos Soundboard. Testes locais de dois contextos passaram; backend e sinalização remota não validados. CHAT_2.md registra limites de reconciliação/autoria.

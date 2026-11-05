@@ -58,3 +58,12 @@ STUDIO-001 concluído para revisão; reserva liberada. Commit 19d316f; base 08f0
 ## Atualização — PROFILE-001 — 05/11/2026
 
 PROFILE-001 concluído para revisão; reserva liberada. Branch feat/user-profiles-2026-11-05; base 03217b8; commit 7a88783. Escopo local/P2P aprovado pelo mantenedor, backend depois. Ver PROFILES.md.
+
+## CHAT-002 — em execução
+
+05/11/2026 · Codex/OpenAI · feat/chat-v2-2026-11-05 · base 206dc46 (perfis integrados pelo PR #3). Checkout limpo; main incorporada por fast-forward. Reserva: módulos chat, componente TextChatSection, persistência/protocolo de mensagens, gates do motor e testes/docs. Preservar áudio/vídeo/Soundboard/Studio/perfis. Backend segue inexistente conforme escopo local/P2P aprovado; não alegar autorização de servidor. Recuperação recovery/pre-chat-v2-2026-11-05.
+
+
+## Atualização — CHAT-002 — 05/11/2026
+
+CHAT-002 concluído para revisão; reserva liberada. feat/chat-v2-2026-11-05, base 206dc46, commit b74272e. Ver CHAT_2.md. Sem push/merge nesta tarefa.

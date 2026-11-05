@@ -83,3 +83,8 @@ STUDIO-001 usa branch feat/cbshub-studio-2026-11-05, base 08f0c51 (PR #1 integra
 ## Atualização — PROFILE-001 — 05/11/2026
 
 PROFILE-001 · feat/user-profiles-2026-11-05 · 7a88783 · base 03217b8. Ler PROFILES.md antes de modificar identidade, perfil público e gates de interação. Não enviar objeto UserProfile privado pelo transporte. Não tratar clientId local como autenticação de conta. Mantenedor escolheu local/P2P e backend depois. Nenhum push/merge desta tarefa.
+
+
+## Atualização — CHAT-002 — 05/11/2026
+
+CHAT-002 · feat/chat-v2-2026-11-05 · b74272e · base 206dc46. Ler CHAT_2.md antes de alterar journal, tombstones, ACK e sync. Banco novo de operações não substitui dados antigos. Não trocar estados explícitos por toggles em v2. Backend ausente; recuperação de operações depende do ator disponível ou journal já local. Sem garantia global/servidor. Soundboard preservado.

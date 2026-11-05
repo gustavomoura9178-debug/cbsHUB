@@ -1,3 +1,4 @@
+import type { ChatOperation } from "../chat/model";
 import type { PublicProfile } from "../profiles/model";
 export type ResolutionPreset = "720p" | "1080p" | "1440p" | "2160p";
 export type FpsPreset = 24 | 25 | 30 | 60;
@@ -72,6 +73,11 @@ export interface ChatReaction {
 }
 
 export interface ChatMessage {
+  replyTo?: string;
+  editedAt?: number;
+  deleted?: boolean;
+  pinned?: boolean;
+  delivery?: "queued" | "sent" | "received" | "error";
   id: string; // UUID v4 único para deduplicação P2P
   roomId: string;
   type: "user" | "system" | "soundboard";
@@ -109,6 +115,9 @@ export interface SoundboardClip {
 }
 
 export type SignalingPacket =
+  | { type: "chat_operation"; operation: ChatOperation }
+  | { type: "chat_operations_sync"; roomId: string; operations: ChatOperation[] }
+  | { type: "chat_ack"; roomId: string; messageId: string }
   | { type: "profile_update"; profile: PublicProfile | null }
   // Descoberta & Presença Mesh
   | { type: "directory_request"; peerInfo: Omit<Participant, "isLocal"> }

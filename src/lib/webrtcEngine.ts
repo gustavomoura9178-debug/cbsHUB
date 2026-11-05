@@ -1,3 +1,5 @@
+import { chatLedger } from "../chat/ledger";
+import { validateMessage, validateOperation, type ChatOperation } from "../chat/model";
 import { publicProfile, validatePublicProfile } from "../profiles/model";
 import { readOwnProfile, isBlocked } from "../profiles/repository";
 import Peer, { type MediaConnection, type DataConnection } from "peerjs";
@@ -72,6 +74,7 @@ interface PeerMediaSession {
 }
 
 class WebRTCEngine {
+  private chatClock = 0;
   private localPeer: Peer | null = null;
   private beaconPeer: Peer | null = null;
   private isBeaconOwner = false;
@@ -122,13 +125,15 @@ class WebRTCEngine {
 
     const slug = this.sanitizeSlug(roomInput);
     this.currentRoomSlug = slug;
+    useHubStore.getState().setMessages([]);
     useHubStore.getState().setRoomId(slug);
     useHubStore.getState().setStatusText("Conectando à sala...");
 
     // Carrega mensagens salvas localmente no IndexedDB
     try {
-      const savedMessages = await storageDb.getMessagesByRoom(slug);
-      useHubStore.getState().setMessages(savedMessages);
+      const savedMessages = await chatLedger.refresh(slug);
+      if (this.currentRoomSlug !== slug) return;
+      useHubStore.getState().addMessageBatch(savedMessages);
     } catch (err) {
       console.warn("[WebRTC Engine] Erro ao carregar histórico local:", err);
     }
@@ -140,6 +145,7 @@ class WebRTCEngine {
       /* ignore */
     }
 
+    if (this.currentRoomSlug !== slug) return;
     const state = useHubStore.getState();
     const shortId = this.generateShortId(state.clientId);
     // Sufixo efêmero único garante que recarregamentos rápidos nunca recebam unavailable-id
@@ -661,21 +667,41 @@ class WebRTCEngine {
       }
 
       case "chat_message": {
-        if (
-          packet.message &&
-          (packet.message.authorClientId !== session.clientId ||
-            packet.message.roomId !== useHubStore.getState().roomId)
-        )
-          return;
-        if (packet.message) {
-          storageDb.saveMessage(packet.message).catch(() => {});
-          useHubStore.getState().addMessage(packet.message);
-          useHubStore.getState().setUnreadCount((prev) => prev + 1);
-        }
+        const room = useHubStore.getState().roomId;
+        try {
+          const msg = validateMessage(packet.message, room);
+          if (msg.authorClientId !== session.clientId) return;
+          chatLedger.mergeMessages(room, [msg]).then(merged => {
+            if (useHubStore.getState().roomId !== room) return;
+            const fresh = !useHubStore.getState().messages.some(m => m.id === msg.id);
+            useHubStore.getState().setMessages(merged);
+            if (fresh) useHubStore.getState().setUnreadCount(n => n + 1);
+            session.dataConn.send({ type: "chat_ack", roomId: room, messageId: msg.id } as SignalingPacket);
+          }).catch(error => console.warn('[Chat] Falha ao persistir mensagem:', error));
+        } catch { /* Invalid remote content is not rendered or stored. */ }
+        break;
+      }
+      case "chat_ack": {
+        const state = useHubStore.getState();
+        const message = state.messages.find(m => m.id === packet.messageId && m.authorClientId === state.clientId);
+        if (!message || packet.roomId !== state.roomId) return;
+        chatLedger.acknowledge(packet.roomId,message.id).then(messages=>{
+          if(useHubStore.getState().roomId===packet.roomId)useHubStore.getState().setMessages(messages);
+        }).catch(()=>{});
+        break;
+      }
+      case "chat_operation": {
+        this.receiveChatOperations(session, useHubStore.getState().roomId, [packet.operation]);
+        break;
+      }
+      case "chat_operations_sync": {
+        if (packet.roomId !== useHubStore.getState().roomId || !Array.isArray(packet.operations) || packet.operations.length > 100) return;
+        this.receiveChatOperations(session, packet.roomId, packet.operations);
         break;
       }
 
       case "chat_reaction_toggle": {
+        if(typeof packet.emoji!=="string" || packet.emoji.length>16 || ["__proto__","constructor","prototype"].includes(packet.emoji))return;
         const ownerState = useHubStore.getState();
         const message = ownerState.messages.find(
           (m) => m.id === packet.messageId,
@@ -707,6 +733,7 @@ class WebRTCEngine {
       }
 
       case "chat_typing": {
+        if(packet.clientId !== session.clientId || typeof packet.nickname !== "string" || packet.nickname.length > 80 || typeof packet.isTyping !== "boolean") return;
         useHubStore
           .getState()
           .setTypingUser(packet.clientId, packet.nickname, packet.isTyping);
@@ -714,32 +741,25 @@ class WebRTCEngine {
       }
 
       case "chat_sync_request": {
-        storageDb.getMessagesByRoom(packet.roomId).then((allMsgs) => {
-          const knownSet = new Set(packet.knownIds || []);
-          const missing = allMsgs.filter(
-            (m) =>
-              !knownSet.has(m.id) &&
-              m.createdAt >= (packet.sinceTimestamp || 0),
-          );
-          if (missing.length > 0) {
-            session.dataConn.send({
-              type: "chat_sync_response",
-              roomId: packet.roomId,
-              messages: missing,
-            } as SignalingPacket);
-          }
-        });
+        const room = useHubStore.getState().roomId;
+        if (packet.roomId !== room || !Array.isArray(packet.knownIds) || packet.knownIds.length > 500) return;
+        storageDb.getMessagesByRoom(room).then(all => {
+          if (useHubStore.getState().roomId !== room) return;
+          const known = new Set(packet.knownIds);
+          const missing = all.filter(m => !known.has(m.id) && !m.deleted && !isBlocked(m.authorClientId));
+          // Original author is needed to authenticate a new v2 edit/delete; history remains best-effort P2P.
+          for(let i=0;i<missing.length;i+=50) session.dataConn.send({type:"chat_sync_response",roomId:room,messages:missing.slice(i,i+50)} as SignalingPacket);
+        }).catch(() => {});
+        this.sendChatOperations(session.dataConn, room);
         break;
       }
-
       case "chat_sync_response": {
-        if (packet.messages && packet.messages.length > 0) {
-          storageDb
-            .saveMessageBatch(packet.roomId, packet.messages)
-            .then((merged) => {
-              useHubStore.getState().setMessages(merged);
-            });
-        }
+        const room = useHubStore.getState().roomId;
+        if (packet.roomId !== room || !Array.isArray(packet.messages) || packet.messages.length > 500) return;
+        try {
+          const clean = packet.messages.filter(m => !isBlocked(m.authorClientId)).map(m => validateMessage(m,room));
+          chatLedger.mergeMessages(room,clean).then(merged => {if(useHubStore.getState().roomId===room)useHubStore.getState().setMessages(merged);}).catch(() => {});
+        } catch { /* Ignore invalid history batches. */ }
         break;
       }
 
@@ -772,21 +792,49 @@ class WebRTCEngine {
   /* ========================================================================= */
 
   private requestChatSync(conn: DataConnection): void {
-    const slug = this.currentRoomSlug;
-    if (!slug) return;
-
-    storageDb.getMessagesByRoom(slug, 100).then((localMsgs) => {
-      const knownIds = localMsgs.map((m) => m.id);
-      const oldest = localMsgs.length > 0 ? localMsgs[0].createdAt : 0;
-
-      conn.send({
-        type: "chat_sync_request",
-        roomId: slug,
-        sinceTimestamp: oldest,
-        knownIds,
-      } as SignalingPacket);
-    });
+    const room = this.currentRoomSlug;
+    if(!room) return;
+    storageDb.getMessagesByRoom(room).then(messages => {
+      if(this.currentRoomSlug !== room || !conn.open) return;
+      conn.send({type:"chat_sync_request",roomId:room,sinceTimestamp:0,knownIds:messages.map(m=>m.id)} as SignalingPacket);
+      for(const msg of messages.filter(m=>m.authorClientId===useHubStore.getState().clientId&&!m.deleted)) conn.send({type:"chat_message",message:msg} as SignalingPacket);
+      this.sendChatOperations(conn,room);
+    }).catch(()=>{});
   }
+
+  private sendChatOperations(conn: DataConnection, room:string): void {
+    chatLedger.operations(room).then(ops=>{
+      if(useHubStore.getState().roomId!==room||!conn.open)return;
+      const own=ops.filter(o=>o.actorClientId===useHubStore.getState().clientId);
+      for(let i=0;i<own.length;i+=100)conn.send({type:"chat_operations_sync",roomId:room,operations:own.slice(i,i+100)} as SignalingPacket);
+    }).catch(()=>{});
+  }
+
+  private receiveChatOperations(session: PeerMediaSession, room:string, incoming:ChatOperation[]):void {
+    try {
+      const state=useHubStore.getState();
+      const clean=incoming.map(o=>validateOperation(o,room,session.clientId)).filter(o=>{
+        const target=state.messages.find(m=>m.id===o.messageId);
+        if(o.kind==='reaction'&&target?.authorClientId===state.clientId&&!readOwnProfile(state.clientId,state.nickname).privacy.allowReactions)return false;
+        return o.kind==='reaction'||!target||target.authorClientId===session.clientId;
+      });
+      chatLedger.record(room,clean,session.clientId).then(messages=>{if(useHubStore.getState().roomId===room)useHubStore.getState().setMessages(messages);}).catch(error=>console.warn('[Chat] Operação recusada:',error));
+    }catch{/* Untrusted operations are ignored. */}
+  }
+
+  public async mutateChat(messageId:string,kind:ChatOperation['kind'],data:{content?:string;emoji?:string;active?:boolean}={}):Promise<void>{
+    const state=useHubStore.getState();const message=state.messages.find(m=>m.id===messageId);
+    if(!message||message.deleted)throw new Error('Mensagem indisponível.');
+    if(kind!=='reaction'&&message.authorClientId!==state.clientId)throw new Error('Você só pode alterar ou fixar suas próprias mensagens.');
+    const author=Object.values(state.participants).find(p=>p.clientId===message.authorClientId);
+    if(isBlocked(message.authorClientId)||(kind==='reaction'&&author?.profile?.interactions.reactions===false))throw new Error('Interação não permitida.');
+    this.chatClock=Math.max(Date.now(),this.chatClock+1);
+    const op=validateOperation({id:crypto.randomUUID(),roomId:state.roomId,messageId,actorClientId:state.clientId,nickname:state.nickname,at:this.chatClock,kind,...data},state.roomId,state.clientId);
+    const messages=await chatLedger.record(state.roomId,[op],state.clientId);
+    if(useHubStore.getState().roomId===state.roomId)useHubStore.getState().setMessages(messages);
+    this.broadcast({type:"chat_operation",operation:op});
+  }
+
 
   /* ========================================================================= */
   /* CHAMADAS DE MÍDIA ENTRANTES & SAÍDAS (FULL MESH)                          */
@@ -1906,9 +1954,11 @@ class WebRTCEngine {
   /* MÉTODOS PÚBLICOS DE CHAT E SOUNDBOARD                                     */
   /* ========================================================================= */
 
-  public async sendChatMessage(content: string): Promise<ChatMessage | null> {
+  public async sendChatMessage(content: string, replyTo?: string): Promise<ChatMessage | null> {
+    await storageDb.requirePersistentStorage();
     const trimmed = content.trim();
     if (!trimmed) return null;
+    if (trimmed.length > 8000) throw new Error("Limite de 8000 caracteres por mensagem.");
 
     const state = useHubStore.getState();
     const id =
@@ -1920,6 +1970,8 @@ class WebRTCEngine {
       id,
       roomId: state.roomId,
       type: "user",
+      ...(replyTo ? { replyTo } : {}),
+      delivery: "queued",
       authorClientId: state.clientId,
       authorNickname: state.nickname,
       authorAvatarColor: state.avatarColor,
@@ -1939,38 +1991,9 @@ class WebRTCEngine {
     return msg;
   }
 
-  public async toggleMessageReaction(
-    messageId: string,
-    emoji: string,
-  ): Promise<void> {
-    const state = useHubStore.getState();
-    const message = state.messages.find((m) => m.id === messageId);
-    const author = Object.values(state.participants).find(
-      (p) => p.clientId === message?.authorClientId,
-    );
-    if (
-      author &&
-      (isBlocked(author.clientId) ||
-        author.profile?.interactions.reactions === false)
-    )
-      return;
-    await storageDb.toggleReaction(
-      messageId,
-      emoji,
-      state.clientId,
-      state.nickname,
-    );
-    useHubStore
-      .getState()
-      .updateMessageReaction(messageId, emoji, state.clientId, state.nickname);
-
-    this.broadcast({
-      type: "chat_reaction_toggle",
-      messageId,
-      emoji,
-      clientId: state.clientId,
-      nickname: state.nickname,
-    });
+  public async toggleMessageReaction(messageId:string,emoji:string):Promise<void>{
+    const state=useHubStore.getState();const msg=state.messages.find(m=>m.id===messageId);
+    await this.mutateChat(messageId,'reaction',{emoji,active:!msg?.reactions[emoji]?.reactorClientIds.includes(state.clientId)});
   }
 
   public sendTypingState(isTyping: boolean): void {
