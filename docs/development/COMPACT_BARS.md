@@ -30,3 +30,6 @@ Limites: ambiente Electron headless não fornece gerenciador de janelas para val
 Uma tentativa de pointer click após maximizar headless falhou por geometria da janela; probe de IPC usa click DOM controlado para minimizar/fechar e confirma handlers/evento de fechamento, sem declarar arraste físico. A página se encerra antes de retornar o evaluate de fechar: teste foi ajustado para aguardar o evento real de encerramento. Capturas foram refeitas aguardando desmontar o modal, evitando imagens durante animação.
 
 Estado: barras disponíveis para revisão local; tarefa BRAND-001 aguarda o arquivo original para concluir a identidade visual. Sem push/merge nesta etapa.
+
+## Continuação BRAND-002
+Arquivo SVG original recebido e integração concluída na branch feat/official-logo-2026-11-05. A pendência de entrada descrita acima é histórica; ver OFFICIAL_LOGO.md para recursos e evidências atuais.

@@ -145,7 +145,7 @@
     width: var(--rail-width);
   }
   .workspace-mark {
-    @apply size-9 rounded-xl flex items-center justify-center bg-primary text-primary-foreground mb-1;
+    @apply size-9 rounded-xl flex items-center justify-center bg-card text-foreground mb-1;
   }
   .rail-divider {
     @apply w-5 h-px bg-border mb-1;

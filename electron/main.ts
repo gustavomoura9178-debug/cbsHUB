@@ -46,6 +46,7 @@ function createWindow(): void {
   const preloadPath = getPreloadPath();
 
   mainWindow = new BrowserWindow({
+    icon: path.join(app.getAppPath(), process.env.VITE_DEV_SERVER_URL ? "public/brand/logo-256.png" : "dist/brand/logo-256.png"),
     width: 1280,
     height: 800,
     minWidth: 1100,

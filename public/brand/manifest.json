@@ -1,0 +1,32 @@
+{
+  "source": "logo.svg",
+  "sourceSha256": "373f0b7d55b512c30fbe61fed90d1734e33bc1bba3ede2fb1646250d1350e3d5",
+  "viewBox": [
+    0,
+    0,
+    1656,
+    1536
+  ],
+  "sizes": [
+    16,
+    20,
+    24,
+    32,
+    48,
+    64,
+    128,
+    256,
+    512
+  ],
+  "icoFrames": [
+    16,
+    24,
+    32,
+    48,
+    64,
+    128,
+    256
+  ],
+  "padding": 0.04,
+  "centralWhite": "Preserved as supplied artwork; outer background is transparent."
+}
