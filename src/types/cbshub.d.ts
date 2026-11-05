@@ -100,6 +100,7 @@ export interface SoundboardClip {
   name: string;
   emoji: string;
   isBuiltIn: boolean; // true = som sintetizado/embutido; false = arquivo importado pelo usuário
+  originalAudioBlob?:Blob;
   audioBlob?: Blob; // Armazenado no IndexedDB para clipes customizados (.mp3, .wav, .ogg)
   synthPreset?:
     | "airhorn"
