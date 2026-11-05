@@ -23,3 +23,8 @@ Sem alterações de funcionalidade ou visual; sem substituição/atualização d
 ## Não lançado — REDESIGN-001 — 05/11/2026
 
 Codex/OpenAI · feat/workspace-redesign-2026-11-05 · a29e4ca. Novo workspace, sidebar ajustável/recolhível, membros opcionais, chat refinado, menus/foco, controle de voz identificado e diagnóstico organizado. Tokens grafite/verde-água e responsividade. Primitivos shadcn/Radix e Tailwind preservados, sem bibliotecas novas. Build e regressões locais passaram; mídia entre máquinas pendente. Detalhes em REDESIGN_REVIEW.md.
+
+
+## Atualização — STUDIO-001 — 05/11/2026
+
+STUDIO-001 · Codex/OpenAI · feat/cbshub-studio-2026-11-05 · STUDIO_CONTENT_COMMIT. Adicionados presets/editor/preview/library/JSON v1, imagens raster locais, layout e contraste. Slider com nome no Thumb; foco inicial de Sheet ajustado. Sem dependências novas, perfis ou backend de sincronização. Detalhes e testes em STUDIO.md.

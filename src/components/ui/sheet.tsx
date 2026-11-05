@@ -17,6 +17,12 @@ export const SheetContent = React.forwardRef<
     <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0" />
     <DialogPrimitive.Content
       ref={ref}
+      onOpenAutoFocus={(event) => {
+        // Start at the labelled panel, avoiding an automatically opened tooltip
+        // on its first button intercepting Escape. Tab still enters the controls.
+        event.preventDefault();
+        (event.target as HTMLElement).focus();
+      }}
       className={cn(
         "workspace-sheet",
         side === "right" ? "workspace-sheet-right" : "workspace-sheet-left",

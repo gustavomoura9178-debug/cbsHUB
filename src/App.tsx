@@ -25,6 +25,8 @@ import {
   SIDEBAR_MAX,
 } from "./hooks/useWorkspaceLayout";
 
+import { StudioDialog } from "./studio/StudioDialog";
+
 export const App: React.FC = () => {
   const {
     isSettingsOpen,
@@ -149,6 +151,7 @@ export const App: React.FC = () => {
         {/* 3. Modais do Sistema */}
         <ScreenPickerModal />
         <SettingsModal />
+        <StudioDialog />
       </div>
     </TooltipProvider>
   );

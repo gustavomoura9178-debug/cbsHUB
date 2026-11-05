@@ -73,3 +73,8 @@ Cloud: install_script/start_skill/rede salvos em rascunho, ainda sem publicaçã
 ## Entrega mais recente — REDESIGN-001
 
 Branch `feat/workspace-redesign-2026-11-05`, base `recovery/pre-redesign-2026-11-05`. Commit UI: a29e4ca. Ler REDESIGN_REVIEW.md, DESIGN_SYSTEM.md e tests/README.md antes de continuar. O usuário autorizou o redesign após a auditoria, antecipando o gate recomendado; não declarar R3 aprovado. Motores, dependências e última otimização de áudio da outra IA preservados. Sem push/merge. Próxima ação é revisão/validação de mídia e correções delimitadas, sem avançar para personalização.
+
+
+## Atualização — STUDIO-001 — 05/11/2026
+
+STUDIO-001 usa branch feat/cbshub-studio-2026-11-05, base 08f0c51 (PR #1 integrado). Ler STUDIO.md antes de alterar formato/provider. Preferências de layout migradas para cbshub-studio-v1; motores e dados de chat/Soundboard intactos. Não adicionar sync P2P de preferências como se fosse backend autenticado. Sem perfis nesta etapa. Commit de conteúdo: STUDIO_CONTENT_COMMIT.

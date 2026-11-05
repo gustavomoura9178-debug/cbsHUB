@@ -40,3 +40,8 @@ Nenhum desses problemas foi corrigido em código nesta fase. Não usar `npm audi
 ## Atualização — REDESIGN-001
 
 K21 parcialmente tratado na apresentação: histórico local agora permanece visível offline, com aviso no compositor; entrega remota continua sem confirmação. K19 recebeu foco/nomes/teclado e tokens na camada visual, mas auditoria completa de acessibilidade ainda não foi executada. Demais problemas de motor/build/dependências permanecem. CPU/GPU explicitamente indisponíveis na telemetria; não há coleta ou valores simulados.
+
+
+## Atualização — STUDIO-001 — 05/11/2026
+
+Studio: sem backend de sincronização; transferir JSON manualmente. LocalStorage pode exceder quota com imagens; gravação falha com aviso e export continua disponível. Cálculo AA cobre pares sólidos, não certifica fundos compostos. Dados locais inválidos usam padrão seguro. Sem validação completa de leitor de tela/Windows/mídia real. Aviso de bundle >500kB e K01 permanecem.

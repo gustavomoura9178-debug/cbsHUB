@@ -1,5 +1,6 @@
 import {
   AudioLines,
+  Palette,
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
@@ -10,6 +11,7 @@ import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { useHubStore } from "../store/useHubStore";
 import { SoundboardPopover } from "./SoundboardPopover";
+import { useStudio } from "../studio/StudioProvider";
 interface Props {
   sidebarOpen: boolean;
   membersOpen: boolean;
@@ -22,6 +24,7 @@ export function WorkspaceRail({
   onToggleSidebar,
   onToggleMembers,
 }: Props) {
+  const studio = useStudio();
   const openSettings = useHubStore((state) => state.setIsSettingsOpen);
   return (
     <nav className="workspace-rail" aria-label="Navegação principal">
@@ -84,6 +87,20 @@ export function WorkspaceRail({
         <TooltipContent side="right">Membros da sala</TooltipContent>
       </Tooltip>
       <div className="flex-1" />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rail-button"
+            onClick={studio.begin}
+            aria-label="Abrir cbsHUB Studio"
+          >
+            <Palette className="size-5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="right">cbsHUB Studio</TooltipContent>
+      </Tooltip>
       <SoundboardPopover
         side="right"
         align="end"
