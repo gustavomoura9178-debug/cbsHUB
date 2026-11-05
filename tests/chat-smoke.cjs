@@ -253,22 +253,12 @@ const assert = require("node:assert/strict");
         useHubStore.getState().soundboardClips[0],
       );
     });
-    assert.equal(await a.locator(".chat-sound-event").count(),0);
-    await a
-      .getByRole("button", {
-        name: "Exibição de eventos do Soundboard",
-        exact: true,
-      })
-      .click();
-    await a
-      .getByRole("menuitemradio", {
-        name: "Somente nas atividades",
-        exact: true,
-      })
-      .click();
     assert.equal(await a.locator(".chat-sound-event").count(), 0);
     await a
-      .getByRole("button", { name: "Atividades do Soundboard", exact: true })
+      .getByRole("button", { name: "Opções da sala", exact: true })
+      .click();
+    await a
+      .getByRole("menuitem", { name: "Atividades do Soundboard", exact: true })
       .click();
     await a
       .getByRole("heading", { name: "Atividades do Soundboard", exact: true })
@@ -306,6 +296,9 @@ const assert = require("node:assert/strict");
       })
       .click();
     assert((await a.locator("[data-message-id]").count()) <= 100);
+    await a
+      .getByRole("button", { name: "Pesquisar mensagens", exact: true })
+      .click();
     await a
       .getByRole("textbox", { name: "Buscar no histórico", exact: true })
       .fill("Histórico 123");

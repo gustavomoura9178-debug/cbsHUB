@@ -1,6 +1,14 @@
+import {
+  useChatView,
+  updateChatView,
+  EMPTY_CHAT_VIEW,
+} from "../chat/viewState";
 import { useState } from "react";
 import {
   Check,
+  Search,
+  Pin,
+  Activity,
   Copy,
   Hash,
   LogOut,
@@ -41,6 +49,7 @@ export function RoomTopBar({ membersOpen, onToggleMembers }: Props) {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
     "idle",
   );
+  const view = useChatView((state) => state.views[roomId] ?? EMPTY_CHAT_VIEW);
   const count = Object.keys(participants).length;
   const copy = async () => {
     try {
@@ -68,6 +77,25 @@ export function RoomTopBar({ membersOpen, onToggleMembers }: Props) {
       </div>
       <div className="room-actions">
         <StreamDiagnostics />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Pesquisar mensagens"
+              aria-expanded={view.searchOpen}
+              onClick={() =>
+                updateChatView(roomId, {
+                  searchOpen: !view.searchOpen,
+                  query: view.searchOpen ? "" : view.query,
+                })
+              }
+            >
+              <Search className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Pesquisar mensagens</TooltipContent>
+        </Tooltip>
         {inVoiceCall && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -140,6 +168,19 @@ export function RoomTopBar({ membersOpen, onToggleMembers }: Props) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onSelect={() => updateChatView(roomId, { pinned: !view.pinned })}
+            >
+              <Pin className="mr-2 size-4" />
+              {view.pinned ? "Mostrar todas as mensagens" : "Mensagens fixadas"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() => updateChatView(roomId, { activities: true })}
+            >
+              <Activity className="mr-2 size-4" />
+              Atividades do Soundboard
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={copy}>
               {copyState === "copied" ? (
                 <Check className="mr-2 size-4" />

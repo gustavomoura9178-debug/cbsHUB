@@ -143,3 +143,7 @@ BRAND-001: barras em commit `7fd816d`; arquivo original da logo ainda necessári
 Branch feat/official-logo-2026-11-05, base 9b58863. SVG oficial recebido e preservado byte a byte; fundo já transparente, branco central faz parte da arte. Exportados nove PNGs e ICO multiresolução; integrados à titlebar/rail, BrowserWindow e builder Windows/Linux. Build, official-logo, compact-bars, window-controls, electron-smoke e empacotamento Linux passaram localmente; logo também carregou no executável Linux. Windows/tray/arraste físico não aprovados. Detalhes/arquivos em OFFICIAL_LOGO.md. Pendência de arquivo de BRAND-001 resolvida; reserva liberada ao concluir revisão local. Sem push/merge nesta etapa.
 
 BRAND-002 entregue em `8cd560e`; SVG oficial preservado, PNG/ICO e integração concluídos. Empacotamento final Linux e logo no executável verificados. Reserva liberada; nenhum push/merge.
+
+## CHAT-UI-003 — 05/11/2026
+
+Chat reorganizado sem tocar webrtcEngine. Testes chat-toolbar/chat-smoke e build passaram; suite completa executada e compact-bars corrigido/reexecutado com passe após ajustar subtítulo responsivo. Números são mensagem legítima conforme confirmação do usuário, sem remoção/migração de dados. Estado UI em chat/viewState, por sala e limitado; densidade usa chave antiga. Próxima etapa adicional explicitamente pedida: WORKSPACE_3_PLAN.md. Nova logo enviada em SVG no chat em 05/11/2026 substitui a marca de arcos; integrar em commit próprio.

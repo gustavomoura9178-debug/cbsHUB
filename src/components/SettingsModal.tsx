@@ -1,5 +1,6 @@
-import {useStudio} from "../studio/StudioProvider";
-import {PRESETS} from "../studio/theme";
+import { useChatView, setChatCompact } from "../chat/viewState";
+import { useStudio } from "../studio/StudioProvider";
+import { PRESETS } from "../studio/theme";
 import { supportsAudioOutput } from "../lib/mediaState";
 import React, { useState, useEffect } from "react";
 import {
@@ -37,6 +38,8 @@ import { useProfiles } from "../profiles/ProfileProvider";
 
 export const SettingsModal: React.FC = () => {
   const profiles = useProfiles();
+  const compact = useChatView((state) => state.compact);
+  const [appearanceError, setAppearanceError] = useState("");
   const studio = useStudio();
   const {
     isSettingsOpen,
@@ -139,7 +142,31 @@ export const SettingsModal: React.FC = () => {
           </div>
         </DialogHeader>
 
-        <div className="px-5 py-3 flex gap-2 items-center"><span className="text-sm">Aparência</span>{PRESETS.filter(t=>["Clássico","Moderno Roxo"].includes(t.name)).map(t=><Button key={t.name} size="sm" variant={studio.theme.name===t.name?"default":"outline"} onClick={()=>studio.selectPreset(t)}>{t.name}</Button>)}<Button size="sm" variant="ghost" onClick={()=>{setIsSettingsOpen(false);studio.begin();}}>Editar temas</Button></div>
+        <div className="px-5 py-3 flex gap-2 items-center">
+          <span className="text-sm">Aparência</span>
+          {PRESETS.filter((t) =>
+            ["Clássico", "Moderno Roxo"].includes(t.name),
+          ).map((t) => (
+            <Button
+              key={t.name}
+              size="sm"
+              variant={studio.theme.name === t.name ? "default" : "outline"}
+              onClick={() => studio.selectPreset(t)}
+            >
+              {t.name}
+            </Button>
+          ))}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setIsSettingsOpen(false);
+              studio.begin();
+            }}
+          >
+            Editar temas
+          </Button>
+        </div>
         {/* Abas e Conteúdo */}
         <Tabs defaultValue="audio" className="flex-1 flex flex-col min-h-0">
           <div className="px-5 pt-3 border-b border-border/50 bg-card/20 shrink-0">
@@ -158,10 +185,44 @@ export const SettingsModal: React.FC = () => {
                 <Mic className="w-3.5 h-3.5" />
                 <span>Áudio, Vídeo & Estúdio</span>
               </TabsTrigger>
+              <TabsTrigger value="appearance">Aparência</TabsTrigger>
             </TabsList>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 min-h-0">
+            <TabsContent value="appearance" className="m-0 space-y-4">
+              <h3 className="font-semibold">Densidade das mensagens</h3>
+              <p className="text-sm text-muted-foreground">
+                Ajuste a apresentação do chat. A escolha é salva neste
+                dispositivo.
+              </p>
+              <div
+                role="group"
+                aria-label="Densidade das mensagens"
+                className="flex gap-2"
+              >
+                {[false, true].map((value) => (
+                  <Button
+                    key={String(value)}
+                    variant={compact === value ? "default" : "outline"}
+                    aria-pressed={compact === value}
+                    onClick={() => {
+                      try {
+                        setChatCompact(value);
+                        setAppearanceError("");
+                      } catch {
+                        setAppearanceError(
+                          "Não foi possível salvar a densidade.",
+                        );
+                      }
+                    }}
+                  >
+                    {value ? "Compacta" : "Confortável"}
+                  </Button>
+                ))}
+              </div>
+              {appearanceError && <p role="alert">{appearanceError}</p>}
+            </TabsContent>
             {/* ABA 1: PERFIL & IDENTIDADE */}
             <TabsContent value="profile" className="m-0 space-y-6">
               <div className="space-y-3">

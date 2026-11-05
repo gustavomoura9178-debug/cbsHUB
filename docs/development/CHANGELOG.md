@@ -79,3 +79,7 @@ Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px
 ## BRAND-002 — 05/11/2026 — Codex/OpenAI
 
 Branch feat/official-logo-2026-11-05, base 9b58863. SVG oficial recebido e preservado byte a byte; fundo já transparente, branco central faz parte da arte. Exportados nove PNGs e ICO multiresolução; integrados à titlebar/rail, BrowserWindow e builder Windows/Linux. Build, official-logo, compact-bars, window-controls, electron-smoke e empacotamento Linux passaram localmente; logo também carregou no executável Linux. Windows/tray/arraste físico não aprovados. Detalhes/arquivos em OFFICIAL_LOGO.md. Pendência de arquivo de BRAND-001 resolvida; reserva liberada ao concluir revisão local. Sem push/merge nesta etapa.
+
+## CHAT-UI-003 — 05/11/2026
+
+Removida a barra redundante “Conversa”, pesquisa permanente e controles duplicados. Pesquisa no cabeçalho; pins e atividades no menu da sala; densidade em Aparência com persistência. Conteúdo numérico legítimo preservado. Sem alteração do motor WebRTC nesta etapa.

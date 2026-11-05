@@ -139,3 +139,6 @@ Codex/OpenAI · feat/official-logo-2026-11-05 · base 9b58863 (PR #9 integrado).
 Branch feat/official-logo-2026-11-05, base 9b58863. SVG oficial recebido e preservado byte a byte; fundo já transparente, branco central faz parte da arte. Exportados nove PNGs e ICO multiresolução; integrados à titlebar/rail, BrowserWindow e builder Windows/Linux. Build, official-logo, compact-bars, window-controls, electron-smoke e empacotamento Linux passaram localmente; logo também carregou no executável Linux. Windows/tray/arraste físico não aprovados. Detalhes/arquivos em OFFICIAL_LOGO.md. Pendência de arquivo de BRAND-001 resolvida; reserva liberada ao concluir revisão local. Sem push/merge nesta etapa.
 
 BRAND-002 entregue em `8cd560e`; SVG oficial preservado, PNG/ICO e integração concluídos. Empacotamento final Linux e logo no executável verificados. Reserva liberada; nenhum push/merge.
+
+## CHAT-UI-003 — ativo — 05/11/2026
+Codex/OpenAI · fix/chat-toolbar-rendering-2026-11-05 · base 27eb0fe. Sem alterações locais prévias; logo integrada PR #10. Reserva: ChatPanel/RoomTopBar/SettingsModal, estado visual do chat, CSS/testes/docs. Pedido atual prevalece sobre anexo amplo: não alterar motor WebRTC. Usuário esclareceu que números eram mensagem legítima; não remover conteúdo nem tratá-lo como bug. Recuperação recovery/pre-chat-toolbar-2026-11-05.
