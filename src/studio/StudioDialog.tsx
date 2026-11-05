@@ -132,7 +132,7 @@ const ranges = {
   shadow: ["Intensidade das sombras", 0, 0.6, 0.05, ""],
   transparency: ["Opacidade dos painéis", 0.65, 1, 0.05, ""],
 } as const;
-export function StudioDialog() {
+export function StudioDialog({ embedded = false }: { embedded?: boolean }) {
   const studio = useStudio();
   const t = studio.theme;
   const [nameDraft, setNameDraft] = useState(t.name);
@@ -196,404 +196,410 @@ export function StudioDialog() {
       setBusy(false);
     }
   }
-  return (
-    <Dialog
-      open={studio.open}
-      onOpenChange={(open) => {
-        if (!open) studio.cancel();
-      }}
-    >
-      <DialogContent className="studio-window">
-        <header className="studio-heading">
-          <div className="studio-logo">
-            <Palette />
-          </div>
-          <div>
-            <DialogTitle>cbsHUB Studio</DialogTitle>
-            <DialogDescription>
-              Seu espaço, do seu jeito. Experimente antes de salvar.
-            </DialogDescription>
-          </div>
-        </header>
-        <div className="studio-toolbar">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => importer.current?.click()}
-            disabled={busy}
-          >
-            <Upload className="size-4 mr-2" />
-            Importar JSON
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => run(() => download({ ...t, name: nameDraft }))}
-          >
-            <Download className="size-4 mr-2" />
-            Exportar tema
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => choose(DEFAULT_THEME)}
-          >
-            <RotateCcw className="size-4 mr-2" />
-            Restaurar padrões
-          </Button>
-          <input
-            ref={importer}
-            type="file"
-            accept=".json,application/json"
-            className="sr-only"
-            aria-label="Importar arquivo de tema"
-            onChange={(e) => {
-              void importFile(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
+  const content = (
+    <>
+      {" "}
+      <header className="studio-heading">
+        <div className="studio-logo">
+          <Palette />
         </div>
-        <div className="studio-body">
-          <div className="studio-editor">
-            <Tabs defaultValue="themes">
-              <TabsList className="studio-tabs">
-                <TabsTrigger value="themes">Temas</TabsTrigger>
-                <TabsTrigger value="colors">Cores</TabsTrigger>
-                <TabsTrigger value="background">Fundo</TabsTrigger>
-                <TabsTrigger value="layout">Layout</TabsTrigger>
-              </TabsList>
-              <TabsContent value="themes" className="studio-tab-content">
-                <h3>Comece com um estilo</h3>
-                <div className="studio-presets">
-                  {PRESETS.map((p) => (
-                    <button
-                      type="button"
-                      key={p.name}
-                      onClick={() => choose(p)}
-                      aria-label={`Prévia ${p.name}`}
-                      className="studio-preset"
-                    >
-                      <span
-                        style={{
-                          background: p.colors.background,
-                          color: p.colors.text,
-                          borderColor: p.colors.border,
-                        }}
-                      >
-                        <i style={{ background: p.colors.sidebar }} />
-                        <b style={{ background: p.colors.button }} />
-                      </span>
-                      {p.name}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex items-center justify-between mt-6 mb-3">
-                  <h3>Meus temas ({studio.library.length}/20)</h3>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => studio.duplicate(t)}
+        <div>
+          {embedded ? (
+            <h3>cbsHUB Studio</h3>
+          ) : (
+            <DialogTitle>cbsHUB Studio</DialogTitle>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Seu espaço, do seu jeito. Experimente antes de salvar.
+          </p>
+        </div>
+      </header>
+      <div className="studio-toolbar">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => importer.current?.click()}
+          disabled={busy}
+        >
+          <Upload className="size-4 mr-2" />
+          Importar JSON
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => run(() => download({ ...t, name: nameDraft }))}
+        >
+          <Download className="size-4 mr-2" />
+          Exportar tema
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => choose(DEFAULT_THEME)}>
+          <RotateCcw className="size-4 mr-2" />
+          Restaurar padrões
+        </Button>
+        <input
+          ref={importer}
+          type="file"
+          accept=".json,application/json"
+          className="sr-only"
+          aria-label="Importar arquivo de tema"
+          onChange={(e) => {
+            void importFile(e.target.files?.[0]);
+            e.target.value = "";
+          }}
+        />
+      </div>
+      <div className="studio-body">
+        <div className="studio-editor">
+          <Tabs defaultValue="themes">
+            <TabsList aria-label="Seções do tema" className="studio-tabs">
+              <TabsTrigger value="themes">Temas</TabsTrigger>
+              <TabsTrigger value="colors">Cores</TabsTrigger>
+              <TabsTrigger value="background">Fundo</TabsTrigger>
+              <TabsTrigger value="layout">Layout</TabsTrigger>
+            </TabsList>
+            <TabsContent value="themes" className="studio-tab-content">
+              <h3>Comece com um estilo</h3>
+              <div className="studio-presets">
+                {PRESETS.map((p) => (
+                  <button
+                    type="button"
+                    key={p.name}
+                    onClick={() => choose(p)}
+                    aria-label={`Prévia ${p.name}`}
+                    className="studio-preset"
                   >
-                    <Copy className="size-3.5 mr-2" />
-                    Duplicar atual
+                    <span
+                      style={{
+                        background: p.colors.background,
+                        color: p.colors.text,
+                        borderColor: p.colors.border,
+                      }}
+                    >
+                      <i style={{ background: p.colors.sidebar }} />
+                      <b style={{ background: p.colors.button }} />
+                    </span>
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center justify-between mt-6 mb-3">
+                <h3>Meus temas ({studio.library.length}/20)</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => studio.duplicate(t)}
+                >
+                  <Copy className="size-3.5 mr-2" />
+                  Duplicar atual
+                </Button>
+              </div>
+              {studio.library.length === 0 && (
+                <p className="studio-help">
+                  Salve sua primeira criação. Seus temas ficam neste
+                  dispositivo; você pode levar um tema a outro dispositivo
+                  exportando o JSON.
+                </p>
+              )}
+              {studio.library.map((entry) => (
+                <div className="studio-library-item" key={entry.id}>
+                  <Button
+                    variant={
+                      entry.id === studio.editingId ? "secondary" : "ghost"
+                    }
+                    onClick={() => choose(entry.theme, entry.id)}
+                    className="justify-start truncate"
+                  >
+                    {entry.theme.name}
+                  </Button>
+                  <Input
+                    aria-label={`Renomear ${entry.theme.name}`}
+                    defaultValue={entry.theme.name}
+                    maxLength={60}
+                    onBlur={(e) => {
+                      if (e.target.value !== entry.theme.name)
+                        studio.rename(entry.id, e.target.value);
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Duplicar ${entry.theme.name}`}
+                    onClick={() => studio.duplicate(entry.theme)}
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Exportar ${entry.theme.name}`}
+                    onClick={() => run(() => download(entry.theme))}
+                  >
+                    <Download className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`Excluir ${entry.theme.name}`}
+                    onClick={() => studio.remove(entry.id)}
+                  >
+                    <Trash2 className="size-4" />
                   </Button>
                 </div>
-                {studio.library.length === 0 && (
-                  <p className="studio-help">
-                    Salve sua primeira criação. Seus temas ficam neste
-                    dispositivo; você pode levar um tema a outro dispositivo
-                    exportando o JSON.
-                  </p>
-                )}
-                {studio.library.map((entry) => (
-                  <div className="studio-library-item" key={entry.id}>
-                    <Button
-                      variant={
-                        entry.id === studio.editingId ? "secondary" : "ghost"
-                      }
-                      onClick={() => choose(entry.theme, entry.id)}
-                      className="justify-start truncate"
-                    >
-                      {entry.theme.name}
-                    </Button>
-                    <Input
-                      aria-label={`Renomear ${entry.theme.name}`}
-                      defaultValue={entry.theme.name}
-                      maxLength={60}
-                      onBlur={(e) => {
-                        if (e.target.value !== entry.theme.name)
-                          studio.rename(entry.id, e.target.value);
-                      }}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Duplicar ${entry.theme.name}`}
-                      onClick={() => studio.duplicate(entry.theme)}
-                    >
-                      <Copy className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Exportar ${entry.theme.name}`}
-                      onClick={() => run(() => download(entry.theme))}
-                    >
-                      <Download className="size-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`Excluir ${entry.theme.name}`}
-                      onClick={() => studio.remove(entry.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
+              ))}
+            </TabsContent>
+            <TabsContent value="colors" className="studio-tab-content">
+              <h3>Uma paleta com a sua identidade</h3>
+              <div className="studio-colors">
+                {(Object.keys(COLOR_LABELS) as ColorKey[]).map((key) => (
+                  <ColorField
+                    key={key}
+                    label={COLOR_LABELS[key]}
+                    value={t.colors[key]}
+                    onChange={(value) =>
+                      patch({ colors: { ...t.colors, [key]: value } })
+                    }
+                  />
                 ))}
-              </TabsContent>
-              <TabsContent value="colors" className="studio-tab-content">
-                <h3>Uma paleta com a sua identidade</h3>
-                <div className="studio-colors">
-                  {(Object.keys(COLOR_LABELS) as ColorKey[]).map((key) => (
-                    <ColorField
-                      key={key}
-                      label={COLOR_LABELS[key]}
-                      value={t.colors[key]}
-                      onChange={(value) =>
-                        patch({ colors: { ...t.colors, [key]: value } })
+              </div>
+              <label className="studio-switch">
+                Controles nativos claros
+                <Switch
+                  checked={t.mode === "light"}
+                  onCheckedChange={(checked) =>
+                    patch({ mode: checked ? "light" : "dark" })
+                  }
+                />
+              </label>
+            </TabsContent>
+            <TabsContent value="background" className="studio-tab-content">
+              <h3>O cenário da sua conversa</h3>
+              <div className="flex gap-2 flex-wrap mb-5">
+                {(["solid", "gradient", "image"] as const).map((kind, i) => (
+                  <Button
+                    key={kind}
+                    variant={
+                      t.background.kind === kind ? "default" : "secondary"
+                    }
+                    onClick={() => {
+                      if (kind === "image" && !t.background.image) {
+                        setNotice(
+                          "Escolha uma imagem abaixo para ativar este fundo.",
+                        );
+                        return;
                       }
-                    />
-                  ))}
-                </div>
-                <label className="studio-switch">
-                  Controles nativos claros
-                  <Switch
-                    checked={t.mode === "light"}
-                    onCheckedChange={(checked) =>
-                      patch({ mode: checked ? "light" : "dark" })
+                      patch({ background: { ...t.background, kind } });
+                    }}
+                  >
+                    {["Cor sólida", "Gradiente", "Imagem"][i]}
+                  </Button>
+                ))}
+              </div>
+              <p className="studio-help">
+                A cor sólida usa o fundo principal da aba Cores. Gradientes e
+                imagens ficam atrás do feed, sem reduzir a opacidade do texto.
+              </p>
+              <div className="studio-colors">
+                <ColorField
+                  label="Gradiente inicial"
+                  value={t.background.from}
+                  onChange={(from) =>
+                    patch({ background: { ...t.background, from } })
+                  }
+                />
+                <ColorField
+                  label="Gradiente final"
+                  value={t.background.to}
+                  onChange={(to) =>
+                    patch({ background: { ...t.background, to } })
+                  }
+                />
+              </div>
+              {(
+                [
+                  ["angle", "Ângulo", 0, 360, 5],
+                  ["opacity", "Opacidade do fundo", 0, 1, 0.05],
+                  ["blur", "Desfoque", 0, 30, 1],
+                ] as const
+              ).map(([key, label, min, max, step]) => (
+                <label className="studio-range" key={key}>
+                  <span>
+                    {label}
+                    <output>{t.background[key]}</output>
+                  </span>
+                  <Slider
+                    aria-label={label}
+                    min={min}
+                    max={max}
+                    step={step}
+                    value={[t.background[key]]}
+                    onValueChange={([v]) =>
+                      patch({ background: { ...t.background, [key]: v } })
                     }
                   />
                 </label>
-              </TabsContent>
-              <TabsContent value="background" className="studio-tab-content">
-                <h3>O cenário da sua conversa</h3>
-                <div className="flex gap-2 flex-wrap mb-5">
-                  {(["solid", "gradient", "image"] as const).map((kind, i) => (
-                    <Button
-                      key={kind}
-                      variant={
-                        t.background.kind === kind ? "default" : "secondary"
-                      }
-                      onClick={() => {
-                        if (kind === "image" && !t.background.image) {
-                          setNotice(
-                            "Escolha uma imagem abaixo para ativar este fundo.",
-                          );
-                          return;
-                        }
-                        patch({ background: { ...t.background, kind } });
-                      }}
-                    >
-                      {["Cor sólida", "Gradiente", "Imagem"][i]}
-                    </Button>
-                  ))}
-                </div>
-                <p className="studio-help">
-                  A cor sólida usa o fundo principal da aba Cores. Gradientes e
-                  imagens ficam atrás do feed, sem reduzir a opacidade do texto.
-                </p>
-                <div className="studio-colors">
-                  <ColorField
-                    label="Gradiente inicial"
-                    value={t.background.from}
-                    onChange={(from) =>
-                      patch({ background: { ...t.background, from } })
-                    }
-                  />
-                  <ColorField
-                    label="Gradiente final"
-                    value={t.background.to}
-                    onChange={(to) =>
-                      patch({ background: { ...t.background, to } })
-                    }
-                  />
-                </div>
-                {(
-                  [
-                    ["angle", "Ângulo", 0, 360, 5],
-                    ["opacity", "Opacidade do fundo", 0, 1, 0.05],
-                    ["blur", "Desfoque", 0, 30, 1],
-                  ] as const
-                ).map(([key, label, min, max, step]) => (
+              ))}
+              <label className="studio-upload">
+                Imagem personalizada (PNG, JPEG ou WebP, até 1 MB)
+                <Input
+                  aria-label="Imagem de fundo"
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  disabled={busy}
+                  onChange={(e) => {
+                    void upload(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {t.background.image && (
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    patch({
+                      background: {
+                        ...t.background,
+                        image: "",
+                        kind: "solid",
+                      },
+                    })
+                  }
+                >
+                  Remover imagem
+                </Button>
+              )}
+            </TabsContent>
+            <TabsContent value="layout" className="studio-tab-content">
+              <h3>Encontre seu ritmo</h3>
+              {Object.entries(ranges).map(
+                ([key, [label, min, max, step, unit]]) => (
                   <label className="studio-range" key={key}>
                     <span>
                       {label}
-                      <output>{t.background[key]}</output>
+                      <output>
+                        {Number(t.layout[key as keyof Theme["layout"]]).toFixed(
+                          step < 1 ? 2 : 0,
+                        )}
+                        {unit}
+                      </output>
                     </span>
                     <Slider
                       aria-label={label}
                       min={min}
                       max={max}
                       step={step}
-                      value={[t.background[key]]}
-                      onValueChange={([v]) =>
-                        patch({ background: { ...t.background, [key]: v } })
+                      value={[t.layout[key as keyof Theme["layout"]] as number]}
+                      onValueChange={([value]) =>
+                        patch({ layout: { ...t.layout, [key]: value } })
                       }
                     />
                   </label>
-                ))}
-                <label className="studio-upload">
-                  Imagem personalizada (PNG, JPEG ou WebP, até 1 MB)
-                  <Input
-                    aria-label="Imagem de fundo"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    disabled={busy}
-                    onChange={(e) => {
-                      void upload(e.target.files?.[0]);
-                      e.target.value = "";
-                    }}
+                ),
+              )}
+              {(
+                [
+                  ["sidebarCollapsed", "Recolher navegação"],
+                  ["membersOpen", "Mostrar painel de membros"],
+                  ["animations", "Animações discretas"],
+                  ["reducedMotion", "Reduzir movimento"],
+                ] as const
+              ).map(([key, label]) => (
+                <label className="studio-switch" key={key}>
+                  {label}
+                  <Switch
+                    checked={t.layout[key]}
+                    onCheckedChange={(checked) =>
+                      patch({ layout: { ...t.layout, [key]: checked } })
+                    }
+                    aria-label={label}
                   />
                 </label>
-                {t.background.image && (
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      patch({
-                        background: {
-                          ...t.background,
-                          image: "",
-                          kind: "solid",
-                        },
-                      })
-                    }
-                  >
-                    Remover imagem
-                  </Button>
-                )}
-              </TabsContent>
-              <TabsContent value="layout" className="studio-tab-content">
-                <h3>Encontre seu ritmo</h3>
-                {Object.entries(ranges).map(
-                  ([key, [label, min, max, step, unit]]) => (
-                    <label className="studio-range" key={key}>
-                      <span>
-                        {label}
-                        <output>
-                          {Number(
-                            t.layout[key as keyof Theme["layout"]],
-                          ).toFixed(step < 1 ? 2 : 0)}
-                          {unit}
-                        </output>
-                      </span>
-                      <Slider
-                        aria-label={label}
-                        min={min}
-                        max={max}
-                        step={step}
-                        value={[
-                          t.layout[key as keyof Theme["layout"]] as number,
-                        ]}
-                        onValueChange={([value]) =>
-                          patch({ layout: { ...t.layout, [key]: value } })
-                        }
-                      />
-                    </label>
-                  ),
-                )}
-                {(
-                  [
-                    ["sidebarCollapsed", "Recolher navegação"],
-                    ["membersOpen", "Mostrar painel de membros"],
-                    ["animations", "Animações discretas"],
-                    ["reducedMotion", "Reduzir movimento"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <label className="studio-switch" key={key}>
-                    {label}
-                    <Switch
-                      checked={t.layout[key]}
-                      onCheckedChange={(checked) =>
-                        patch({ layout: { ...t.layout, [key]: checked } })
-                      }
-                      aria-label={label}
-                    />
-                  </label>
-                ))}
-                <p className="studio-help">
-                  A preferência de movimento reduzido do sistema é sempre
-                  respeitada. Em telas pequenas os painéis continuam disponíveis
-                  como gavetas.
-                </p>
-              </TabsContent>
-            </Tabs>
-          </div>
-          <aside className="studio-preview-column">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="status-dot" />
-              <h3>Prévia em tempo real</h3>
-            </div>
-            <ThemePreview theme={t} />
-            <label className="studio-name">
-              Nome do tema
-              <Input
-                aria-label="Nome do tema"
-                value={nameDraft}
-                maxLength={60}
-                onChange={(e) => setNameDraft(e.target.value)}
-              />
-            </label>
-            <section className="studio-contrast">
-              <h3 className="flex items-center gap-2">
-                {failing.length ? (
-                  <AlertTriangle className="size-4 text-warning" />
-                ) : (
-                  <Check className="size-4 text-success" />
-                )}
-                Contraste do texto
-              </h3>
-              {checks.map((c) => (
-                <div key={c.label}>
-                  <span>{c.label}</span>
-                  <strong>
-                    {c.ratio.toFixed(2)}:1 {c.ratio >= 4.5 ? "AA" : "Revisar"}
-                  </strong>
-                </div>
               ))}
-              <p>
-                Referência AA: 4,5:1 para texto normal. Fundos com imagem,
-                transparência e gradientes exigem revisão visual adicional.
+              <p className="studio-help">
+                A preferência de movimento reduzido do sistema é sempre
+                respeitada. Em telas pequenas os painéis continuam disponíveis
+                como gavetas.
               </p>
-            </section>
-            <p className="studio-help">
-              Preferências locais. Este aplicativo ainda não oferece backend de
-              sincronização de temas.
-            </p>
-          </aside>
+            </TabsContent>
+          </Tabs>
         </div>
-        <footer className="studio-footer">
-          <div
-            role={error || studio.error ? "alert" : "status"}
-            className="studio-status"
-          >
-            {error ||
-              studio.error ||
-              notice ||
-              "Alterações em prévia. Fechar ou cancelar restaura o tema salvo."}
+        <aside className="studio-preview-column">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="status-dot" />
+            <h3>Prévia em tempo real</h3>
           </div>
-          <Button variant="ghost" onClick={studio.cancel}>
-            Cancelar
-          </Button>
-          <Button
-            disabled={busy}
-            onClick={() => run(() => studio.save(nameDraft))}
-          >
-            <Save className="size-4 mr-2" />
-            Salvar tema
-          </Button>
-        </footer>
-      </DialogContent>
+          <ThemePreview theme={t} />
+          <label className="studio-name">
+            Nome do tema
+            <Input
+              aria-label="Nome do tema"
+              value={nameDraft}
+              maxLength={60}
+              onChange={(e) => setNameDraft(e.target.value)}
+            />
+          </label>
+          <section className="studio-contrast">
+            <h3 className="flex items-center gap-2">
+              {failing.length ? (
+                <AlertTriangle className="size-4 text-warning" />
+              ) : (
+                <Check className="size-4 text-success" />
+              )}
+              Contraste do texto
+            </h3>
+            {checks.map((c) => (
+              <div key={c.label}>
+                <span>{c.label}</span>
+                <strong>
+                  {c.ratio.toFixed(2)}:1 {c.ratio >= 4.5 ? "AA" : "Revisar"}
+                </strong>
+              </div>
+            ))}
+            <p>
+              Referência AA: 4,5:1 para texto normal. Fundos com imagem,
+              transparência e gradientes exigem revisão visual adicional.
+            </p>
+          </section>
+          <p className="studio-help">
+            Preferências locais. Este aplicativo ainda não oferece backend de
+            sincronização de temas.
+          </p>
+        </aside>
+      </div>
+      <footer className="studio-footer">
+        <div
+          role={error || studio.error ? "alert" : "status"}
+          className="studio-status"
+        >
+          {error ||
+            studio.error ||
+            notice ||
+            "Alterações em prévia. Fechar ou cancelar restaura o tema salvo."}
+        </div>
+        <Button variant="ghost" onClick={studio.cancel}>
+          Cancelar
+        </Button>
+        <Button
+          disabled={busy}
+          onClick={() => run(() => studio.save(nameDraft))}
+        >
+          <Save className="size-4 mr-2" />
+          Salvar tema
+        </Button>
+      </footer>
+    </>
+  );
+  return embedded ? (
+    <section className="studio-embedded" aria-label="Editor de temas">
+      {content}
+    </section>
+  ) : (
+    <Dialog
+      open={studio.open}
+      onOpenChange={(open) => {
+        if (!open) studio.cancel();
+      }}
+    >
+      <DialogContent className="studio-window">{content}</DialogContent>
     </Dialog>
   );
 }

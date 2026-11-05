@@ -1,3 +1,6 @@
+import { useSettingsNavigation } from "../lib/settingsNavigation";
+import { ProfileDialog } from "../profiles/ProfileDialog";
+import { StudioDialog } from "../studio/StudioDialog";
 import { MicrophoneTest } from "./MicrophoneTest";
 import {
   useVoicePreferences,
@@ -45,6 +48,11 @@ import { useProfiles } from "../profiles/ProfileProvider";
 
 export const SettingsModal: React.FC = () => {
   const profiles = useProfiles();
+  const settingsTab = useSettingsNavigation((s) => s.tab);
+  const closeSettings = (open: boolean) => {
+    setIsSettingsOpen(open);
+    if (!open) studio.cancel();
+  };
   const voicePreferences = useVoicePreferences();
   const [voicePreferenceError, setVoicePreferenceError] = useState("");
   const saveVoice = (patch: Parameters<typeof saveVoicePreferences>[0]) => {
@@ -141,8 +149,8 @@ export const SettingsModal: React.FC = () => {
         `Webcam (${audioConfig.videoDeviceId.slice(0, 6)})`;
 
   return (
-    <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
-      <DialogContent className="max-w-2xl bg-surface border border-border text-foreground p-0 overflow-hidden shadow-2xl flex flex-col max-h-[88vh]">
+    <Dialog open={isSettingsOpen} onOpenChange={closeSettings}>
+      <DialogContent className="settings-window max-w-5xl bg-surface border border-border text-foreground p-0 overflow-hidden shadow-2xl flex flex-col max-h-[88vh]">
         {/* Cabeçalho */}
         <DialogHeader className="p-5 border-b border-border/60 bg-card/40 shrink-0">
           <div className="flex items-center gap-2.5">
@@ -161,10 +169,15 @@ export const SettingsModal: React.FC = () => {
           </div>
         </DialogHeader>
 
-        <div className="px-5 py-3 flex gap-2 items-center">
+        <div className="px-5 py-3 flex gap-2 items-center flex-wrap">
           <span className="text-sm">Aparência</span>
           {PRESETS.filter((t) =>
-            ["Clássico", "Moderno Roxo"].includes(t.name),
+            [
+              "Clássico",
+              "Moderno Roxo",
+              "Sakura Dream",
+              "Velvet Nocturne",
+            ].includes(t.name),
           ).map((t) => (
             <Button
               key={t.name}
@@ -179,7 +192,6 @@ export const SettingsModal: React.FC = () => {
             size="sm"
             variant="ghost"
             onClick={() => {
-              setIsSettingsOpen(false);
               studio.begin();
             }}
           >
@@ -187,9 +199,18 @@ export const SettingsModal: React.FC = () => {
           </Button>
         </div>
         {/* Abas e Conteúdo */}
-        <Tabs defaultValue="audio" className="flex-1 flex flex-col min-h-0">
+        <Tabs
+          value={settingsTab}
+          onValueChange={(tab) =>
+            useSettingsNavigation.setState({ tab: tab as typeof settingsTab })
+          }
+          className="flex-1 flex flex-col min-h-0"
+        >
           <div className="px-5 pt-3 border-b border-border/50 bg-card/20 shrink-0">
-            <TabsList className="bg-secondary/70 h-auto min-h-8 p-0.5 flex-wrap">
+            <TabsList
+              aria-label="Seções das configurações"
+              className="bg-secondary/70 h-auto min-h-8 p-0.5 flex-wrap"
+            >
               <TabsTrigger
                 value="profile"
                 className="text-xs h-7 px-3 flex items-center gap-1.5"
@@ -214,6 +235,7 @@ export const SettingsModal: React.FC = () => {
               <CallDiagnosticsPanel />
             </TabsContent>
             <TabsContent value="appearance" className="m-0 space-y-4">
+              <StudioDialog embedded />
               <h3 className="font-semibold">Densidade das mensagens</h3>
               <p className="text-sm text-muted-foreground">
                 Ajuste a apresentação do chat. A escolha é salva neste
@@ -247,26 +269,9 @@ export const SettingsModal: React.FC = () => {
               {appearanceError && <p role="alert">{appearanceError}</p>}
             </TabsContent>
             {/* ABA 1: PERFIL & IDENTIDADE */}
-            <TabsContent value="profile" className="m-0 space-y-6">
-              <div className="space-y-3">
-                <h3 className="text-base font-semibold">
-                  Seu perfil no cbsHUB
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Gerencie identidade, aparência e privacidade no editor de
-                  perfil.
-                </p>
-                <Button
-                  onClick={() => {
-                    setIsSettingsOpen(false);
-                    profiles.edit();
-                  }}
-                >
-                  Abrir editor de perfil
-                </Button>
-              </div>
+            <TabsContent value="profile" className="m-0">
+              <ProfileDialog embedded />
             </TabsContent>
-
             {/* ABA 2: ÁUDIO, VÍDEO & ESTÚDIO */}
             <TabsContent value="audio" className="m-0 space-y-6">
               <section
@@ -693,11 +698,11 @@ export const SettingsModal: React.FC = () => {
         <DialogFooter className="p-4 border-t border-border/60 bg-card/40 flex items-center justify-between shrink-0">
           <div className="text-caption text-muted-foreground flex items-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-primary" />
-            <span>Configurações sincronizadas localmente</span>
+            <span>Preferências salvas neste dispositivo</span>
           </div>
           <Button
             size="sm"
-            onClick={() => setIsSettingsOpen(false)}
+            onClick={() => closeSettings(false)}
             className="h-8 px-5 text-xs font-semibold"
           >
             Concluído

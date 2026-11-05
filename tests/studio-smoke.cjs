@@ -19,8 +19,10 @@ const fs = require("node:fs/promises");
       ? r.continue()
       : r.abort(),
   );
-  const open = () =>
-    p.getByRole("button", { name: "Abrir cbsHUB Studio", exact: true }).click();
+  const open = async () => {
+    if(await p.getByRole("dialog",{name:"Configurações do cbsHUB",exact:true}).isVisible())await p.getByRole("button",{name:"Editar temas",exact:true}).click();
+    else await p.getByRole("button",{name:"Abrir cbsHUB Studio",exact:true}).click();
+  };
   const bg = () =>
     p.evaluate(() =>
       document.documentElement.style.getPropertyValue("--background"),

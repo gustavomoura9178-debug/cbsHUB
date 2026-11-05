@@ -30,8 +30,8 @@ const test = (label, fn) => {
   count++;
   console.log("PASS", label);
 };
-test("sete presets válidos e roundtrip JSON", () => {
-  assert.equal(PRESETS.length, 7);
+test("nove presets válidos e roundtrip JSON", () => {
+  assert.equal(PRESETS.length, 9);
   for (const t of PRESETS)
     assert.equal(
       serializeTheme(parseTheme(serializeTheme(t))),

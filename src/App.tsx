@@ -29,7 +29,6 @@ import {
 
 import { MediaNotice } from "./components/CallStatus";
 import { ProfileDialog } from "./profiles/ProfileDialog";
-import { StudioDialog } from "./studio/StudioDialog";
 
 export const App: React.FC = () => {
   usePushToTalk();
@@ -89,7 +88,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isSettingsOpen) setIsSettingsOpen(false);
+        if (isSettingsOpen) {setIsSettingsOpen(false);window.dispatchEvent(new Event("cbshub-settings-dismissed"));}
         if (isScreenPickerOpen) setIsScreenPickerOpen(false);
       }
     };
@@ -175,7 +174,7 @@ export const App: React.FC = () => {
         {/* 3. Modais do Sistema */}
         <ScreenPickerModal />
         <SettingsModal />
-        <StudioDialog />
+
         <ProfileDialog />
       </div>
     </TooltipProvider>

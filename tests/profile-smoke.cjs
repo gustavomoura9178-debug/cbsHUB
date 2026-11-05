@@ -24,8 +24,16 @@ const assert = require("node:assert/strict");
     );
     await p.goto("http://127.0.0.1:5173");
     await p.getByRole("button", { name: "Meu perfil", exact: true }).waitFor();
-    await p.evaluate(async () => { window.__profileTestEngine = (await import("/src/lib/webrtcEngine.ts")).webrtcEngine; });
-    await p.waitForFunction(() => !!window.__profileTestEngine.localPeer && window.__profileTestEngine.roomGeneration >= 3);
+    await p.evaluate(async () => {
+      window.__profileTestEngine = (
+        await import("/src/lib/webrtcEngine.ts")
+      ).webrtcEngine;
+    });
+    await p.waitForFunction(
+      () =>
+        !!window.__profileTestEngine.localPeer &&
+        window.__profileTestEngine.roomGeneration >= 3,
+    );
     return p;
   }
   try {
@@ -59,9 +67,13 @@ const assert = require("node:assert/strict");
         mimeType: "image/png",
         buffer: Buffer.from(image, "base64"),
       });
-      if(kind === "avatar") await a.getByRole("button",{name:"Aplicar recorte",exact:true}).click();
+      if (kind === "avatar")
+        await a
+          .getByRole("button", { name: "Aplicar recorte", exact: true })
+          .click();
     }
     await a.getByRole("button", { name: "Salvar perfil", exact: true }).click();
+    await a.getByRole("button", { name: "Concluído", exact: true }).click();
     await a.getByRole("dialog").waitFor({ state: "hidden" });
     await a.reload();
     await a.getByRole("button", { name: "Meu perfil", exact: true }).waitFor();
@@ -85,6 +97,7 @@ const assert = require("node:assert/strict");
       "Aurora",
     );
     console.log("PASS cancelar sem persistir rascunho");
+    await a.getByRole("button", { name: "Concluído", exact: true }).click();
     const packet = await a.evaluate(async () => {
       const m = await import("/src/profiles/model.ts");
       const p = JSON.parse(localStorage.getItem(m.PROFILE_KEY));

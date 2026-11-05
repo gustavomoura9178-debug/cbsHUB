@@ -1,3 +1,4 @@
+import { openSettings } from "../lib/settingsNavigation";
 import {
   createContext,
   useContext,
@@ -75,9 +76,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setFull(false);
     },
     edit: () => {
-      setSelected("self");
-      setEditing(true);
+      setSelected(null);
+      setEditing(false);
       setFull(true);
+      openSettings("profile");
     },
     expand: () => setFull(true),
     close: () => {

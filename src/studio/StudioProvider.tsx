@@ -1,3 +1,4 @@
+import { openSettings } from "../lib/settingsNavigation";
 import {
   createContext,
   useContext,
@@ -100,7 +101,9 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }
   const context: StudioContext = {
-    selectPreset: next => { if(persist({...saved,active:validateTheme(next)})) setDraft(null); },
+    selectPreset: (next) => {
+      if (persist({ ...saved, active: validateTheme(next) })) setDraft(null);
+    },
     theme,
     library: saved.library,
     open,
@@ -110,6 +113,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       setDraft(structuredClone(saved.active));
       setEditingId(null);
       setOpen(true);
+      openSettings("appearance");
       setError("");
     },
     cancel: () => {
@@ -186,11 +190,41 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     clearError: () => setError(""),
   };
   useEffect(() => {
+    const dismiss = () => {
+      setDraft(null);
+      setOpen(false);
+      setEditingId(null);
+    };
+    window.addEventListener("cbshub-settings-dismissed", dismiss);
+    return () =>
+      window.removeEventListener("cbshub-settings-dismissed", dismiss);
+  }, []);
+  useEffect(() => {
     const root = document.documentElement;
-    root.dataset.workspaceStyle = theme.name === "Clássico" ? "classic" : "modern";
+    root.dataset.workspaceStyle =
+      theme.name === "Clássico" ? "classic" : "modern";
+    root.dataset.themePreset =
+      theme.name === "Sakura Dream"
+        ? "sakura"
+        : theme.name === "Velvet Nocturne"
+          ? "velvet"
+          : "default";
     const c = theme.colors,
       l = theme.layout;
     const vars: Record<string, string> = {
+      "--success":
+        theme.name === "Velvet Nocturne"
+          ? "#b99a62"
+          : theme.mode === "light"
+            ? "#38694f"
+            : "#6eddbd",
+      "--warning": theme.mode === "light" ? "#7a4d18" : "#f0bd68",
+      "--destructive": theme.mode === "light" ? "#9f254c" : "#f1788a",
+      "--destructive-foreground": "#ffffff",
+      "--title-font":
+        theme.name === "Velvet Nocturne"
+          ? 'Georgia, "Times New Roman", serif'
+          : "inherit",
       "--background": c.background,
       "--foreground": c.text,
       "--surface": c.sidebar,
