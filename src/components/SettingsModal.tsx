@@ -1,3 +1,5 @@
+import { useShallow } from "zustand/react/shallow";
+import { MicrophoneLevelMeter } from "./MicrophoneLevelMeter";
 import { useSettingsNavigation } from "../lib/settingsNavigation";
 import { ProfileDialog } from "../profiles/ProfileDialog";
 import { StudioDialog } from "../studio/StudioDialog";
@@ -44,10 +46,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useHubStore } from "../store/useHubStore";
 import { webrtcEngine } from "../lib/webrtcEngine";
 
-import { useProfiles } from "../profiles/ProfileProvider";
-
 export const SettingsModal: React.FC = () => {
-  const profiles = useProfiles();
   const settingsTab = useSettingsNavigation((s) => s.tab);
   const closeSettings = (open: boolean) => {
     setIsSettingsOpen(open);
@@ -68,13 +67,13 @@ export const SettingsModal: React.FC = () => {
   const compact = useChatView((state) => state.compact);
   const [appearanceError, setAppearanceError] = useState("");
   const studio = useStudio();
-  const {
-    isSettingsOpen,
-    setIsSettingsOpen,
-    audioConfig,
-    micLevel,
-    isLocalSpeaking,
-  } = useHubStore();
+  const { isSettingsOpen, setIsSettingsOpen, audioConfig } = useHubStore(
+    useShallow((s) => ({
+      isSettingsOpen: s.isSettingsOpen,
+      setIsSettingsOpen: s.setIsSettingsOpen,
+      audioConfig: s.audioConfig,
+    })),
+  );
 
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
@@ -293,8 +292,8 @@ export const SettingsModal: React.FC = () => {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Segure a tecla para falar com a janela em foco. Não funciona
-                  enquanto digita. O silêncio manual sempre prevalece;
-                  Soundboard continua independente.
+                  enquanto digita. O silêncio manual sempre prevalece; Os
+                  efeitos sonoros continuam independentes.
                 </p>
                 <label className="text-xs flex items-center gap-2">
                   Tecla de fala
@@ -542,35 +541,7 @@ export const SettingsModal: React.FC = () => {
 
               {/* VU Meter e Controles de Volume */}
               <div className="p-4 rounded-xl bg-secondary/40 border border-border/60 space-y-4">
-                {/* VU Meter ao Vivo */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-foreground flex items-center gap-1.5">
-                      <Activity
-                        className={`w-4 h-4 ${isLocalSpeaking ? "text-success animate-pulse" : "text-muted-foreground"}`}
-                      />
-                      <span>Nível do Microfone (VU Meter)</span>
-                    </span>
-                    <span className="text-caption font-mono text-muted-foreground">
-                      {isLocalSpeaking ? "Falando" : "Silêncio"}
-                    </span>
-                  </div>
-
-                  <div className="w-full h-2.5 bg-card rounded-full overflow-hidden p-0.5 border border-border/40">
-                    <div
-                      className={`h-full rounded-full transition-all duration-75 ${
-                        micLevel > 70
-                          ? "bg-destructive"
-                          : micLevel > 20
-                            ? "bg-success"
-                            : "bg-primary"
-                      }`}
-                      style={{
-                        width: `${Math.min(100, Math.max(0, micLevel))}%`,
-                      }}
-                    />
-                  </div>
-                </div>
+                <MicrophoneLevelMeter />
 
                 {/* Slider Ganho do Mic */}
                 <div className="space-y-1.5">

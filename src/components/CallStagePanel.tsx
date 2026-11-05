@@ -22,7 +22,7 @@ import {
 import { useHubStore } from "../store/useHubStore";
 import { webrtcEngine } from "../lib/webrtcEngine";
 import { UserCallCard, ScreenShareTile } from "./UserCallCard";
-import { CallControlDock } from "./CallControlDock";
+import { CallControls } from "./CallControls";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import type { Participant } from "../types/cbshub";
@@ -444,7 +444,7 @@ export const CallStagePanel: React.FC = () => {
           </div>
 
           <div className="pl-2 shrink-0">
-            <CallControlDock />
+            <CallControls />
           </div>
         </div>
 
@@ -545,7 +545,7 @@ export const CallStagePanel: React.FC = () => {
       {/* Dock de Controles Centralizada na Base */}
       <div className="pb-3 flex items-center justify-center pointer-events-none">
         <div className="pointer-events-auto">
-          <CallControlDock />
+          <CallControls />
         </div>
       </div>
 

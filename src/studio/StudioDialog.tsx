@@ -575,7 +575,15 @@ export function StudioDialog({ embedded = false }: { embedded?: boolean }) {
             notice ||
             "Alterações em prévia. Fechar ou cancelar restaura o tema salvo."}
         </div>
-        <Button variant="ghost" onClick={studio.cancel}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            studio.cancel();
+            setNameDraft(t.name);
+            setError("");
+            setNotice("Prévia cancelada.");
+          }}
+        >
           Cancelar
         </Button>
         <Button

@@ -1,3 +1,5 @@
+import { useShallow } from "zustand/react/shallow";
+import { useSidebarControls } from "../hooks/useSidebarControls";
 import {
   useChatView,
   updateChatView,
@@ -37,6 +39,7 @@ interface Props {
   onToggleMembers: () => void;
 }
 export function RoomTopBar({ membersOpen, onToggleMembers }: Props) {
+  const sidebarControls = useSidebarControls();
   const {
     roomId,
     inVoiceCall,
@@ -45,7 +48,17 @@ export function RoomTopBar({ membersOpen, onToggleMembers }: Props) {
     participants,
     isConnected,
     setIsSettingsOpen,
-  } = useHubStore();
+  } = useHubStore(
+    useShallow((s) => ({
+      roomId: s.roomId,
+      inVoiceCall: s.inVoiceCall,
+      callStageMode: s.callStageMode,
+      setCallStageMode: s.setCallStageMode,
+      participants: s.participants,
+      isConnected: s.isConnected,
+      setIsSettingsOpen: s.setIsSettingsOpen,
+    })),
+  );
   const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
     "idle",
   );
@@ -124,24 +137,27 @@ export function RoomTopBar({ membersOpen, onToggleMembers }: Props) {
             <TooltipContent>Alternar palco da chamada</TooltipContent>
           </Tooltip>
         )}
-        <Button
-          size="sm"
-          variant={inVoiceCall ? "destructive" : "default"}
-          className="voice-action gap-2"
-          onClick={() =>
-            inVoiceCall
-              ? webrtcEngine.leaveVoiceCall()
-              : webrtcEngine.joinVoiceCall()
-          }
-          aria-label={inVoiceCall ? "Desligar chamada" : "Entrar na voz"}
-        >
-          {inVoiceCall ? (
-            <PhoneOff className="size-4" />
-          ) : (
-            <PhoneCall className="size-4" />
-          )}
-          <span>{inVoiceCall ? "Desligar" : "Entrar na voz"}</span>
-        </Button>
+        {(!inVoiceCall ||
+          (!sidebarControls && callStageMode === "minimized")) && (
+          <Button
+            size="sm"
+            variant={inVoiceCall ? "destructive" : "default"}
+            className="voice-action gap-2"
+            onClick={() =>
+              inVoiceCall
+                ? webrtcEngine.leaveVoiceCall()
+                : webrtcEngine.joinVoiceCall()
+            }
+            aria-label={inVoiceCall ? "Desligar chamada" : "Entrar na voz"}
+          >
+            {inVoiceCall ? (
+              <PhoneOff className="size-4" />
+            ) : (
+              <PhoneCall className="size-4" />
+            )}
+            <span>{inVoiceCall ? "Desligar" : "Entrar na voz"}</span>
+          </Button>
+        )}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

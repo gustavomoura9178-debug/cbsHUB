@@ -30,7 +30,6 @@ import {
 
 import { MediaNotice } from "./components/CallStatus";
 import { ProfileDialog } from "./profiles/ProfileDialog";
-import { StudioDialog } from "./studio/StudioDialog";
 
 export const App: React.FC = () => {
   usePushToTalk();

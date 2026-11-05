@@ -1,3 +1,4 @@
+import { openSettings } from "../lib/settingsNavigation";
 import { CallQualityBadge } from "./CallStatus";
 import { useShallow } from "zustand/react/shallow";
 import { useVoicePreferences } from "../lib/voicePreferences";
@@ -497,7 +498,7 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
             </VoiceAction>
             <VoiceAction
               label="Configurações de voz"
-              onClick={() => setIsSettingsOpen(true)}
+              onClick={() => openSettings("audio")}
             >
               <Sliders className="size-4" />
             </VoiceAction>

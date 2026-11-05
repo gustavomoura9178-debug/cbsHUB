@@ -78,6 +78,16 @@ const { chromium } = require("playwright"),
         path: `/workspace/cbshub-onboarding/refinement-${name.replaceAll(" ", "-")}.png`,
       });
     }
+    await page
+      .getByRole("textbox", { name: "Nome do tema", exact: true })
+      .fill("Descartar nome");
+    await page.getByRole("button", { name: "Cancelar", exact: true }).click();
+    assert.equal(
+      await page
+        .getByRole("textbox", { name: "Nome do tema", exact: true })
+        .inputValue(),
+      "Velvet Nocturne",
+    );
     await page.getByRole("button", { name: "Concluído", exact: true }).click();
     await page.reload();
     await page
@@ -129,7 +139,24 @@ const { chromium } = require("playwright"),
         },
       });
     });
-    let previous = 0;
+    assert.equal(
+      await page
+        .getByRole("button", { name: "Mutar microfone", exact: true })
+        .count(),
+      0,
+      "common controls must not be duplicated permanently",
+    );
+    await page
+      .getByRole("button", { name: "Dispositivos e opções", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Mutar microfone", exact: true })
+      .waitFor();
+    await page
+      .getByRole("button", { name: "Ocultar opções da chamada", exact: true })
+      .click();
+    let previous = 0,
+      initialCardHeight = 0;
     for (const height of [220, 360, 490]) {
       await page.evaluate((h) => s.getState().setCallStageHeight(h), height);
       await page.waitForTimeout(80);
@@ -137,15 +164,55 @@ const { chromium } = require("playwright"),
         .locator(".call-responsive-grid")
         .evaluate((el) => ({
           height: el.getBoundingClientRect().height,
+          cardWidth: el
+            .querySelector("[data-call-card]")
+            .getBoundingClientRect().width,
           card: el.querySelector("[data-call-card]").getBoundingClientRect()
             .height,
           width: el.getBoundingClientRect().width,
           container: el.parentElement.getBoundingClientRect().width,
         }));
-      assert(bounds.card > previous, JSON.stringify(bounds));
+      assert(bounds.card >= previous, JSON.stringify(bounds));
+      assert(
+        Math.abs(bounds.cardWidth / bounds.card - 16 / 9) < 0.02,
+        JSON.stringify(bounds),
+      );
+      if (!initialCardHeight) initialCardHeight = bounds.card;
       previous = bounds.card;
       assert(bounds.width <= bounds.container);
     }
+    assert(
+      previous > initialCardHeight,
+      "cards must grow from the small stage until width-constrained",
+    );
+    await page.evaluate(async () => {
+      await e.toggleWebcam();
+      window.testScreen = await navigator.mediaDevices.getUserMedia({
+        video: true,
+      });
+      s.getState().updateParticipant("test-remote", { isScreenSharing: true });
+      s.getState().setRemoteStream("test-remote", "screen", testScreen);
+    });
+    await page
+      .getByRole("button", {
+        name: "Focar tela de Outro participante",
+        exact: true,
+      })
+      .click();
+    await page
+      .getByRole("button", { name: "Voltar para Grade", exact: true })
+      .click();
+    await page.waitForFunction(() =>
+      [...document.querySelectorAll("[data-call-card] video")].some(
+        (video) => video.srcObject,
+      ),
+    );
+    await page.evaluate(async () => {
+      testScreen.getTracks().forEach((t) => t.stop());
+      s.getState().setRemoteStream("test-remote", "screen", null);
+      s.getState().updateParticipant("test-remote", { isScreenSharing: false });
+      await e.toggleWebcam();
+    });
     assert.equal(
       await page
         .locator('[data-call-card="test-remote"]')
