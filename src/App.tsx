@@ -63,6 +63,7 @@ export const App: React.FC = () => {
 
   // 1. Inicialização do microfone e da sala executada apenas UMA VEZ no mount
   useEffect(() => {
+    if (localStorage.getItem("cbshub-room-removed-active") === "1" && !roomId) return;
     const initialRoom = roomId || "cbs-irmandade";
     webrtcEngine.joinRoom(initialRoom, false).catch((err) => {
       console.warn("[App] Erro ao conectar na sala inicial:", err);

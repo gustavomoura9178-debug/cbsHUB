@@ -30,8 +30,8 @@ const test = (label, fn) => {
   count++;
   console.log("PASS", label);
 };
-test("seis presets válidos e roundtrip JSON", () => {
-  assert.equal(PRESETS.length, 6);
+test("sete presets válidos e roundtrip JSON", () => {
+  assert.equal(PRESETS.length, 7);
   for (const t of PRESETS)
     assert.equal(
       serializeTheme(parseTheme(serializeTheme(t))),
@@ -41,7 +41,7 @@ test("seis presets válidos e roundtrip JSON", () => {
 test("contraste WCAG conhecido", () => {
   assert.equal(contrast("#ffffff", "#000000"), 21);
   assert.equal(contrast("#ffffff", "#ffffff"), 1);
-  assert(contrastChecks(PRESETS[1]).every((c) => c.ratio >= 4.5));
+  assert(contrastChecks(PRESETS.find(t=>t.name==="Light Modern")).every((c) => c.ratio >= 4.5));
 });
 const file = () => JSON.parse(serializeTheme(DEFAULT_THEME));
 test("versão desconhecida", () => {

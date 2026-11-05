@@ -1,3 +1,4 @@
+import { useActivities } from "./activities";
 import { useSoundPreferences, setSoundMode } from "./soundPreferences";
 import { useShallow } from "zustand/react/shallow";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -102,6 +103,7 @@ export function ChatPanel() {
     [activities, setActivities] = useState(false),
     [nearBottom, setNearBottom] = useState(true);
   const mode = useSoundPreferences(s => s.mode);
+  const soundEvents = useActivities(s => s.events);
   const [compact, setCompact] = useState(() => {
     try {
       return localStorage.getItem("cbshub-chat-density") === "compact";
@@ -168,7 +170,7 @@ export function ChatPanel() {
       messages.filter(
         (m) =>
           !profiles.blocked.includes(m.authorClientId) &&
-          (mode !== "hidden" || m.type !== "soundboard") &&
+          m.type !== "soundboard" &&
           (!pinned || m.pinned) &&
           (!query ||
             `${m.content} ${m.authorNickname}`
@@ -674,10 +676,10 @@ export function ChatPanel() {
             Os últimos 50 eventos disponíveis. Os sons continuam funcionando em
             qualquer modo de exibição.
           </DialogDescription>
-          {messages
+          {[...messages, ...soundEvents]
             .filter(
               (m) =>
-                m.type === "soundboard" &&
+                m.type === "soundboard" && m.roomId === roomId &&
                 !profiles.blocked.includes(m.authorClientId),
             )
             .slice(-50)

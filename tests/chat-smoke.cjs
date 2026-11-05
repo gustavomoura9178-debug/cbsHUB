@@ -253,7 +253,7 @@ const assert = require("node:assert/strict");
         useHubStore.getState().soundboardClips[0],
       );
     });
-    await a.locator(".chat-sound-event").waitFor();
+    assert.equal(await a.locator(".chat-sound-event").count(),0);
     await a
       .getByRole("button", {
         name: "Exibição de eventos do Soundboard",

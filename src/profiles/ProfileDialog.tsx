@@ -1,3 +1,4 @@
+import {AvatarCrop} from "./AvatarCrop";
 import {
   Children,
   isValidElement,
@@ -249,8 +250,10 @@ export function ProfileDialog() {
       shareImages: true,
     },
   })!;
+  const [cropFile,setCropFile] = useState<File|null>(null);
   async function upload(file: File | undefined, kind: "avatar" | "banner") {
     if (!file) return;
+    if(kind === "avatar") {setCropFile(file);return;}
     setBusy(true);
     setError("");
     try {
@@ -383,7 +386,7 @@ export function ProfileDialog() {
                       <div className="profile-upload" key={kind}>
                         <label>
                           {kind === "avatar"
-                            ? "Avatar (até 1 MB)"
+                            ? "Avatar (original até 20 MB)"
                             : "Banner (até 2 MB)"}
                           <Input
                             type="file"
@@ -662,6 +665,7 @@ export function ProfileDialog() {
           </>
         )}
       </DialogContent>
+      <AvatarCrop file={cropFile} onClose={()=>setCropFile(null)} onSave={image=>setDraft(current=>({...current,avatar:image}))} />
     </Dialog>
   );
 }

@@ -1,3 +1,5 @@
+import {useStudio} from "../studio/StudioProvider";
+import {AlertDialog,AlertDialogContent,AlertDialogTitle,AlertDialogDescription} from "./ui/alert-dialog";
 import { useState } from "react";
 import {
   ArrowRight,
@@ -43,11 +45,15 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
     setIsSettingsOpen,
   } = useHubStore();
   const profiles = useProfiles();
+  const studio=useStudio();
+  const participants=useHubStore(s=>s.participants);
+  const [removing,setRemoving] = useState<string|null>(null);
+  const [removed,setRemoved] = useState<string|null>(null);
   const [slug, setSlug] = useState("");
   const [query, setQuery] = useState("");
   const [copied, setCopied] = useState("");
   const [copyError, setCopyError] = useState(false);
-  const rooms = [...new Set([roomId, ...recentRooms])].filter((room) =>
+  const rooms = [...new Set([roomId, ...recentRooms])].filter(Boolean).filter((room) =>
     room.includes(query.toLowerCase()),
   );
   const join = async (room: string) => {
@@ -188,6 +194,7 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
+                  <DropdownMenuItem onSelect={()=>setRemoving(room)}>Remover sala deste dispositivo</DropdownMenuItem>
                   <DropdownMenuItem onSelect={() => join(room)}>
                     <Hash className="mr-2 size-4" />
                     Abrir sala
@@ -210,7 +217,10 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
             </p>
           )}
         </div>
+      {studio.theme.name === "Clássico" && <div className="px-3 py-4 border-t border-border"><p className="section-eyebrow mb-3">Na sala</p>{Object.values(participants).map(p=><div key={p.peerId} className="flex gap-2 items-center py-2"><ParticipantAvatar clientId={p.clientId} name={p.nickname} color={p.avatarColor} className="size-8"/><div className="text-xs"><p>{p.nickname}</p><span className="text-muted-foreground">{p.inVoiceCall?"Na voz":"No chat"}</span></div></div>)}</div>}
       </ScrollArea>
+      {removed && <Button variant="ghost" onClick={()=>{useHubStore.getState().addRecentRoom(removed);setRemoved(null);}}>Restaurar sala removida</Button>}
+      <AlertDialog open={!!removing} onOpenChange={open=>{if(!open)setRemoving(null);}}><AlertDialogContent><AlertDialogTitle>Remover sala deste dispositivo?</AlertDialogTitle><AlertDialogDescription>Remove apenas dos seus recentes e sai da sala atual. Os participantes, mensagens e arquivos são preservados. Você poderá restaurar ou entrar pelo código novamente.</AlertDialogDescription><Button data-alert-cancel variant="outline" onClick={()=>setRemoving(null)}>Cancelar</Button><Button variant="destructive" onClick={()=>{if(!removing)return;const room=removing;if(room===roomId){webrtcEngine.leaveRoom();localStorage.setItem("cbshub-room-removed-active","1");useHubStore.setState({roomId:""});}useHubStore.setState(s=>({recentRooms:s.recentRooms.filter(r=>r!==room)}));setRemoved(room);setRemoving(null);}}>Confirmar remoção local</Button></AlertDialogContent></AlertDialog>
       <div role="status" className="sr-only">
         {copyError
           ? "Não foi possível copiar o código."
@@ -266,6 +276,7 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
           <Button
             variant={isMuted ? "destructive" : "secondary"}
             size="sm"
+            title={isMuted ? "Ativar microfone" : "Silenciar microfone"}
             aria-pressed={isMuted}
             onClick={() => webrtcEngine.toggleMute()}
             className="gap-2"
@@ -275,17 +286,18 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
             ) : (
               <Mic className="size-3.5" />
             )}
-            {isMuted ? "Mutado" : "Microfone"}
+            <span className="sr-only">{isMuted ? "Mutado" : "Microfone"}</span>
           </Button>
           <Button
             variant={isDeafened ? "destructive" : "secondary"}
             size="sm"
+            title={isDeafened ? "Ativar áudio" : "Silenciar áudio"}
             aria-pressed={isDeafened}
             onClick={() => webrtcEngine.toggleDeafen()}
             className="gap-2"
           >
             <Headphones className="size-3.5" />
-            {isDeafened ? "Sem áudio" : "Áudio"}
+            <span className="sr-only">{isDeafened ? "Sem áudio" : "Áudio"}</span>
           </Button>
         </div>
       </div>
