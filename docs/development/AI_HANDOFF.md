@@ -179,3 +179,8 @@ Pacote Linux local preparado com electron-builder --linux --dir e Electron45 ins
 Pendente/manual: chamadas reais em dois computadores/redes e vários participantes, ICE/STUN/TURN, suspensão/recuperação real, dispositivos físicos, vídeo/tela/Soundboard simultâneos, consumo de CPU/memória sob carga, Windows/ícones/arraste físicos, leitor de tela e revisão fina de contraste. Não declarar que todas as quedas foram corrigidas ou que o aplicativo está pronto para produção. Versão de desenvolvimento permanece 2.0.0-rc.2; selecionar próximo rc conforme VERSIONING.md antes de distribuir novo candidato. Backend próprio continua proposta para revisão; contas, ACL/salas globais, sincronização entre dispositivos, DM, anexos/pastas/GIFs e notificações do SO não implementados nesta entrega. Sem interfaces falsas.
 
 Próximo responsável: revisar os commits separados, coletar relatório Configurações > Diagnóstico durante uma queda real e executar os gates da matriz de WORKSPACE_3_STATUS.md. No PTT usar F8/F9/F10 com foco; não confundir com atalho global. Favoritos/remoção/restauração de salas são locais; dados históricos existentes preservados.
+
+
+## Publicação autorizada — WORKSPACE-3 — 05/11/2026
+
+Codex/OpenAI · branch feat/workspace-3-2026-11-05 · conteúdo até a512aa8. Usuário autorizou envio ao Git nesta tarefa. Push da branch efetuado com sucesso; main intacta, sem force push, merge ou release. Este registro documental acompanha a publicação. Checkout estava limpo antes do envio. Testes não reexecutados nesta tarefa de publicação: evidência anterior permanece build aprovado, 22 testes aprovados e 1 BLOCKED por ICE, além de smoke do pacote Linux. Matriz física/Windows/backend continuam pendentes conforme WORKSPACE_3_STATUS.md.
