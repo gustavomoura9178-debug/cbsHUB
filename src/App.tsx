@@ -1,3 +1,4 @@
+import { BootSplash, ConnectionScreen } from "./components/ConnectionScreen";
 import { usePushToTalk } from "./hooks/usePushToTalk";
 import { useShallow } from "zustand/react/shallow";
 import React, { useEffect, useState } from "react";
@@ -29,9 +30,11 @@ import {
 
 import { MediaNotice } from "./components/CallStatus";
 import { ProfileDialog } from "./profiles/ProfileDialog";
+import { StudioDialog } from "./studio/StudioDialog";
 
 export const App: React.FC = () => {
   usePushToTalk();
+  const [booting, setBooting] = useState(true);
   const {
     isSettingsOpen,
     isScreenPickerOpen,
@@ -64,13 +67,24 @@ export const App: React.FC = () => {
 
   // 1. Inicialização do microfone e da sala executada apenas UMA VEZ no mount
   useEffect(() => {
-    if (localStorage.getItem("cbshub-room-removed-active") === "1" && !roomId)
+    if (localStorage.getItem("cbshub-room-removed-active") === "1" && !roomId) {
+      setBooting(false);
       return;
+    }
+    let active = true;
     const initialRoom = roomId || "cbs-irmandade";
-    webrtcEngine.joinRoom(initialRoom, false).catch((err) => {
-      console.warn("[App] Erro ao conectar na sala inicial:", err);
-    });
-    return () => webrtcEngine.leaveRoom();
+    webrtcEngine
+      .joinRoom(initialRoom, false)
+      .catch((err) => {
+        console.warn("[App] Erro ao conectar na sala inicial:", err);
+      })
+      .finally(() => {
+        if (active) setBooting(false);
+      });
+    return () => {
+      active = false;
+      webrtcEngine.leaveRoom();
+    };
   }, []); // Array de dependências vazio estrito
 
   useEffect(() => {
@@ -88,7 +102,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isSettingsOpen) {setIsSettingsOpen(false);window.dispatchEvent(new Event("cbshub-settings-dismissed"));}
+        if (isSettingsOpen) {
+          setIsSettingsOpen(false);
+          window.dispatchEvent(new Event("cbshub-settings-dismissed"));
+        }
         if (isScreenPickerOpen) setIsScreenPickerOpen(false);
       }
     };
@@ -108,6 +125,8 @@ export const App: React.FC = () => {
     <TooltipProvider delayDuration={150}>
       <div className="workspace-root">
         <TitleBar />
+        {booting && <BootSplash />}
+        <ConnectionScreen />
         <div className="workspace-body">
           <WorkspaceRail
             sidebarOpen={sidebarOpen}

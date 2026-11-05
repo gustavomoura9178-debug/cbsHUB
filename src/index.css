@@ -512,3 +512,11 @@ html[data-studio-motion="reduced"] *, html[data-studio-motion="reduced"] *::befo
 [data-theme-preset="sakura"] .navigation-heading { background:radial-gradient(ellipse at top right,color-mix(in srgb,var(--studio-highlight) 9%,transparent),transparent 75%); }
 @media(max-width:800px){.studio-embedded .studio-body,.settings-window .profile-editor-grid {grid-template-columns:1fr;}.studio-embedded .studio-editor{padding:12px 0;}.studio-presets{grid-template-columns:repeat(2,minmax(0,1fr));}.studio-embedded .studio-preview-column{border-left:0;}}
 
+.brand-loading-screen { position:fixed; inset:var(--titlebar-height) 0 0; z-index:45; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-panel); background:var(--background); color:var(--foreground); }
+.animated-official-logo { width:min(200px,45vw); height:auto; overflow:visible; animation:brand-breathe 2.6s ease-in-out infinite; }
+.animated-official-logo path { animation:brand-reveal 2.6s ease-in-out infinite; }
+.animated-official-logo .logo-lower { animation-delay:.12s; }
+@keyframes brand-reveal {0%,5% {clip-path:inset(0 0 100% 0);}40%,60% {clip-path:inset(0);}96%,100% {clip-path:inset(100% 0 0 0);}}
+@keyframes brand-breathe {0%,40%,100%{transform:scale(1);}60%{transform:scale(1.025);}}
+[data-studio-motion="reduced"] .animated-official-logo,[data-studio-motion="reduced"] .animated-official-logo path {animation:none;clip-path:none;transform:none;}
+@media(prefers-reduced-motion:reduce){.animated-official-logo,.animated-official-logo path{animation:none;clip-path:none;transform:none;}}
