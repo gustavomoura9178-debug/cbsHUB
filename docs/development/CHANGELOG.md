@@ -1,3 +1,5 @@
+> Atualização atual: **2.0.0-rc.2 / SECURITY-002**. Leia [SECURITY_UPDATE.md](SECURITY_UPDATE.md). Estados anteriores são históricos.
+
 > Estado atual em 05/11/2026: candidato **2.0.0-rc.1**, estabilização STABILIZE-001. Consulte [STABILIZATION.md](STABILIZATION.md). As seções anteriores abaixo são históricas.
 
 # Changelog
@@ -62,3 +64,8 @@ Pendências: validação visual fina contra as capturas, acessibilidade completa
 ## STABILIZE-001 — 05/11/2026
 
 Candidato 2.0.0-rc.1: preload CJS único; sandbox/IPC/navegação/captura reforçados; agrupamento linear no journal; liberação imediata de bitmap rejeitado; servidor renderer e runner de regressão versionados. Nenhuma biblioteca substituída ou atualizada. Build e pacote Linux passaram; 14 testes passaram, 1 bloqueado. Não é release de produção.
+
+
+## SECURITY-002 — 05/11/2026
+
+SECURITY-002: Electron 45.2.3, builder 26.18.0, Vite 8.3.6 e plugins compatíveis; esbuild explícito e override restrito de minimatch. CSP de produção, allowlist de capacidades, captura fail-closed e validação de presença. Novo teste de sinalização, Electron smoke ampliado e teste de rascunho desambiguado. Proposta de backend próprio adicionada. Ver SECURITY_UPDATE.md para justificativas e limites.

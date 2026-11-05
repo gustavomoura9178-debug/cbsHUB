@@ -34,3 +34,7 @@ Mesmos pré-requisitos dos demais probes; iniciar renderer e reiniciar depois de
 # Estabilização
 
 Use `npm run build`, `npm run dev:renderer` (terminal separado) e `npm test`. O runner versionado registra logs/resultados em build/; bloqueio não é aprovação e retorna exit 1. Novos probes: desktop-security (origens/argumentos/CJS), electron-smoke (runtime/reload/sandbox) e stabilization-a11y (foco/Tab/Escape/reduced motion). O teste Electron aceita CBSHUB_TEST_EXECUTABLE para validar pacote Linux. Relatório atual: docs/development/STABILIZATION.md.
+
+# SECURITY-002
+
+Electron 45 baixa o runtime sob demanda: preparar com `node node_modules/electron/install.js` antes dos testes (cloud: ELECTRON_GET_USE_PROXY=1). Node mínimo 22.12; ambiente testado Node 24.22.1. Novo signaling-validation valida presença P2P malformada. Electron smoke agora verifica interface carregada, CSP efetiva e entrada/saída da voz com captura sintética, além de preload/sandbox/reload. Resultados atuais em docs/development/SECURITY_UPDATE.md.

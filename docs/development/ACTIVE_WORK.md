@@ -107,3 +107,14 @@ Entrega VISUAL-002: commit de conteúdo `27d6c15`; reserva liberada, branch limp
 STABILIZE-001 concluído para revisão; reserva liberada. Branch fix/stabilization-2026-11-05, base 89dc1bb; candidato 2.0.0-rc.1. Build/pacote Linux testados; 14 scripts aprovados e 1 bloqueado. Ler STABILIZATION.md antes de integrar. Main intacta.
 
 Entrega STABILIZE-001: conteúdo em `f9df3e8`, branch fix/stabilization-2026-11-05, candidato 2.0.0-rc.1. 14 scripts aprovados e media-transport bloqueado, build/Electron/pacote Linux verificados. Reserva liberada; este é o registro documental posterior. Nenhum push, merge ou declaração de produção.
+
+## SECURITY-002 — ativo — 05/11/2026
+
+Codex/OpenAI · fix/security-hardening-2026-11-05 · base 7bede05 (PR #7 integrado), checkout inicialmente limpo. Recuperação recovery/pre-security-hardening-2026-11-05. Usuário autorizou executar pendências da revisão: começar por segurança/dependências/permissões, preservando shadcn/Tailwind e motores existentes. Atualizações das bibliotecas existentes serão justificadas pelos advisories e verificadas por build/regressões. Sem substituição da stack. Backend depende da resposta à pergunta sobre serviço existente versus proposta própria; trabalho independente prossegue. Reserva: package/lock, compatibilidade build/plugins, políticas Electron, testes e docs.
+
+
+## SECURITY-002 — 05/11/2026
+
+SECURITY-002 concluído para revisão, reserva liberada. Branch fix/security-hardening-2026-11-05, base 7bede05, candidato 2.0.0-rc.2. Segurança: audit 0 e políticas/perfis P2P reforçados. Backend próprio: proposta pronta, aguardando revisão do mantenedor; nenhuma implementação de servidor ativa. Pendências físicas e demais etapas em SECURITY_UPDATE.md/BACKEND_PROPOSAL.md.
+
+Entrega SECURITY-002: commit de conteúdo `2f898b9`, candidato 2.0.0-rc.2. Instalação limpa/build/audit/empacotamento verificados; 15 testes passaram e 1 bloqueou por ICE; pacote Linux abriu com interface e CSP. Backend próprio proposto para revisão conforme escolha do mantenedor, não implementado. Reserva liberada; sem push/merge ou declaração de produção.

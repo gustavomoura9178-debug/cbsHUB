@@ -84,3 +84,8 @@ mediaState guarda apenas estado transitório de captura/erro/reconexão e qualid
 ## STABILIZE-001 — 05/11/2026
 
 Preload usa build Rollup CJS único com lib:false, mantendo seis métodos da API. Main valida origem/frame/argumentos de IPC, bloqueia navegação externa e usa sandbox de renderer. Captura exige fonte selecionada e não usa fallback automático para a primeira tela. Journal agrupa operações por append linear, sem mudar banco/protocolo. Servidor de testes e runner agora estão versionados em scripts/. Ver STABILIZATION.md.
+
+
+## SECURITY-002 — 05/11/2026
+
+SECURITY-002 preserva arquitetura local/P2P. Acrescenta CSP no HTML de produção, política explícita de capacidades Electron e validador allowlist de presença. Atualiza ferramentas mantendo UI e motores. BACKEND_PROPOSAL descreve arquitetura futura para revisão, não implementação atual.

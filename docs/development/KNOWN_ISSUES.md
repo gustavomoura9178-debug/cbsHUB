@@ -79,3 +79,8 @@ Pendências: validação visual fina contra as capturas, acessibilidade completa
 ## STABILIZE-001 — 05/11/2026
 
 K01 corrigido nesta revisão: emissão CJS única e startup/reload verificados em Electron e pacote Linux. K15 parcialmente mitigado por sandbox, navegação e IPC; CSP/permissões completas e dependências vulneráveis continuam pendentes. npm audit: 19 (1 crítica/13 altas/5 moderadas). K07/telemetria de tela global e trust de contas/histórico P2P permanecem. Sem arquivos/pastas/GIFs compartilhados; sem teste real entre duas máquinas. Não anunciar 2.0.0 estável. Lista e evidências em STABILIZATION.md.
+
+
+## SECURITY-002 — 05/11/2026
+
+As 19 vulnerabilidades conhecidas anteriores foram eliminadas nesta árvore (npm audit final zero), sem garantia de ausência de vulnerabilidades futuras. Plugin renderer mantém avisos customResolver/freeze no Vite 8; bundle >500 kB continua. ICE/matriz física, ABR/stats por par, Windows/macOS, EXIF/memória e leitor de tela pendentes. Backend é apenas proposta. As seções antigas descrevem estados históricos.
