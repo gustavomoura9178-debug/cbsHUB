@@ -34,6 +34,11 @@ export interface DesktopSourceItem {
 }
 
 export interface StreamTelemetry {
+  sourcePeerId?:string;
+  observedLinkPeerId?:string;
+  direction?:"outgoing"|"incoming";
+  lossMeasured?:boolean;
+  bitrateMeasured?:boolean;
   active: boolean;
   resolution: string;
   fps: number;

@@ -1,3 +1,4 @@
+import type { StreamTelemetry } from "../types/cbshub";
 import { useVoicePreferences } from "./voicePreferences";
 import {
   callEvent,
@@ -1038,8 +1039,9 @@ class WebRTCEngine {
         });
         useHubStore.getState().setRemoteStream(packet.peerId, "screen", null);
         useHubStore.getState().setRemoteScreenStream(null);
-        useHubStore.getState().setTelemetry({ active: false });
-        this.stopReceiverStats();
+        if (useHubStore.getState().telemetry.sourcePeerId === session.peerId)
+          useHubStore.getState().setTelemetry({ active: false });
+        this.stopReceiverStats(session.peerId);
         sounds.playStreamStop();
         break;
       }
@@ -1459,11 +1461,7 @@ class WebRTCEngine {
         useHubStore
           .getState()
           .updateParticipant(remotePeerId, { isScreenSharing: true });
-        useHubStore
-          .getState()
-          .setTelemetry({ active: true, abrStatus: "optimal" });
-
-        this.startReceiverStats(call.peerConnection, stream);
+        this.startReceiverStats(call.peerConnection, stream, remotePeerId);
       });
 
       call.on("close", () => {
@@ -1474,8 +1472,9 @@ class WebRTCEngine {
         useHubStore
           .getState()
           .updateParticipant(remotePeerId, { isScreenSharing: false });
-        useHubStore.getState().setTelemetry({ active: false });
-        this.stopReceiverStats();
+        if (useHubStore.getState().telemetry.sourcePeerId === session.peerId)
+          useHubStore.getState().setTelemetry({ active: false });
+        this.stopReceiverStats(session.peerId);
         sounds.playStreamStop();
       });
     } else if (channel === "webcam") {
@@ -1739,6 +1738,7 @@ class WebRTCEngine {
         call.peerConnection,
         videoSender,
         useHubStore.getState().videoQualityConfig,
+        session.peerId,
       );
     }
   }
@@ -2211,11 +2211,9 @@ class WebRTCEngine {
     }
 
     if (this.localPeer) {
-      useHubStore
-        .getState()
-        .updateParticipant(this.localParticipantId(), {
-          isDeafened: nextDeafened,
-        });
+      useHubStore.getState().updateParticipant(this.localParticipantId(), {
+        isDeafened: nextDeafened,
+      });
     }
     this.broadcastLocalState();
   }
@@ -2246,11 +2244,9 @@ class WebRTCEngine {
       }
 
       if (this.localPeer) {
-        useHubStore
-          .getState()
-          .updateParticipant(this.localParticipantId(), {
-            isWebcamActive: false,
-          });
+        useHubStore.getState().updateParticipant(this.localParticipantId(), {
+          isWebcamActive: false,
+        });
       }
       this.broadcastLocalState();
     } else {
@@ -2286,11 +2282,9 @@ class WebRTCEngine {
         useHubStore.getState().setWebcamActive(true);
 
         if (this.localPeer) {
-          useHubStore
-            .getState()
-            .updateParticipant(this.localParticipantId(), {
-              isWebcamActive: true,
-            });
+          useHubStore.getState().updateParticipant(this.localParticipantId(), {
+            isWebcamActive: true,
+          });
         }
         this.broadcastLocalState();
 
@@ -2734,11 +2728,35 @@ class WebRTCEngine {
     }
   }
 
+  private abrStatsGeneration = 0;
+  private receiverStatsGeneration = 0;
+  private receiverStatsPeerId: string | null = null;
+  private publishScreenTelemetry(sample: StreamTelemetry) {
+    const state = useHubStore.getState(),
+      focus = state.focusedPeerStreamKey;
+    if (sample.direction === "outgoing" && !state.isScreenSharing) return;
+    const focusPeerId = focus?.startsWith("screen-") ? focus.slice(7) : null;
+    const validFocus =
+      focusPeerId &&
+      (state.participants[focusPeerId]?.isLocal
+        ? state.localScreenStream
+        : state.remoteStreams[focusPeerId]?.screen);
+    if (
+      state.callStageMode === "spotlight" &&
+      validFocus &&
+      focusPeerId !== sample.sourcePeerId
+    )
+      return;
+    useHubStore.getState().setTelemetry(sample);
+  }
+
   private startAbrLoop(
     pc: RTCPeerConnection,
     sender: RTCRtpSender,
     config: VideoQualityConfig,
+    linkPeerId: string,
   ): void {
+    const generation = ++this.abrStatsGeneration;
     if (this.abrIntervalId !== null) clearInterval(this.abrIntervalId);
 
     this.currentMaxBitrate = config.maxBitrateBps;
@@ -2751,10 +2769,17 @@ class WebRTCEngine {
     this.abrIntervalId = window.setInterval(async () => {
       try {
         const stats = await pc.getStats();
-        let fps = config.fps;
+        if (
+          generation !== this.abrStatsGeneration ||
+          !useHubStore.getState().isScreenSharing
+        )
+          return;
+        let fps = 0;
         let bitrateMbps = 0;
-        let rttMs = 20;
-        let packetsLostPercent = 0;
+        let rttMs = 0;
+        let packetsLostPercent = 0,
+          lossMeasured = false,
+          bitrateMeasured = false;
 
         stats.forEach((report) => {
           if (report.type === "outbound-rtp" && report.kind === "video") {
@@ -2767,6 +2792,7 @@ class WebRTCEngine {
             const now = performance.now();
             const deltaMs = now - this.prevSenderTimestamp;
             if (this.prevSenderBytes > 0 && deltaMs > 0 && report.bytesSent) {
+              bitrateMeasured = true;
               const bytesDiff = report.bytesSent - this.prevSenderBytes;
               bitrateMbps = Math.max(
                 0,
@@ -2783,7 +2809,7 @@ class WebRTCEngine {
             report.type === "candidate-pair" &&
             report.state === "succeeded"
           ) {
-            if (typeof report.currentRoundTripTime === "number") {
+            if (Number.isFinite(report.currentRoundTripTime)) {
               rttMs = Math.round(report.currentRoundTripTime * 1000);
             }
           }
@@ -2793,6 +2819,7 @@ class WebRTCEngine {
             const packetsReceived = report.packetsReceived || 0;
             const total = packetsLost + packetsReceived;
             if (total > 0) {
+              lossMeasured = true;
               packetsLostPercent = Math.max(
                 0,
                 Number(((packetsLost / total) * 100).toFixed(1)),
@@ -2802,9 +2829,12 @@ class WebRTCEngine {
         });
 
         let abrStatus: "optimal" | "throttled" | "recovering" =
-          useHubStore.getState().telemetry.abrStatus;
+          this.currentMaxBitrate >= this.targetMaxBitrate
+            ? "optimal"
+            : "recovering";
 
-        if (packetsLostPercent > 4.0 || rttMs > 120) {
+        const networkMeasured = rttMs > 0 || lossMeasured;
+        if (networkMeasured && (packetsLostPercent > 4.0 || rttMs > 120)) {
           this.consecutiveBadCycles++;
           this.consecutiveGoodCycles = 0;
 
@@ -2819,7 +2849,11 @@ class WebRTCEngine {
             }
             abrStatus = "throttled";
           }
-        } else if (packetsLostPercent < 0.5 && rttMs <= 100) {
+        } else if (
+          networkMeasured &&
+          packetsLostPercent < 0.5 &&
+          rttMs <= 100
+        ) {
           this.consecutiveBadCycles = 0;
           this.consecutiveGoodCycles++;
 
@@ -2842,9 +2876,15 @@ class WebRTCEngine {
           this.consecutiveGoodCycles = 0;
         }
 
-        useHubStore.getState().setTelemetry({
+        if (generation !== this.abrStatsGeneration) return;
+        this.publishScreenTelemetry({
+          sourcePeerId: this.localParticipantId(),
+          observedLinkPeerId: linkPeerId,
+          direction: "outgoing",
+          lossMeasured,
+          bitrateMeasured,
           active: true,
-          resolution: `${config.resolution} (${config.width}x${config.height})`,
+          resolution: `Meta ${config.resolution} (${config.width}x${config.height})`,
           fps: Math.round(fps),
           bitrateMbps,
           rttMs,
@@ -2857,19 +2897,60 @@ class WebRTCEngine {
     }, 1500);
   }
 
-  private startReceiverStats(pc: RTCPeerConnection, stream: MediaStream): void {
+  public observeScreenTelemetry(peerId: string): void {
+    const state = useHubStore.getState();
+    if (state.participants[peerId]?.isLocal) {
+      this.stopReceiverStats();
+      return;
+    }
+    const session = this.sessions.get(peerId),
+      stream = state.remoteStreams[peerId]?.screen;
+    if (this.receiverStatsPeerId === peerId) return;
+    if (session?.screenCall?.peerConnection && stream)
+      this.startReceiverStats(
+        session.screenCall.peerConnection,
+        stream,
+        peerId,
+      );
+  }
+
+  private startReceiverStats(
+    pc: RTCPeerConnection,
+    stream: MediaStream,
+    peerId: string,
+  ): void {
+    const state = useHubStore.getState(),
+      focus = state.focusedPeerStreamKey;
+    const focusPeerId = focus?.startsWith("screen-") ? focus.slice(7) : null;
+    const validFocus =
+      focusPeerId &&
+      (state.participants[focusPeerId]?.isLocal
+        ? state.localScreenStream
+        : state.remoteStreams[focusPeerId]?.screen);
+    if (
+      state.callStageMode === "spotlight" &&
+      validFocus &&
+      focusPeerId !== peerId
+    )
+      return;
     this.stopReceiverStats();
+    this.receiverStatsPeerId = peerId;
+    const generation = this.receiverStatsGeneration;
     this.prevReceiverBytes = 0;
     this.prevReceiverTimestamp = performance.now();
 
     this.receiverStatsIntervalId = window.setInterval(async () => {
       try {
         const stats = await pc.getStats();
-        let fps = 60;
+        if (generation !== this.receiverStatsGeneration || !stream.active)
+          return;
+        let fps = 0;
         let bitrateMbps = 0;
-        let rttMs = 18;
-        let packetsLostPercent = 0;
-        let resolution = "1080p";
+        let rttMs = 0;
+        let packetsLostPercent = 0,
+          lossMeasured = false,
+          bitrateMeasured = false;
+        let resolution = "—";
 
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
@@ -2894,6 +2975,7 @@ class WebRTCEngine {
               deltaMs > 0 &&
               report.bytesReceived
             ) {
+              bitrateMeasured = true;
               const bytesDiff = report.bytesReceived - this.prevReceiverBytes;
               bitrateMbps = Math.max(
                 0,
@@ -2909,6 +2991,7 @@ class WebRTCEngine {
             const packetsReceived = report.packetsReceived || 0;
             const total = packetsLost + packetsReceived;
             if (total > 0) {
+              lossMeasured = true;
               packetsLostPercent = Math.max(
                 0,
                 Number(((packetsLost / total) * 100).toFixed(1)),
@@ -2920,13 +3003,18 @@ class WebRTCEngine {
             report.type === "candidate-pair" &&
             report.state === "succeeded"
           ) {
-            if (typeof report.currentRoundTripTime === "number") {
+            if (Number.isFinite(report.currentRoundTripTime)) {
               rttMs = Math.round(report.currentRoundTripTime * 1000);
             }
           }
         });
 
-        useHubStore.getState().setTelemetry({
+        this.publishScreenTelemetry({
+          sourcePeerId: peerId,
+          observedLinkPeerId: peerId,
+          direction: "incoming",
+          lossMeasured,
+          bitrateMeasured,
           active: true,
           resolution,
           fps: Math.round(fps),
@@ -2941,7 +3029,10 @@ class WebRTCEngine {
     }, 1500);
   }
 
-  private stopReceiverStats(): void {
+  private stopReceiverStats(peerId?: string): void {
+    if (peerId && this.receiverStatsPeerId !== peerId) return;
+    this.receiverStatsGeneration++;
+    this.receiverStatsPeerId = null;
     if (this.receiverStatsIntervalId !== null) {
       clearInterval(this.receiverStatsIntervalId);
       this.receiverStatsIntervalId = null;
@@ -3055,11 +3146,9 @@ class WebRTCEngine {
         const current =
           useHubStore.getState().participants[this.localPeer?.id || ""];
         if (current?.activeSoundEffect?.name === clip.name) {
-          useHubStore
-            .getState()
-            .updateParticipant(this.localParticipantId(), {
-              activeSoundEffect: null,
-            });
+          useHubStore.getState().updateParticipant(this.localParticipantId(), {
+            activeSoundEffect: null,
+          });
         }
       }, 3600);
     }

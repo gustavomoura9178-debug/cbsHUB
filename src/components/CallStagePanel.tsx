@@ -125,6 +125,26 @@ export const CallStagePanel: React.FC = () => {
     }
   }, [focusedItem?.stream, callStageMode]);
 
+  useEffect(() => {
+    const state = useHubStore.getState();
+    const key = state.focusedPeerStreamKey;
+    const id = key?.startsWith("screen-") ? key.slice(7) : null;
+    const valid =
+      id &&
+      (state.participants[id]?.isLocal
+        ? state.localScreenStream
+        : state.remoteStreams[id]?.screen);
+    const expected = valid ? id : focusedItem?.participant.peerId;
+    if (state.callStageMode === "spotlight" && expected)
+      webrtcEngine.observeScreenTelemetry(expected);
+    if (
+      state.callStageMode === "spotlight" &&
+      state.telemetry.active &&
+      state.telemetry.sourcePeerId !== expected
+    )
+      state.setTelemetry({ active: false });
+  }, [focusedPeerStreamKey, focusedItem?.participant.peerId]);
+
   // Redimensionamento arrastando a borda inferior
   const handleResizeMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -319,53 +339,69 @@ export const CallStagePanel: React.FC = () => {
           />
 
           {/* HUD de Telemetria no Topo Esquerdo */}
-          {showHud && telemetry.active && (
-            <div className="absolute top-3 left-3 z-20 backdrop-blur-md bg-black/80 border border-border rounded-xl px-3 py-2 shadow-2xl text-xs space-y-1">
-              <div className="flex items-center gap-2 border-b border-border pb-1 mb-1">
-                <span className="w-2 h-2 rounded-full bg-success animate-ping" />
-                <span className="font-extrabold text-white uppercase text-caption tracking-wider">
-                  {isLocal
-                    ? "Sua Transmissão Local"
-                    : `Tela de ${focusedItem.participant.nickname}`}
-                </span>
-                <span className="text-micro px-1.5 py-0.2 bg-primary/20 text-primary-foreground rounded font-mono font-bold">
-                  Ao vivo
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 text-foreground font-mono text-caption">
-                <span className="font-semibold text-white">
-                  {telemetry.resolution}
-                </span>
-                <span className="text-zinc-600">•</span>
-                <span className="text-success font-bold">
-                  {telemetry.fps} FPS
-                </span>
-                <span className="text-zinc-600">•</span>
-                <span className="text-primary font-bold">
-                  {telemetry.bitrateMbps} Mbps
-                </span>
-                <span className="text-zinc-600">•</span>
-                <span className="text-warning font-bold">
-                  {telemetry.rttMs} ms
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between text-2xs text-muted-foreground pt-0.5">
-                <span className="flex items-center gap-1">
-                  <Activity className="w-3 h-3 text-success" />
-                  <span className="font-semibold uppercase text-micro">
-                    {telemetry.abrStatus === "optimal"
-                      ? "Qualidade estável"
-                      : telemetry.abrStatus === "throttled"
-                        ? "Qualidade ajustada"
-                        : "Recuperando qualidade"}
+          {showHud &&
+            telemetry.active &&
+            telemetry.sourcePeerId === focusedItem.participant.peerId && (
+              <div
+                data-stream-metrics={telemetry.sourcePeerId}
+                className="absolute top-3 left-3 z-20 backdrop-blur-md bg-black/80 border border-border rounded-xl px-3 py-2 shadow-2xl text-xs space-y-1"
+              >
+                <div className="flex items-center gap-2 border-b border-border pb-1 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-success animate-ping" />
+                  <span className="font-extrabold text-white uppercase text-caption tracking-wider">
+                    {isLocal
+                      ? "Sua Transmissão Local"
+                      : `Tela de ${focusedItem.participant.nickname}`}
                   </span>
-                </span>
-                <span>Perda: {telemetry.packetsLostPercent}%</span>
+                  <span className="text-micro px-1.5 py-0.2 bg-primary/20 text-primary-foreground rounded font-mono font-bold">
+                    Ao vivo
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-foreground font-mono text-caption">
+                  <span className="font-semibold text-white">
+                    {telemetry.resolution}
+                  </span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-success font-bold">
+                    {telemetry.fps > 0
+                      ? `${telemetry.fps} FPS`
+                      : "FPS indisponível"}
+                  </span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-primary font-bold">
+                    {telemetry.bitrateMeasured
+                      ? `${telemetry.bitrateMbps} Mbps`
+                      : "Bitrate indisponível"}
+                  </span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-warning font-bold">
+                    {telemetry.rttMs > 0
+                      ? `${telemetry.rttMs} ms (enlace)`
+                      : "RTT indisponível"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-2xs text-muted-foreground pt-0.5">
+                  <span className="flex items-center gap-1">
+                    <Activity className="w-3 h-3 text-success" />
+                    <span className="font-semibold uppercase text-micro">
+                      {telemetry.abrStatus === "optimal"
+                        ? "Qualidade estável"
+                        : telemetry.abrStatus === "throttled"
+                          ? "Qualidade ajustada"
+                          : "Recuperando qualidade"}
+                    </span>
+                  </span>
+                  <span>
+                    Perda:{" "}
+                    {telemetry.lossMeasured
+                      ? telemetry.packetsLostPercent + "%"
+                      : "indisponível"}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Botões do Topo Direito */}
           <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
