@@ -1,3 +1,4 @@
+import { notifyNative } from "./nativeNotifications";
 import type { StreamTelemetry } from "../types/cbshub";
 import { useVoicePreferences } from "./voicePreferences";
 import {
@@ -157,6 +158,12 @@ class WebRTCEngine {
     roomInput: string,
     autoJoinVoice = false,
   ): Promise<void> {
+    if (
+      this.sanitizeSlug(roomInput) === this.currentRoomSlug &&
+      this.localPeer &&
+      !this.localPeer.destroyed
+    )
+      return;
     localStorage.removeItem("cbshub-room-removed-active");
     this.leaveRoom();
     const generation = this.roomGeneration;
@@ -1144,6 +1151,8 @@ class WebRTCEngine {
           session.clientId,
         );
         if (!remote) return;
+        const beforeParticipant =
+          useHubStore.getState().participants[session.peerId];
         session.clientId = remote.clientId;
         session.nickname = remote.nickname;
 
@@ -1163,6 +1172,37 @@ class WebRTCEngine {
         if (isBlocked(remote.clientId)) {
           this.closeBlockedMedia(session);
           return;
+        }
+        if (
+          beforeParticipant &&
+          !beforeParticipant.inVoiceCall &&
+          remote.inVoiceCall &&
+          !useHubStore.getState().inVoiceCall
+        ) {
+          const room = this.currentRoomSlug,
+            generation = this.roomGeneration;
+          notifyNative(
+            {
+              id: crypto.randomUUID(),
+              kind: "call",
+              title: "Chamada na sala",
+              body: `${remote.nickname.slice(0, 80)} iniciou uma chamada. Clique para atender.`,
+            },
+            () => {
+              if (
+                this.roomGeneration === generation &&
+                this.currentRoomSlug === room &&
+                this.sessions.get(session.peerId) === session &&
+                useHubStore.getState().participants[session.peerId]
+                  ?.inVoiceCall &&
+                !isBlocked(session.clientId) &&
+                !useHubStore.getState().inVoiceCall
+              )
+                void this.joinVoiceCall().catch((error) =>
+                  mediaError("Atender chamada", error),
+                );
+            },
+          );
         }
         this.sendProfileToSession(session);
         // Compatibilidade legada
@@ -1256,6 +1296,13 @@ class WebRTCEngine {
                 .messages.some((m) => m.id === msg.id);
               useHubStore.getState().setMessages(merged);
               if (fresh) useHubStore.getState().setUnreadCount((n) => n + 1);
+              if (fresh && msg.type === "user" && !isBlocked(session.clientId))
+                notifyNative({
+                  id: msg.id,
+                  kind: "message",
+                  title: msg.authorNickname.slice(0, 100),
+                  body: msg.content.slice(0, 240),
+                });
               session.dataConn.send({
                 type: "chat_ack",
                 roomId: room,
@@ -1525,8 +1572,8 @@ class WebRTCEngine {
       chatLedger
         .record(room, clean, session.clientId)
         .then((messages) => {
-          if (useHubStore.getState().roomId === room)
-            useHubStore.getState().setMessages(messages);
+          if (useHubStore.getState().roomId !== room) return;
+          useHubStore.getState().setMessages(messages);
         })
         .catch((error) => console.warn("[Chat] Operação recusada:", error));
     } catch {
