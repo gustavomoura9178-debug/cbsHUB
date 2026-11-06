@@ -1,3 +1,4 @@
+import { useHubStore } from "../store/useHubStore";
 import { useMediaState } from "../lib/mediaState";
 import { webrtcEngine } from "../lib/webrtcEngine";
 import { Button } from "./ui/button";
@@ -85,6 +86,37 @@ export function CallQualityBadge({ peerId }: { peerId: string }) {
         {status}
         {metrics}
       </span>
+      <span className="quality-dot" aria-hidden="true">
+        ●
+      </span>
+    </span>
+  );
+}
+
+export function LocalConnectionBadge() {
+  const signaling = useMediaState((s) => s.signaling);
+  const reconnecting = useMediaState((s) => s.reconnecting);
+  const connected = useHubStore((s) => s.isConnected);
+  const lost = signaling === "offline" || signaling === "failed";
+  const status = lost
+    ? reconnecting
+      ? "Reconectando sinalização"
+      : "Sinalização indisponível"
+    : signaling === "connecting"
+      ? "Conectando sinalização"
+      : connected
+        ? "Conectado à sala"
+        : signaling === "online"
+          ? "Redescobrindo sala"
+          : "Modo local";
+  return (
+    <span
+      data-local-connection
+      className={`call-quality-badge rounded-md bg-overlay px-2 py-1 text-micro ${connected && !lost ? "text-success" : "text-warning"}`}
+      aria-label={`Sua conexão: ${status}`}
+      title="Estado local da sinalização e presença. Sem ping local independente medido; RTT nos demais cards é a medição do enlace WebRTC."
+    >
+      <span className="quality-text">{status}</span>
       <span className="quality-dot" aria-hidden="true">
         ●
       </span>

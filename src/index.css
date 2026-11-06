@@ -515,9 +515,10 @@ html[data-studio-motion="reduced"] *, html[data-studio-motion="reduced"] *::befo
 .brand-loading-screen { position:fixed; inset:var(--titlebar-height) 0 0; z-index:45; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:var(--space-panel); background:var(--background); color:var(--foreground); }
 .animated-official-logo { width:min(200px,45vw); height:auto; overflow:visible; animation:brand-breathe 2.6s ease-in-out infinite; }
 .animated-official-logo path { animation:brand-reveal 2.6s ease-in-out infinite; }
-.animated-official-logo .logo-lower { animation-delay:.12s; }
-@keyframes brand-reveal {0%,5% {clip-path:inset(0 0 100% 0);}40%,54% {clip-path:inset(0);}96%,100% {clip-path:inset(100% 0 0 0);}}
-@keyframes brand-breathe {0%,40%,100%{transform:scale(1);}54%{transform:scale(1.025);}}
+.animated-official-logo .logo-lower { animation-name:brand-reveal-lower; }
+@keyframes brand-reveal {0%,5% {clip-path:inset(0 0 100% 0);}40%,60% {clip-path:inset(0);}90%,100% {clip-path:inset(100% 0 0 0);}}
+@keyframes brand-reveal-lower {0%,10% {clip-path:inset(0 0 100% 0);}46%,60% {clip-path:inset(0);}96%,100% {clip-path:inset(100% 0 0 0);}}
+@keyframes brand-breathe {0%,46%,100%{transform:scale(1);}60%{transform:scale(1.025);}}
 [data-studio-motion="reduced"] .animated-official-logo,[data-studio-motion="reduced"] .animated-official-logo path {animation:none;clip-path:none;transform:none;}
 @media(prefers-reduced-motion:reduce){.animated-official-logo,.animated-official-logo path{animation:none;clip-path:none;transform:none;}}
 
@@ -525,3 +526,6 @@ html[data-studio-motion="reduced"] *, html[data-studio-motion="reduced"] *::befo
 .quality-dot { display:none; }
 @container(max-height:100px){.call-card-quality{top:4px;left:4px}.call-quality-badge{padding:0 3px}.call-quality-badge .quality-text{display:none}.call-quality-badge .quality-dot{display:inline}.call-card-name{font-size:9px;bottom:4px;padding-inline:4px}.call-card-name .text-micro{display:none}}
 @container(max-height:45px){.call-card-avatar{opacity:.5}.call-card-quality{top:1px}.call-card-name{max-width:100%;font-size:9px;}}
+
+.call-spotlight-footer { height:clamp(2.75rem,30cqh,6rem); }
+.call-spotlight-area { gap:calc(var(--space-panel) * .4); }

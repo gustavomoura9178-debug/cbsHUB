@@ -94,10 +94,12 @@ const { chromium } = require("playwright"),
       .click();
     await page.getByRole("tab", { name: "Áudio, Vídeo & Estúdio" }).waitFor();
     await page.keyboard.press("Escape");
-    await page.evaluate(() => m.setState({ reconnecting: true }));
+    await page.evaluate(() =>
+      m.setState({ reconnecting: true, signaling: "offline" }),
+    );
     await page
       .getByRole("region", { name: "Painel de voz" })
-      .getByText("Reconectando", { exact: true })
+      .getByLabel("Sua conexão: Reconectando sinalização", { exact: true })
       .waitFor();
     await page
       .getByRole("button", { name: "Desconectar voz", exact: true })
