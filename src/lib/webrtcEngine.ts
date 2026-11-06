@@ -81,6 +81,10 @@ interface PeerMediaSession {
   outgoingScreen?: MediaConnection | null;
   outgoingWebcam?: MediaConnection | null;
   qualityTimer?: number;
+  mediaFlowVerified?: boolean;
+  recoveryRxBase?: number;
+  recoveryTxBase?: number;
+  recoveryMediaAt?: number;
   voiceRetryTimer?: number;
   voiceRetryAttempts?: number;
   dataGraceTimer?: number;
@@ -213,38 +217,33 @@ class WebRTCEngine {
     // Inicializa localPeer
     useMediaState.setState({ signaling: "connecting" });
     this.signalingPendingAt = Date.now();
-    this.localPeer = new Peer(localPeerId, PEER_CONFIG);
+    this.localPeer = this.createSignalingPeer(localPeerId);
 
     const peer = this.localPeer;
     let firstOpen = true;
     this.setupLocalPeerListeners();
     this.localPeer.on("open", (id) => {
       if (this.localPeer !== peer) return;
-      this.recoveryAttempts = 0;
       callEvent("signaling_open");
       this.signalingPendingAt = 0;
       useMediaState.setState({
-        reconnecting: false,
         signaling: "online",
-        recoveryAttempt: 0,
-        error: null,
       });
       useHubStore
         .getState()
         .setConnectionStatus(
-          true,
           false,
+          true,
           id,
           null,
-          "Conectado à sala de texto e presença!",
+          "Sinalização aberta; verificando participantes...",
         );
       sounds.playJoin();
 
       // Configura escuta de conexões de dados e chamadas de mídia entrantes
       // Tenta assumir ou consultar o Beacon da sala
-      if (!this.beaconPeer) this.attemptClaimBeacon(slug);
-      else if (!this.isBeaconOwner)
-        this.queryBeaconDirectory(`cbshub-v2-${slug}-beacon`);
+      this.ensureDiscovery();
+      this.refreshRecoveryState();
 
       const shouldJoinVoice = autoJoinVoice && firstOpen;
       firstOpen = false;
@@ -281,6 +280,7 @@ class WebRTCEngine {
       if (this.localPeer === peer) {
         useMediaState.setState({ signaling: "offline" });
         useHubStore.setState({ isConnected: false });
+        this.discoveryConfirmed = false;
         callEvent("signaling_disconnected");
         this.scheduleRecovery();
       }
@@ -298,6 +298,148 @@ class WebRTCEngine {
     });
   }
 
+  private createSignalingPeer(id: string): Peer {
+    return new Peer(id, PEER_CONFIG);
+  }
+  private recoveryEpoch = 0;
+  private recoveryActive = false;
+  private discoveryConfirmed = false;
+  private beaconPendingAt = 0;
+  private waitingForMedia = new Set<string>();
+  private directoryConn: DataConnection | null = null;
+  private directoryTimer: number | null = null;
+  private beginRecovery() {
+    if (this.recoveryActive) return;
+    this.recoveryActive = true;
+    this.recoveryEpoch++;
+    const state = useHubStore.getState();
+    if (state.inVoiceCall)
+      for (const p of Object.values(state.participants))
+        if (!p.isLocal && p.inVoiceCall) {
+          this.waitingForMedia.add(p.clientId);
+          const session = this.sessions.get(p.peerId);
+          if (session) {
+            session.mediaFlowVerified = false;
+            session.recoveryRxBase = undefined;
+            session.recoveryTxBase = undefined;
+            session.recoveryMediaAt = undefined;
+          }
+          useMediaState.setState((s) => ({
+            quality: {
+              ...s.quality,
+              ...(s.quality[p.peerId]
+                ? { [p.peerId]: { ...s.quality[p.peerId], flowing: false } }
+                : {}),
+            },
+          }));
+        }
+  }
+  private refreshRecoveryState(): boolean {
+    const signaling =
+      !!this.localPeer?.open &&
+      !this.localPeer.destroyed &&
+      !this.localPeer.disconnected &&
+      navigator.onLine;
+    const pendingData = [...this.sessions.values()].some(
+      (s) => !s.dataConn.open,
+    );
+    if (
+      signaling &&
+      this.discoveryConfirmed &&
+      !pendingData &&
+      !this.recoveryCancelled
+    )
+      useHubStore.setState({ isConnected: true });
+    if (!this.recoveryActive || this.recoveryCancelled) return false;
+    const phase = !signaling
+      ? "signaling"
+      : !this.discoveryConfirmed || pendingData
+        ? "discovery"
+        : this.waitingForMedia.size
+          ? "media"
+          : "idle";
+    if (phase === "media")
+      for (const session of this.sessions.values())
+        if (
+          this.waitingForMedia.has(session.clientId) &&
+          session.recoveryMediaAt === undefined
+        )
+          session.recoveryMediaAt = Date.now();
+    if (phase === "idle") {
+      this.recoveryActive = false;
+      this.recoveryAttempts = 0;
+      if (this.recoveryTimer !== null) clearTimeout(this.recoveryTimer);
+      this.recoveryTimer = null;
+      useMediaState.setState({
+        reconnecting: false,
+        recoveryPhase: "idle",
+        recoveryMissingMedia: 0,
+        recoveryAttempt: 0,
+        signaling: "online",
+        error: null,
+      });
+      useHubStore
+        .getState()
+        .setStatusText("Sinalização e sessões recuperadas.");
+      return true;
+    }
+    if (this.recoveryAttempts >= 8) {
+      useMediaState.setState({
+        reconnecting: false,
+        recoveryPhase: "failed",
+        recoveryMissingMedia: this.waitingForMedia.size,
+      });
+      return false;
+    }
+    useMediaState.setState({
+      reconnecting: true,
+      recoveryPhase: phase,
+      recoveryMissingMedia: this.waitingForMedia.size,
+    });
+    return false;
+  }
+  private closeDirectory() {
+    const conn = this.directoryConn;
+    this.directoryConn = null;
+    if (this.directoryTimer !== null) clearTimeout(this.directoryTimer);
+    this.directoryTimer = null;
+    try {
+      conn?.close();
+    } catch {}
+  }
+  private ensureDiscovery() {
+    if (!this.localPeer?.open || this.recoveryCancelled) return;
+    let beacon = this.beaconPeer;
+    if (
+      beacon &&
+      !beacon.open &&
+      this.beaconPendingAt > 0 &&
+      Date.now() - this.beaconPendingAt > 12000
+    ) {
+      this.beaconPeer = null;
+      this.isBeaconOwner = false;
+      try {
+        beacon.destroy();
+      } catch {}
+      beacon = null;
+    }
+    if (beacon && !beacon.destroyed && beacon.disconnected) {
+      this.beaconPendingAt ||= Date.now();
+      try {
+        beacon.reconnect();
+      } catch {
+        this.beaconPeer = null;
+        this.isBeaconOwner = false;
+        try {
+          beacon.destroy();
+        } catch {}
+      }
+    }
+    if (!this.beaconPeer || this.beaconPeer.destroyed)
+      this.attemptClaimBeacon(this.currentRoomSlug);
+    else this.queryBeaconDirectory(`cbshub-v2-${this.currentRoomSlug}-beacon`);
+  }
+
   private signalingPendingAt = 0;
 
   private scheduleRecovery(): void {
@@ -307,6 +449,7 @@ class WebRTCEngine {
       this.recoveryCancelled
     )
       return;
+    this.beginRecovery();
     if (this.recoveryAttempts >= 8) {
       callEvent("retry_exhausted", {
         attempt: this.recoveryAttempts,
@@ -314,9 +457,12 @@ class WebRTCEngine {
       });
       useMediaState.setState({
         reconnecting: false,
+        recoveryPhase: "failed",
+        recoveryMissingMedia: this.waitingForMedia.size,
         signaling: this.localPeer?.open ? "online" : "failed",
-        error:
-          "Não foi possível reconectar à sala. A voz ativa foi preservada quando possível. Tente novamente.",
+        error: this.waitingForMedia.size
+          ? "Não foi possível confirmar a recuperação de mídia. Verifique a conexão e tente novamente."
+          : "Não foi possível recuperar sinalização e participantes. Tente novamente.",
       });
       return;
     }
@@ -326,6 +472,7 @@ class WebRTCEngine {
         (0.8 + Math.random() * 0.4),
     );
     callEvent("retry_scheduled", { attempt, delayMs });
+    if (this.refreshRecoveryState()) return;
     useMediaState.setState({ reconnecting: true, recoveryAttempt: attempt });
     useHubStore
       .getState()
@@ -362,13 +509,14 @@ class WebRTCEngine {
               session.dataConn.close();
             } catch {}
           }
-          if (this.beaconPeer) {
-            try {
-              this.beaconPeer.destroy();
-            } catch {}
-            this.beaconPeer = null;
-            this.isBeaconOwner = false;
-          }
+          this.closeDirectory();
+          this.discoveryConfirmed = false;
+          const beacon = this.beaconPeer;
+          this.beaconPeer = null;
+          this.isBeaconOwner = false;
+          try {
+            beacon?.destroy();
+          } catch {}
           try {
             this.openRoomPeer(this.currentRoomSlug, false);
           } catch {
@@ -384,7 +532,7 @@ class WebRTCEngine {
           }
         } else if (this.localPeer.open) {
           this.signalingPendingAt = 0;
-          this.queryBeaconDirectory(`cbshub-v2-${this.currentRoomSlug}-beacon`);
+          this.ensureDiscovery();
           let pending = false;
           for (const session of this.sessions.values())
             if (!session.dataConn.open) {
@@ -392,15 +540,7 @@ class WebRTCEngine {
               this.connectToPeer(session.peerId, session.clientId);
             }
           this.broadcastLocalState();
-          if (!pending) {
-            this.recoveryAttempts = 0;
-            useMediaState.setState({
-              reconnecting: false,
-              signaling: "online",
-              recoveryAttempt: 0,
-            });
-            return;
-          }
+          if (this.refreshRecoveryState()) return;
         }
       }
       this.scheduleRecovery();
@@ -423,7 +563,12 @@ class WebRTCEngine {
 
   public notifyNetwork(online: boolean): void {
     callEvent(online ? "network_online" : "network_offline");
-    if (!online) useMediaState.setState({ signaling: "offline" });
+    if (!online) {
+      this.discoveryConfirmed = false;
+      this.closeDirectory();
+      useHubStore.setState({ isConnected: false });
+      useMediaState.setState({ signaling: "offline" });
+    }
     if (online && !this.recoveryCancelled) {
       this.retryConnection();
       return;
@@ -433,6 +578,10 @@ class WebRTCEngine {
 
   public cancelRecovery(): void {
     this.recoveryCancelled = true;
+    this.recoveryActive = false;
+    this.waitingForMedia.clear();
+    this.closeDirectory();
+    useMediaState.setState({ recoveryPhase: "idle", recoveryMissingMedia: 0 });
     if (this.recoveryTimer !== null) clearTimeout(this.recoveryTimer);
     this.recoveryTimer = null;
     for (const session of this.sessions.values()) {
@@ -449,6 +598,7 @@ class WebRTCEngine {
   private scheduleVoiceRetry(session: PeerMediaSession): void {
     if (
       this.recoveryCancelled ||
+      (this.recoveryActive && this.recoveryAttempts >= 8) ||
       session.voiceRetryTimer ||
       this.sessions.get(session.peerId) !== session ||
       !this.canCallSession(session)
@@ -507,40 +657,60 @@ class WebRTCEngine {
   /* ========================================================================= */
 
   private attemptClaimBeacon(slug: string): void {
-    const beaconId = `cbshub-v2-${slug}-beacon`;
-
+    if (!slug || this.recoveryCancelled || !this.localPeer?.open) return;
+    if (this.beaconPeer && !this.beaconPeer.destroyed) return;
+    const generation = this.roomGeneration,
+      beaconId = `cbshub-v2-${slug}-beacon`;
     try {
-      this.beaconPeer = new Peer(beaconId, PEER_CONFIG);
-
-      this.beaconPeer.on("open", () => {
-        // Cenário A: Este cliente assumiu com sucesso o papel de Beacon (Diretório)
-        this.isBeaconOwner = true;
-        useHubStore
-          .getState()
-          .setStatusText("Conectado como Diretório da sala.");
-
-        this.beaconPeer!.on("connection", (conn) => {
-          this.handleBeaconDirectoryConnection(conn);
-        });
+      const peer = this.createSignalingPeer(beaconId);
+      this.beaconPeer = peer;
+      this.beaconPendingAt = Date.now();
+      const current = () =>
+        generation === this.roomGeneration &&
+        this.beaconPeer === peer &&
+        slug === this.currentRoomSlug;
+      peer.on("connection", (conn) => {
+        if (current()) this.handleBeaconDirectoryConnection(conn);
+        else conn.close();
       });
-
-      this.beaconPeer.on("error", (err: { type?: string }) => {
-        if (err.type === "unavailable-id") {
-          // Cenário B: Já existe um Beacon ativo na sala! Conectar a ele para descobrir os irmãos
+      peer.on("open", () => {
+        if (!current()) return;
+        this.isBeaconOwner = true;
+        this.beaconPendingAt = 0;
+        if (this.recoveryActive) this.queryBeaconDirectory(beaconId);
+        else this.discoveryConfirmed = true;
+        this.refreshRecoveryState();
+      });
+      peer.on("disconnected", () => {
+        if (!current()) return;
+        this.beaconPendingAt = Date.now();
+        this.discoveryConfirmed = false;
+        this.scheduleRecovery();
+      });
+      peer.on("close", () => {
+        if (!current()) return;
+        this.beaconPeer = null;
+        this.isBeaconOwner = false;
+        this.discoveryConfirmed = false;
+        this.scheduleRecovery();
+      });
+      peer.on("error", (error: { type?: string }) => {
+        if (!current()) return;
+        if (error.type === "unavailable-id") {
+          this.beaconPeer = null;
           this.isBeaconOwner = false;
           try {
-            this.beaconPeer?.destroy();
-          } catch {
-            /* ignore */
-          }
-          this.beaconPeer = null;
+            peer.destroy();
+          } catch {}
           this.queryBeaconDirectory(beaconId);
         } else {
-          console.warn("[WebRTC Beacon] Erro no beacon peer:", err);
+          this.discoveryConfirmed = false;
+          this.scheduleRecovery();
         }
       });
-    } catch (err) {
-      console.warn("[WebRTC Beacon] Falha ao instanciar beacon:", err);
+    } catch {
+      this.discoveryConfirmed = false;
+      this.scheduleRecovery();
     }
   }
 
@@ -548,7 +718,9 @@ class WebRTCEngine {
    * Responde a novos membros que conectam ao Beacon para pedir a lista de participantes
    */
   private handleBeaconDirectoryConnection(conn: DataConnection): void {
+    const generation = this.roomGeneration;
     conn.on("data", (data) => {
+      if (generation !== this.roomGeneration) return;
       const packet = data as SignalingPacket;
       if (packet && packet.type === "directory_request") {
         const state = useHubStore.getState();
@@ -585,72 +757,76 @@ class WebRTCEngine {
    * Consulta o Beacon para obter a lista de irmãos e abrir malha direta (Full Mesh)
    */
   private queryBeaconDirectory(beaconId: string): void {
-    if (!this.localPeer || this.localPeer.destroyed) return;
-
-    const conn = this.localPeer.connect(beaconId, { reliable: true });
-
+    if (
+      !this.localPeer?.open ||
+      this.localPeer.destroyed ||
+      this.directoryConn ||
+      this.recoveryCancelled
+    )
+      return;
+    const generation = this.roomGeneration,
+      peer = this.localPeer;
+    let conn: DataConnection;
+    try {
+      conn = peer.connect(beaconId, { reliable: true });
+    } catch {
+      this.scheduleRecovery();
+      return;
+    }
+    this.directoryConn = conn;
+    const current = () =>
+      this.directoryConn === conn &&
+      this.localPeer === peer &&
+      generation === this.roomGeneration &&
+      !this.recoveryCancelled;
+    const failed = () => {
+      if (!current()) return;
+      this.discoveryConfirmed = false;
+      this.closeDirectory();
+      this.scheduleBeaconElection();
+      this.scheduleRecovery();
+    };
+    this.directoryTimer = window.setTimeout(failed, 8000);
     conn.on("open", () => {
-      const state = useHubStore.getState();
-      const localParticipant = state.participants[this.localPeer?.id || ""];
-      const myInfo: Omit<Participant, "isLocal"> = localParticipant
-        ? {
-            peerId: localParticipant.peerId,
-            clientId: localParticipant.clientId,
-            nickname: localParticipant.nickname,
-            avatarColor: localParticipant.avatarColor,
-            inVoiceCall: localParticipant.inVoiceCall,
-            isMuted: localParticipant.isMuted,
-            isDeafened: localParticipant.isDeafened,
-            isSpeaking: localParticipant.isSpeaking,
-            isWebcamActive: localParticipant.isWebcamActive,
-            isScreenSharing: localParticipant.isScreenSharing,
-          }
-        : {
-            peerId: this.localPeer!.id,
-            clientId: state.clientId,
-            nickname: state.nickname,
-            avatarColor: state.avatarColor,
-            inVoiceCall: state.inVoiceCall,
-            isMuted: state.isMuted,
-            isDeafened: state.isDeafened,
-            isSpeaking: false,
-            isWebcamActive: false,
-            isScreenSharing: false,
-          };
-
-      conn.send({
-        type: "directory_request",
-        peerInfo: myInfo,
-      } as SignalingPacket);
-    });
-
-    conn.on("data", (data) => {
-      const packet = data as SignalingPacket;
-      if (
-        packet &&
-        packet.type === "directory_response" &&
-        Array.isArray(packet.peers)
-      ) {
-        // Conecta a todos os irmãos retornados pelo diretório
-        packet.peers.forEach((peer) => {
-          if (peer.peerId && peer.peerId !== this.localPeer?.id) {
-            this.connectToPeer(peer.peerId, peer.clientId);
-          }
-        });
-        // Fecha conexão temporária com o Beacon após receber o diretório
-        window.setTimeout(() => {
-          try {
-            conn.close();
-          } catch {
-            /* ignore */
-          }
-        }, 500);
+      if (!current()) return;
+      const state = useHubStore.getState(),
+        local = Object.values(state.participants).find((p) => p.isLocal);
+      if (!local) return;
+      const { isLocal, profile, ...info } = local;
+      try {
+        conn.send({
+          type: "directory_request",
+          peerInfo: info,
+        } as SignalingPacket);
+      } catch {
+        failed();
       }
     });
-
-    conn.on("error", () => {
-      // Beacon pode ter caído, agenda auto-heal
-      this.scheduleBeaconElection();
+    conn.on("data", (data) => {
+      if (!current()) return;
+      const packet = data as SignalingPacket;
+      if (packet?.type !== "directory_response" || !Array.isArray(packet.peers))
+        return;
+      const peers = packet.peers
+        .slice(0, MAX_ROOM_PEERS)
+        .filter(
+          (p) =>
+            p &&
+            typeof p.peerId === "string" &&
+            p.peerId.startsWith(`cbshub-v2-${this.currentRoomSlug}-p-`) &&
+            p.peerId.length <= 180 &&
+            typeof p.clientId === "string" &&
+            p.clientId.length <= 128,
+        );
+      this.discoveryConfirmed = true;
+      for (const p of peers)
+        if (p.peerId !== peer.id) this.connectToPeer(p.peerId, p.clientId);
+      this.closeDirectory();
+      this.refreshRecoveryState();
+    });
+    conn.on("error", failed);
+    conn.on("close", () => {
+      if (current()) failed();
     });
   }
 
@@ -658,7 +834,16 @@ class WebRTCEngine {
    * Eleição determinística de novo Beacon baseada em ordem alfabética dos clientIds
    */
   private scheduleBeaconElection(): void {
-    if (this.isBeaconOwner || this.beaconHealTimeout !== null) return;
+    if (
+      (this.isBeaconOwner &&
+        this.beaconPeer?.open &&
+        !this.beaconPeer.disconnected &&
+        !this.beaconPeer.destroyed) ||
+      this.beaconHealTimeout !== null ||
+      this.recoveryCancelled ||
+      this.recoveryAttempts >= 8
+    )
+      return;
 
     const state = useHubStore.getState();
     const allParticipants = Object.values(state.participants);
@@ -672,8 +857,12 @@ class WebRTCEngine {
 
     this.beaconHealTimeout = window.setTimeout(() => {
       this.beaconHealTimeout = null;
-      if (!this.isBeaconOwner && this.currentRoomSlug) {
-        this.attemptClaimBeacon(this.currentRoomSlug);
+      if (this.currentRoomSlug && !this.recoveryCancelled) {
+        if (this.beaconPeer?.disconnected) {
+          try {
+            this.beaconPeer.reconnect();
+          } catch {}
+        } else this.attemptClaimBeacon(this.currentRoomSlug);
       }
     }, delay);
   }
@@ -776,6 +965,7 @@ class WebRTCEngine {
       if (session.dataConnectTimer) clearTimeout(session.dataConnectTimer);
       session.dataConnectTimer = undefined;
       callEvent("data_open", {}, remotePeerId);
+      this.refreshRecoveryState();
       const state = useHubStore.getState();
       const localParticipant = state.participants[this.localPeer?.id || ""];
 
@@ -869,7 +1059,7 @@ class WebRTCEngine {
     if (session.dataConnectTimer) clearTimeout(session.dataConnectTimer);
     session.dataConnectTimer = undefined;
     this.closeBlockedMedia(session);
-    this.scheduleRecovery();
+    this.waitingForMedia.delete(session.clientId);
     sounds.playLeave();
     this.teardownPeerVoiceAudio(session);
 
@@ -898,6 +1088,7 @@ class WebRTCEngine {
     this.sessions.delete(session.peerId);
     useHubStore.getState().removeParticipant(session.peerId);
     useHubStore.getState().removeRemoteStreams(session.peerId);
+    this.scheduleRecovery();
 
     // Compatibilidade legada
     if (useHubStore.getState().remotePeerId === session.peerId) {
@@ -997,7 +1188,11 @@ class WebRTCEngine {
           }, 400);
         }
 
-        if (!remote.inVoiceCall) this.closeBlockedMedia(session);
+        if (!remote.inVoiceCall) {
+          this.waitingForMedia.delete(remote.clientId);
+          this.closeBlockedMedia(session);
+          this.refreshRecoveryState();
+        }
         if (
           localState.inVoiceCall &&
           remote.inVoiceCall &&
@@ -1558,6 +1753,10 @@ class WebRTCEngine {
     if (session.qualityTimer) clearInterval(session.qualityTimer);
     if (session.voiceRetryTimer) clearTimeout(session.voiceRetryTimer);
     session.voiceRetryTimer = undefined;
+    session.mediaFlowVerified = false;
+    session.recoveryRxBase = 0;
+    session.recoveryTxBase = 0;
+    session.recoveryMediaAt = undefined;
     const connectingAt = Date.now();
     let lastState = "",
       lastTick = Date.now();
@@ -1594,11 +1793,31 @@ class WebRTCEngine {
           session.peerId,
         );
       }
-      if (pc.connectionState === "connected") session.voiceRetryAttempts = 0;
+      if (pc.connectionState !== "connected") session.mediaFlowVerified = false;
+      const previousQuality = useMediaState.getState().quality[session.peerId];
+      if (previousQuality && previousQuality.state !== pc.connectionState)
+        useMediaState.setState((s) => ({
+          quality: {
+            ...s.quality,
+            [session.peerId]: {
+              ...previousQuality,
+              state: pc.connectionState,
+              flowing: false,
+            },
+          },
+        }));
+      if (pc.connectionState === "connected" && session.mediaFlowVerified)
+        session.voiceRetryAttempts = 0;
       if (pc.connectionState === "disconnected") disconnectedAt ||= Date.now();
       else disconnectedAt = 0;
       if (
         pc.connectionState === "failed" ||
+        (this.recoveryActive &&
+          this.recoveryAttempts < 8 &&
+          this.discoveryConfirmed &&
+          this.waitingForMedia.has(session.clientId) &&
+          session.recoveryMediaAt !== undefined &&
+          Date.now() - session.recoveryMediaAt > 10000) ||
         (disconnectedAt && Date.now() - disconnectedAt > 8000) ||
         (["new", "connecting"].includes(pc.connectionState) &&
           Date.now() - connectingAt > 30000)
@@ -1620,11 +1839,14 @@ class WebRTCEngine {
       if (busy) return;
       busy = true;
       try {
+        const epoch = this.recoveryEpoch;
         const stats = await pc.getStats();
-        if (session.voiceCall !== call) return;
+        if (session.voiceCall !== call || epoch !== this.recoveryEpoch) return;
         let rttMs: number | null = null,
           loss: number | null = null,
           jitterMs: number | null = null;
+        let receivedAudio = 0,
+          sentAudio = 0;
         stats.forEach((report) => {
           if (
             report.type === "candidate-pair" &&
@@ -1639,6 +1861,9 @@ class WebRTCEngine {
           ) {
             if (Number.isFinite(report.jitter))
               jitterMs = Math.round(report.jitter * 10000) / 10;
+            receivedAudio = Number.isFinite(report.packetsReceived)
+              ? report.packetsReceived
+              : 0;
             const received = report.packetsReceived || 0,
               lost = report.packetsLost || 0;
             const delta = Math.max(0, received - previousReceived),
@@ -1650,7 +1875,32 @@ class WebRTCEngine {
             previousReceived = received;
             previousLost = lost;
           }
+          if (
+            report.type === "outbound-rtp" &&
+            (report.kind === "audio" || report.mediaType === "audio") &&
+            report.bytesSent > 0
+          )
+            sentAudio = report.bytesSent;
         });
+        if (
+          this.waitingForMedia.has(session.clientId) &&
+          session.recoveryRxBase === undefined
+        ) {
+          session.recoveryRxBase = receivedAudio;
+          session.recoveryTxBase = sentAudio;
+        } else if (
+          receivedAudio > (session.recoveryRxBase ?? 0) &&
+          sentAudio > (session.recoveryTxBase ?? 0) &&
+          !!session.voiceAudioEl?.srcObject &&
+          pc.connectionState === "connected"
+        ) {
+          session.mediaFlowVerified = true;
+          this.waitingForMedia.delete(session.clientId);
+        }
+        const flowing =
+          pc.connectionState === "connected" &&
+          session.mediaFlowVerified === true;
+        this.refreshRecoveryState();
         useMediaState.setState((s) => ({
           quality: {
             ...s.quality,
@@ -1659,6 +1909,7 @@ class WebRTCEngine {
               rttMs,
               loss,
               jitterMs,
+              flowing,
             },
           },
         }));
@@ -1674,7 +1925,15 @@ class WebRTCEngine {
       session.qualityTimer = undefined;
       useMediaState.setState((s) => {
         const quality = { ...s.quality };
-        delete quality[session.peerId];
+        if (this.canCallSession(session))
+          quality[session.peerId] = {
+            state: "closed",
+            rttMs: null,
+            loss: null,
+            jitterMs: null,
+            flowing: false,
+          };
+        else delete quality[session.peerId];
         return { quality };
       });
       callEvent(
@@ -1965,6 +2224,7 @@ class WebRTCEngine {
     reason: "manual_leave" | "microphone_ended" = "manual_leave",
   ): void {
     endCallDiagnostics(reason);
+    this.waitingForMedia.clear();
     this.pushToTalkHeld = false;
     const state = useHubStore.getState();
     this.micGeneration++;
@@ -2020,6 +2280,7 @@ class WebRTCEngine {
 
     // Notifica todos os irmãos mantendo o chat ativo!
     this.broadcastLocalState();
+    this.refreshRecoveryState();
   }
 
   private canCallSession(session: PeerMediaSession): boolean {
@@ -3163,6 +3424,10 @@ class WebRTCEngine {
   /* ========================================================================= */
 
   public leaveRoom(): void {
+    this.recoveryActive = false;
+    this.waitingForMedia.clear();
+    this.discoveryConfirmed = false;
+    this.closeDirectory();
     endCallDiagnostics("room_left");
     this.pushToTalkHeld = false;
     this.recoveryCancelled = false;
@@ -3182,6 +3447,8 @@ class WebRTCEngine {
       reconnecting: false,
       signaling: "idle",
       recoveryAttempt: 0,
+      recoveryPhase: "idle",
+      recoveryMissingMedia: 0,
       quality: {},
     });
     const leavingPeer = this.localPeer;
