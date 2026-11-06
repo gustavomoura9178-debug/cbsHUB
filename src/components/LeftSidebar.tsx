@@ -1,5 +1,5 @@
 import { openSettings } from "../lib/settingsNavigation";
-import { CallQualityBadge } from "./CallStatus";
+import { CallQualityBadge, LocalConnectionBadge } from "./CallStatus";
 import { useShallow } from "zustand/react/shallow";
 import { useVoicePreferences } from "../lib/voicePreferences";
 import { useStudio } from "../studio/StudioProvider";
@@ -79,7 +79,8 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const ptt = useVoicePreferences((s) => s.pushToTalk),
     talkKey = useVoicePreferences((s) => s.talkKey);
   const unreadCount = useHubStore((s) => s.unreadCount);
-  const reconnecting = useMediaState((s) => s.reconnecting);
+  const signaling = useMediaState((s) => s.signaling);
+  const localImpaired = !isConnected || signaling !== "online";
   const cameraBusy = useMediaState((s) => s.cameraBusy);
   const screenBusy = useMediaState((s) => s.screenBusy);
   const isWebcamActive = useHubStore((s) => s.isWebcamActive);
@@ -422,14 +423,14 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
         <section className="sidebar-voice-panel" aria-label="Painel de voz">
           <div className="flex items-center gap-2 min-w-0">
             <Signal
-              className={`size-4 shrink-0 ${reconnecting ? "text-warning" : "text-success"}`}
+              className={`size-4 shrink-0 ${localImpaired ? "text-warning" : "text-success"}`}
             />
             <div className="min-w-0 flex-1">
               <p
                 role="status"
-                className={`text-xs font-semibold ${reconnecting ? "text-warning" : "text-success"}`}
+                className={`text-xs font-semibold ${localImpaired ? "text-warning" : "text-success"}`}
               >
-                {reconnecting ? "Reconectando" : "Na voz"}
+                <LocalConnectionBadge />
               </p>
               <p
                 className="truncate text-caption text-muted-foreground"

@@ -11,7 +11,12 @@ import {
   TALK_KEYS,
 } from "../lib/voicePreferences";
 import { CallDiagnosticsPanel } from "./CallDiagnosticsPanel";
-import { useChatView, setChatCompact } from "../chat/viewState";
+import {
+  useChatView,
+  setChatCompact,
+  useMessageIdentity,
+  saveMessageIdentity,
+} from "../chat/viewState";
 import { useStudio } from "../studio/StudioProvider";
 import { PRESETS } from "../studio/theme";
 import { supportsAudioOutput } from "../lib/mediaState";
@@ -71,6 +76,7 @@ export const SettingsModal: React.FC = () => {
       );
     }
   };
+  const messageIdentity = useMessageIdentity();
   const compact = useChatView((state) => state.compact);
   const [appearanceError, setAppearanceError] = useState("");
   const studio = useStudio();
@@ -241,6 +247,46 @@ export const SettingsModal: React.FC = () => {
                 ))}
               </div>
               <StudioDialog embedded />
+              <section
+                aria-labelledby="message-identity-heading"
+                className="space-y-3 rounded-lg border border-border p-3"
+              >
+                <h3 id="message-identity-heading" className="font-semibold">
+                  Identidade das Mensagens
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Preferências de leitura salvas neste dispositivo. O nome do
+                  autor permanece visível; cores sem contraste suficiente usam a
+                  cor do tema.
+                </p>
+                {(
+                  [
+                    ["showAvatars", "Exibir avatares nas mensagens"],
+                    ["colorNames", "Usar cores dos autores nos nomes"],
+                  ] as const
+                ).map(([key, label]) => (
+                  <label
+                    key={key}
+                    className="flex items-center justify-between gap-3 text-sm"
+                  >
+                    {label}
+                    <Switch
+                      aria-label={label}
+                      checked={messageIdentity[key]}
+                      onCheckedChange={(value) => {
+                        try {
+                          saveMessageIdentity({ [key]: value });
+                          setAppearanceError("");
+                        } catch {
+                          setAppearanceError(
+                            "Não foi possível salvar a identidade das mensagens.",
+                          );
+                        }
+                      }}
+                    />
+                  </label>
+                ))}
+              </section>
               <h3 className="font-semibold">Densidade das mensagens</h3>
               <p className="text-sm text-muted-foreground">
                 Ajuste a apresentação do chat. A escolha é salva neste

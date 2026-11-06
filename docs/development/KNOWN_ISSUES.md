@@ -1,3 +1,5 @@
+> Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
+
 > Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
 
 # Problemas conhecidos
@@ -117,3 +119,6 @@ Caminhos de recuperação prematura/beacon obsoleto corrigidos no código e cobe
 Windows: ícone/menu da bandeja, aviso inicial, captura em segundo plano e ciclo X/restaurar/encerrar exigem teste físico. Linux headless usa fallback minimizar; teste de processo não é teste da bandeja Windows. Contraste/leitor de tela, primeira pintura e dispositivos físicos permanecem na matriz manual. Bundle principal >500 kB e avisos customResolver/freeze persistem; boot-theme.js clássico é intencionalmente copiado de public, sem bundling, para rodar antes do renderer. Sem dependências novas.
 
 Arquitetura continua sem servidor autenticado/ACL global; backend próprio é proposta. Notificações do SO, DM/anexos/pastas/GIFs e garantia de durabilidade quando IndexedDB indisponível permanecem fora deste hotfix. Cards extremadamente pequenos conservam identificadores acessíveis/title, mas reduzem texto/controles visuais. Detalhes/evidências em HOTFIX_STABILITY.md.
+
+## HOTFIX-006 — limites confirmados — 06/11/2026 UTC
+Cards locais sem indicador, identidade das mensagens ausente, miniaturas fixas/sem espaço mobile e pausa compartilhada curta foram corrigidos e testados. Mantêm-se os gates físicos do HOTFIX-005. Chromium tem política administrada WebRtcIPHandling=disable_non_proxied_udp; não contornar para forçar passe ICE. Contraste de nomes é validado contra cor sólida das mensagens, não certifica legibilidade sobre qualquer wallpaper/hover; fallback semântico e opção de desativar cores disponíveis. Nenhum ping independente da internet de cada usuário é alegado. Detalhes e testes em HOTFIX_ACCEPTANCE.md.

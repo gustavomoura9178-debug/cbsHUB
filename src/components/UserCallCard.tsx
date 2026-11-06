@@ -1,5 +1,5 @@
 import { useShallow } from "zustand/react/shallow";
-import { CallQualityBadge } from "./CallStatus";
+import { CallQualityBadge, LocalConnectionBadge } from "./CallStatus";
 import { useMediaOutput } from "../hooks/useMediaOutput";
 import React, { useRef, useEffect, useState } from "react";
 import {
@@ -32,13 +32,9 @@ function getInitials(name: string): string {
 
 interface UserCallCardProps {
   participant: Participant;
-  isCompact?: boolean;
 }
 
-export const UserCallCard: React.FC<UserCallCardProps> = ({
-  participant,
-  isCompact = false,
-}) => {
+export const UserCallCard: React.FC<UserCallCardProps> = ({ participant }) => {
   const { localWebcamStream, remoteStreams, peerVolumes } = useHubStore(
     useShallow((s) => ({
       localWebcamStream: s.localWebcamStream,
@@ -70,19 +66,19 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
   return (
     <div
       data-call-card={participant.peerId}
-      className={`call-participant-card relative rounded-xl border transition-colors duration-200 overflow-hidden flex items-center justify-center select-none group bg-card ${
-        isCompact ? "h-20 w-32 shrink-0" : "w-full h-full min-h-0"
-      } ${
+      className={`call-participant-card relative rounded-xl border transition-colors duration-200 overflow-hidden flex items-center justify-center select-none group bg-card w-full h-full min-w-0 min-h-0 ${
         isSpeakingNow
           ? "border-success ring-2 ring-success/30 shadow-lg shadow-success/10"
           : "border-border hover:border-primary/40"
       }`}
     >
-      {!isLocal && (
-        <div className="call-card-quality absolute top-2 left-2 z-10">
+      <div className="call-card-quality absolute top-2 left-2 z-10">
+        {isLocal ? (
+          <LocalConnectionBadge />
+        ) : (
           <CallQualityBadge peerId={participant.peerId} />
-        </div>
-      )}
+        )}
+      </div>
       {isSpeakingNow && (
         <span className="sr-only">{participant.nickname} está falando</span>
       )}
@@ -102,7 +98,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
             name={participant.nickname}
             color={participant.avatarColor}
             speaking={isSpeakingNow}
-            className={isCompact ? "size-10" : "call-card-avatar"}
+            className="call-card-avatar"
           />
         </div>
       )}

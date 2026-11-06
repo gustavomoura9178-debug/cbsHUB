@@ -29,6 +29,7 @@ import type { Participant } from "../types/cbshub";
 
 export const CallStagePanel: React.FC = () => {
   const gridBounds = useElementSize();
+  const spotlightBounds = useElementSize();
 
   const {
     inVoiceCall,
@@ -75,6 +76,12 @@ export const CallStagePanel: React.FC = () => {
     (p) => p.inVoiceCall,
   );
   const inVoiceCount = participantsInVoice.length;
+  const spotlightGeometry = callGrid(
+    spotlightBounds.width,
+    spotlightBounds.height,
+    inVoiceCount,
+    spotlightBounds.gap,
+  );
 
   // Participantes compartilhando tela
   const screenSharers: Array<{
@@ -323,13 +330,13 @@ export const CallStagePanel: React.FC = () => {
         onDoubleClick={toggleFullscreen}
         style={{
           height: `${callStageHeight}px`,
-          minHeight: "min(18rem, 40dvh)",
+          containerType: "size",
           maxHeight: "55dvh",
         }}
         className="relative bg-surface border-b border-border flex flex-col justify-between overflow-hidden select-none shrink-0"
       >
         {/* Vídeo Focado 4K */}
-        <div className="relative flex-1 w-full h-full flex items-center justify-center bg-black overflow-hidden">
+        <div className="relative flex-1 min-h-0 w-full flex items-center justify-center bg-black overflow-hidden">
           <video
             ref={spotlightVideoRef}
             autoPlay
@@ -472,15 +479,30 @@ export const CallStagePanel: React.FC = () => {
         </div>
 
         {/* Tira Horizontal de Mini-Cards dos Irmãos (para continuar vendo quem fala) */}
-        <div className="h-24 bg-surface/90 border-t border-border px-3 py-1.5 flex items-center justify-between gap-2 overflow-x-auto shrink-0 z-20">
-          <div className="flex items-center gap-2 overflow-x-auto py-1">
-            {participantsInVoice.map((p) => (
-              <UserCallCard key={p.peerId} participant={p} isCompact />
-            ))}
+        <div className="call-spotlight-footer bg-surface/90 border-t border-border px-3 py-1.5 flex items-center justify-between gap-2 min-w-0 shrink-0 z-20">
+          <div
+            ref={spotlightBounds.ref}
+            className="call-spotlight-area flex-1 min-w-0 h-full flex items-center justify-center"
+          >
+            <div
+              className="call-spotlight-grid grid"
+              style={{
+                gridTemplateColumns: `repeat(${spotlightGeometry.columns}, ${spotlightGeometry.width}px)`,
+                gridAutoRows: `${spotlightGeometry.height}px`,
+                gap: spotlightGeometry.gap,
+                width:
+                  spotlightGeometry.width * spotlightGeometry.columns +
+                  spotlightGeometry.gap * (spotlightGeometry.columns - 1),
+              }}
+            >
+              {participantsInVoice.map((p) => (
+                <UserCallCard key={p.peerId} participant={p} />
+              ))}
+            </div>
           </div>
 
           <div className="pl-2 shrink-0">
-            <CallControls />
+            <CallControls compact />
           </div>
         </div>
 
