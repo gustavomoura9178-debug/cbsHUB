@@ -6,9 +6,15 @@ import { Input } from "./ui/input";
 export function AudioTrimEditor({
   source,
   onApply,
+  initialStart = 0,
+  initialEnd,
+  onPendingChange,
 }: {
   source: Blob;
-  onApply: (blob: Blob, duration: number) => void;
+  initialStart?: number;
+  initialEnd?: number;
+  onPendingChange?: () => void;
+  onApply: (blob: Blob, duration: number, start: number, end: number) => void;
 }) {
   const deafened = useHubStore((s) => s.isDeafened);
   const [buffer, setBuffer] = useState<AudioBuffer | null>(null),
@@ -25,8 +31,16 @@ export function AudioTrimEditor({
       .then((data) => {
         if (active) {
           setBuffer(data);
-          setStart(0);
-          setEnd(data.duration);
+          setStart(
+            Number.isFinite(initialStart)
+              ? Math.max(0, Math.min(initialStart, data.duration - 0.05))
+              : 0,
+          );
+          setEnd(
+            Number.isFinite(initialEnd)
+              ? Math.min(data.duration, Math.max(0.05, initialEnd!))
+              : data.duration,
+          );
         }
       })
       .catch((e) => {
@@ -59,7 +73,7 @@ export function AudioTrimEditor({
       const blob = trimWav(buffer, start, end);
       setError("");
       if (apply) {
-        onApply(blob, end - start);
+        onApply(blob, end - start, start, end);
       } else {
         player.current?.pause();
         setPreview(URL.createObjectURL(blob));
@@ -119,7 +133,10 @@ export function AudioTrimEditor({
                 max={buffer.duration}
                 step={0.05}
                 value={start}
-                onChange={(e) => setStart(Number(e.target.value))}
+                onChange={(e) => {
+                  setStart(Number(e.target.value));
+                  onPendingChange?.();
+                }}
               />
             </label>
             <label className="text-xs">
@@ -131,7 +148,10 @@ export function AudioTrimEditor({
                 max={buffer.duration}
                 step={0.05}
                 value={end}
-                onChange={(e) => setEnd(Number(e.target.value))}
+                onChange={(e) => {
+                  setEnd(Number(e.target.value));
+                  onPendingChange?.();
+                }}
               />
             </label>
           </div>

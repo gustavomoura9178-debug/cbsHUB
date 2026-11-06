@@ -56,6 +56,7 @@ export const SoundboardPopover: React.FC<Props> = ({
     inVoice = useHubStore((s) => s.inVoiceCall),
     deafened = useHubStore((s) => s.isDeafened);
   const mode = useSoundPreferences((s) => s.mode);
+  const [trimPending, setTrimPending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [search, setSearch] = useState(""),
     [tab, setTab] = useState("all"),
@@ -279,6 +280,7 @@ export const SoundboardPopover: React.FC<Props> = ({
                     aria-label={`Editar ${clip.name}`}
                     onClick={() => {
                       setConfirmDelete(false);
+                      setTrimPending(false);
                       setEditing({ ...clip });
                     }}
                   >
@@ -404,15 +406,21 @@ export const SoundboardPopover: React.FC<Props> = ({
               {!editing.isBuiltIn && editing.audioBlob && (
                 <AudioTrimEditor
                   source={editing.originalAudioBlob || editing.audioBlob}
-                  onApply={(blob, seconds) =>
+                  initialStart={editing.trimStartSec}
+                  initialEnd={editing.trimEndSec}
+                  onPendingChange={() => setTrimPending(true)}
+                  onApply={(blob, seconds, start, end) => {
+                    setTrimPending(false);
                     setEditing({
                       ...editing,
                       audioBlob: blob,
                       originalAudioBlob:
                         editing.originalAudioBlob || editing.audioBlob,
                       durationSec: seconds,
-                    })
-                  }
+                      trimStartSec: start,
+                      trimEndSec: end,
+                    });
+                  }}
                 />
               )}
               {editing.isBuiltIn && (
@@ -445,7 +453,10 @@ export const SoundboardPopover: React.FC<Props> = ({
                 </Button>
                 <Button
                   disabled={
-                    busy || !editing.name.trim() || !editing.emoji.trim()
+                    busy ||
+                    trimPending ||
+                    !editing.name.trim() ||
+                    !editing.emoji.trim()
                   }
                   onClick={() =>
                     void run(async () => {
