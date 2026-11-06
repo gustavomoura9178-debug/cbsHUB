@@ -39,3 +39,36 @@ export function setChatCompact(compact: boolean) {
   );
   useChatView.setState({ compact });
 }
+
+export interface MessageIdentity {
+  showAvatars: boolean;
+  colorNames: boolean;
+}
+const IDENTITY_KEY = "cbshub-message-identity-v1";
+const DEFAULT_IDENTITY: MessageIdentity = {
+  showAvatars: true,
+  colorNames: false,
+};
+function readIdentity(): MessageIdentity {
+  try {
+    const saved = JSON.parse(localStorage.getItem(IDENTITY_KEY) || "null");
+    if (
+      saved?.version === 1 &&
+      typeof saved.showAvatars === "boolean" &&
+      typeof saved.colorNames === "boolean"
+    )
+      return { showAvatars: saved.showAvatars, colorNames: saved.colorNames };
+  } catch {}
+  return { ...DEFAULT_IDENTITY };
+}
+export const useMessageIdentity = create<MessageIdentity>(() => readIdentity());
+export function saveMessageIdentity(patch: Partial<MessageIdentity>) {
+  const next = { ...useMessageIdentity.getState(), ...patch };
+  if (
+    typeof next.showAvatars !== "boolean" ||
+    typeof next.colorNames !== "boolean"
+  )
+    throw new Error("Preferência inválida");
+  localStorage.setItem(IDENTITY_KEY, JSON.stringify({ version: 1, ...next }));
+  useMessageIdentity.setState(next);
+}

@@ -1,3 +1,7 @@
+import { useShallow } from "zustand/react/shallow";
+import { useMessageIdentity } from "./viewState";
+import { useStudio } from "../studio/StudioProvider";
+import { contrast } from "../studio/theme";
 import { useState } from "react";
 import { Copy, MoreHorizontal, Pencil, Pin, Reply, Trash2 } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -42,6 +46,19 @@ export function MessageRow({
   compact,
   onReplay,
 }: Props) {
+  const { showAvatars, colorNames } = useMessageIdentity(
+    useShallow((s) => ({
+      showAvatars: s.showAvatars,
+      colorNames: s.colorNames,
+    })),
+  );
+  const { theme } = useStudio();
+  const authorColor =
+    colorNames &&
+    /^#[0-9a-f]{6}$/i.test(m.authorAvatarColor) &&
+    contrast(m.authorAvatarColor, theme.colors.messages) >= 4.5
+      ? m.authorAvatarColor
+      : undefined;
   const [copy, setCopy] = useState("Copiar conteúdo");
   const [menuOpen, setMenuOpen] = useState(false);
   return (
@@ -56,7 +73,7 @@ export function MessageRow({
       className={`chat-message-row ${grouped || compact ? "chat-message-compact" : ""} ${m.type === "soundboard" ? "chat-sound-event" : ""}`}
       data-message-id={m.id}
     >
-      {!grouped && !compact && (
+      {!grouped && !compact && showAvatars && (
         <ParticipantAvatar
           clientId={m.authorClientId}
           name={m.authorNickname}
@@ -65,7 +82,9 @@ export function MessageRow({
       )}
       <div className="min-w-0 flex-1">
         <header className="chat-message-meta">
-          {(!grouped || compact) && <strong>{m.authorNickname}</strong>}
+          {(!grouped || compact) && (
+            <strong style={{ color: authorColor }}>{m.authorNickname}</strong>
+          )}
           <time
             dateTime={new Date(m.createdAt).toISOString()}
             title={new Date(m.createdAt).toLocaleString()}
