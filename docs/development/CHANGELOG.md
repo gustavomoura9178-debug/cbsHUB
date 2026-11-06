@@ -1,3 +1,5 @@
+> Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
+
 > Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
 
 > Atualização atual: **2.0.0-rc.2 / SECURITY-002**. Leia [SECURITY_UPDATE.md](SECURITY_UPDATE.md). Estados anteriores são históricos.
@@ -134,3 +136,9 @@ Para outra IA: ler DESKTOP_REFINEMENT.md antes de editar. Studio.begin e Profile
 ## HOTFIX-005 — 2.0.0-rc.4 — não lançado — 06/11/2026 UTC
 
 Codex/OpenAI · hotfix/stability-desktop-2026-11-05 · base b8983d6. Corrigidos confirmação prematura de recuperação, beacon desconectado, consultas sem prazo e mídia sem novos pacotes; rede e UI em commits distintos. Cards passam a caber no palco sem piso fixo; estados/RTT são do enlace observado. Bandeja ganha mostrar/ocultar, estado e aviso inicial persistido. Configurações conservam rascunhos entre abas e confirmam descarte inline; temas ficam em Aparência. Corte conserva intervalo e exige reaplicar antes de salvar. Splash aplica cores validadas antes do React e pausa completa de 364 ms. Nenhuma dependência, banco ou logo substituído. Escopo/arquivos, resultados e limitações: HOTFIX_STABILITY.md. Sem merge/release automática.
+
+## HOTFIX-006 — 06/11/2026 UTC — Codex/OpenAI
+
+Branch fix/hotfix-acceptance-gaps-2026-11-06, base 16afa14 (PR #13 já integrado). Candidato rc.5; conteúdo b527927 e a544853, seguido do fechamento documental. Corrigidas lacunas reais: identidade das mensagens em Aparência com persistência e contraste, estado de sinalização/presença local no próprio card/sidebar, miniaturas spotlight proporcionais e pausa conjunta de 364 ms da logo. Motor de rede, bancos, IPC, arte e stack preservados. Relatório por requisito/arquivos: HOTFIX_ACCEPTANCE.md.
+
+EXECUTADO: build/tsc PASSED; suíte 33 scripts, 32 PASSED/1 BLOCKED por ICE (exit 1); zero falhas restantes. Teste integrado adicional dos controles compactos PASSED. Pacote e smoke Linux rc.5 PASSED. Evidências em hotfix-006-results.json. Windows, audição bidirecional em dispositivos físicos após queda e revisão assistiva não executados. Sem produção aprovada ou merge automático.

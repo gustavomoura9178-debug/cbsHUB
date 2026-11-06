@@ -1,3 +1,5 @@
+> Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
+
 > Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
 
 # Trabalho ativo e reservas
@@ -170,3 +172,9 @@ Codex/OpenAI · hotfix/stability-desktop-2026-11-05 · base b8983d6 (PR #12 inte
 ## HOTFIX-005 — concluído para revisão — 06/11/2026 UTC
 
 Codex/OpenAI · hotfix/stability-desktop-2026-11-05 · base b8983d6 · commits e573b61, be773a3, 6194b4a, df71b48, f489dd3 e 3ad21b0, seguidos do fechamento documental rc.4. Reservas desta sessão liberadas. Build/tsc, 30 testes e pacote/smoke Linux passaram; media-transport BLOCKED por ICE. Pendências físicas e tentativas anteriores em HOTFIX_STABILITY.md/ACTIVITY_LOG.md. Main preservada; disponibilizar branch para revisão, sem merge/release automática.
+
+## HOTFIX-006 — ativo — 06/11/2026 UTC
+Codex/OpenAI · fix/hotfix-acceptance-gaps-2026-11-06 · base 16afa14 (PR #13 integrado; conteúdo idêntico ao hotfix anterior). Árvore limpa, recuperação recovery/pre-acceptance-gaps-2026-11-06. Reserva: identidade visual das mensagens em Aparência, status local separado do enlace remoto, miniaturas spotlight e pausa comum das duas partes da logo, testes/docs. Motor de rede/IPC/bancos existentes preservados. Causa ambiental de ICE identificada em política administrada WebRtcIPHandling=disable_non_proxied_udp; não contornar. Testes físicos Windows/duas máquinas permanecem pendentes.
+
+## HOTFIX-006 — concluído para revisão — 06/11/2026 UTC
+Codex/OpenAI · fix/hotfix-acceptance-gaps-2026-11-06 · base 16afa14 · b527927/a544853 e fechamento documental posterior. Reservas desta tarefa liberadas. Build/tsc, 32 scripts e pacote/smoke Linux passaram; media-transport BLOCKED pela ausência de candidatos ICE, política administrada preservada. Relatório HOTFIX_ACCEPTANCE.md. Main não alterada. Matriz física/Windows pendente; não declarar produção.

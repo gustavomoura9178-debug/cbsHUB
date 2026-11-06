@@ -2,7 +2,7 @@
 
 Aplicativo Electron de comunicação P2P com React, TypeScript, shadcn/ui e Tailwind CSS.
 
-Versão de revisão: **2.0.0-rc.4**. Não há aprovação para produção. Leia [o hotfix atual](docs/development/HOTFIX_STABILITY.md) e [a revisão desktop anterior](docs/development/DESKTOP_REFINEMENT.md) e [a política de versões](docs/development/VERSIONING.md).
+Versão de revisão: **2.0.0-rc.5**. Não há aprovação para produção. Leia [a conferência atual do hotfix](docs/development/HOTFIX_ACCEPTANCE.md) e [a revisão desktop anterior](docs/development/DESKTOP_REFINEMENT.md) e [a política de versões](docs/development/VERSIONING.md).
 
 ## Instalação e execução
 

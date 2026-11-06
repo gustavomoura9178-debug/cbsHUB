@@ -1,3 +1,5 @@
+> Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
+
 > Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
 
 > Atualização atual: **2.0.0-rc.2 / SECURITY-002**. Leia [SECURITY_UPDATE.md](SECURITY_UPDATE.md). Estados anteriores são históricos.
@@ -215,3 +217,11 @@ Próxima IA: executar a matriz física de rede/Windows antes de propor release. 
 Resultado final EXECUTADO — HOTFIX-005: build/tsc PASSED; suíte 31 scripts, 30 PASSED/1 BLOCKED (media-transport sem candidatos ICE locais), nenhuma falha restante; exit 1 é o bloqueio. Resumo em hotfix-005-results.json. npm audit --omit=dev: zero vulnerabilidades reportadas. Pacote Linux rc.4 e smoke do executável passaram. Renderer foi parado antes de empacotar. Windows, audição real em dois dispositivos após queda, captura física e revisão assistiva permanecem manuais. Nenhuma aprovação de produção ou publicação de binário.
 
 Publicação HOTFIX-005 — 06/11/2026 UTC: branch hotfix/stability-desktop-2026-11-05 enviada ao origin com sucesso, entrega rc.4 até `0b64874`; este é o registro documental posterior. Main remoto conferido em b8983d6 e preservado. Sem merge, force push, release ou publicação de binário. Consulta automática de PR via gh retornou Forbidden na API GraphQL; nenhum PR foi aberto por esta sessão. Revisão pode ser iniciada pela branch no GitHub. Testes não repetidos para este registro, que não muda código: evidência continua 30 PASSED/1 BLOCKED, build/audit produção zero e pacote/smoke Linux aprovados. Árvore estava limpa antes da publicação.
+
+## HOTFIX-006 — 06/11/2026 UTC — Codex/OpenAI
+
+Branch fix/hotfix-acceptance-gaps-2026-11-06, base 16afa14 (PR #13 já integrado). Candidato rc.5; conteúdo b527927 e a544853, seguido do fechamento documental. Corrigidas lacunas reais: identidade das mensagens em Aparência com persistência e contraste, estado de sinalização/presença local no próprio card/sidebar, miniaturas spotlight proporcionais e pausa conjunta de 364 ms da logo. Motor de rede, bancos, IPC, arte e stack preservados. Relatório por requisito/arquivos: HOTFIX_ACCEPTANCE.md.
+
+EXECUTADO: build/tsc PASSED; suíte 33 scripts, 32 PASSED/1 BLOCKED por ICE (exit 1); zero falhas restantes. Teste integrado adicional dos controles compactos PASSED. Pacote e smoke Linux rc.5 PASSED. Evidências em hotfix-006-results.json. Windows, audição bidirecional em dispositivos físicos após queda e revisão assistiva não executados. Sem produção aprovada ou merge automático.
+
+Outra IA: preservar cbshub-message-identity-v1 (dois booleanos, versão 1), fallback de contraste dos nomes, LocalConnectionBadge independente do booleano global reconnecting, callGrid no spotlight e CallControls compact. Não voltar a dimensões fixas nas miniaturas ou animation-delay global da parte inferior, que encurta a pausa compartilhada. Ler os limites ambientais e o roteiro manual em HOTFIX_ACCEPTANCE.md. Não tentar contornar a política administrada WebRtcIPHandling.
