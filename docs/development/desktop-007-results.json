@@ -1,0 +1,212 @@
+{
+  "task": "DESKTOP-007",
+  "date": "2026-11-06",
+  "timezone": "America/Sao_Paulo",
+  "version": "2.0.0-rc.6",
+  "branch": "fix/native-notifications-call-stability-2026-11-06",
+  "base": "1a9d3e9",
+  "contentCommits": [
+    "4361de2",
+    "05ff793",
+    "1573a6f"
+  ],
+  "suiteExit": 1,
+  "summary": {
+    "passed": 35,
+    "blocked": 1,
+    "failed": 0
+  },
+  "build": "passed",
+  "supplemental": {
+    "desktop7-valid-accept-once": "passed",
+    "linux-directory-package": "passed",
+    "packaged-linux-electron-smoke": "passed"
+  },
+  "tests": [
+    {
+      "file": "acceptance-gaps.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "audio-tools.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "audio-trim.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "background-notice.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "boot-theme.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "call-recovery.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "chat-drafts.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "chat-model.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "chat-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "chat-toolbar.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "compact-bars.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "desktop-refinement.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "desktop-security.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "desktop7.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "electron-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "hotfix-layout.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "hotfix-recovery.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "media-engine.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "media-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "media-transport.cjs",
+      "status": "blocked",
+      "exit": 1
+    },
+    {
+      "file": "message-identity.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "native-notifications.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "notification-ipc.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "official-logo.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "profile-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "profile-validation.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "redesign-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "signaling-validation.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "stabilization-a11y.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "stream-telemetry.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "studio-smoke.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "theme-validation.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "tray-lifecycle.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "visual-fixes.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "window-controls.cjs",
+      "status": "passed",
+      "exit": 0
+    },
+    {
+      "file": "workspace-sidebar.cjs",
+      "status": "passed",
+      "exit": 0
+    }
+  ],
+  "limitations": [
+    "ICE bloqueado pela política administrada WebRtcIPHandling=disable_non_proxied_udp; transporte real não aprovado.",
+    "Notificação Windows instalada e botão Atender não testados; apresentação do SO simulada no teste IPC.",
+    "Arquivo original que causou queda não disponível; audio sintético local não comprova estabilidade entre dois dispositivos."
+  ]
+}

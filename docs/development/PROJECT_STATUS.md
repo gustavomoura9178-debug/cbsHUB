@@ -1,3 +1,5 @@
+> Estado atual: **DESKTOP-007 · 2.0.0-rc.6 · 06/11/2026 (America/Sao_Paulo)**. Leia [DESKTOP_NATIVE.md](DESKTOP_NATIVE.md). Build, 35 testes e pacote/smoke Linux aprovados; um teste bloqueado por ICE. Registros abaixo são históricos; validações Windows e duas máquinas continuam pendentes.
+
 > Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
 
 > Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
@@ -142,3 +144,7 @@ Resultado final EXECUTADO — HOTFIX-005: build/tsc PASSED; suíte 31 scripts, 3
 Branch fix/hotfix-acceptance-gaps-2026-11-06, base 16afa14 (PR #13 já integrado). Candidato rc.5; conteúdo b527927 e a544853, seguido do fechamento documental. Corrigidas lacunas reais: identidade das mensagens em Aparência com persistência e contraste, estado de sinalização/presença local no próprio card/sidebar, miniaturas spotlight proporcionais e pausa conjunta de 364 ms da logo. Motor de rede, bancos, IPC, arte e stack preservados. Relatório por requisito/arquivos: HOTFIX_ACCEPTANCE.md.
 
 EXECUTADO: build/tsc PASSED; suíte 33 scripts, 32 PASSED/1 BLOCKED por ICE (exit 1); zero falhas restantes. Teste integrado adicional dos controles compactos PASSED. Pacote e smoke Linux rc.5 PASSED. Evidências em hotfix-006-results.json. Windows, audição bidirecional em dispositivos físicos após queda e revisão assistiva não executados. Sem produção aprovada ou merge automático.
+
+
+## DESKTOP-007 — candidato rc.6 para revisão
+Splash mínima de 5 s, dock sempre visível/centralizado, diagnóstico somente ícone na titlebar, sala atual sem reentrada e limites/isolamento dos efeitos implementados. Notificações Electron para mensagens em segundo plano e entrada de participante em voz com ação Atender. Chamadas continuam por sala; não há ligação direta/DM ou push com processo encerrado. Evidências e limites em DESKTOP_NATIVE.md. Sem mudanças em shadcn/Tailwind, autenticação ou dependências.

@@ -178,3 +178,10 @@ Codex/OpenAI · fix/hotfix-acceptance-gaps-2026-11-06 · base 16afa14 (PR #13 in
 
 ## HOTFIX-006 — concluído para revisão — 06/11/2026 UTC
 Codex/OpenAI · fix/hotfix-acceptance-gaps-2026-11-06 · base 16afa14 · b527927/a544853 e fechamento documental posterior. Reservas desta tarefa liberadas. Build/tsc, 32 scripts e pacote/smoke Linux passaram; media-transport BLOCKED pela ausência de candidatos ICE, política administrada preservada. Relatório HOTFIX_ACCEPTANCE.md. Main não alterada. Matriz física/Windows pendente; não declarar produção.
+
+## DESKTOP-007 — ativo — 06/11/2026 — Codex/OpenAI
+Branch fix/native-notifications-call-stability-2026-11-06, base 1a9d3e9 (PR anterior integrado), árvore limpa. Reserva: splash mínima de 5 s explicitamente solicitada (substitui regra antiga), controles sempre visíveis, notificações Electron, mesma sala idempotente, limites/isolamento de reprodução e diagnóstico na titlebar. Sem inicialização automática Windows. Mídia física/toasts Windows exigem validação externa.
+
+
+## DESKTOP-007 — concluído para revisão — 06/11/2026 — Codex/OpenAI
+Branch `fix/native-notifications-call-stability-2026-11-06`, base 1a9d3e9; 4361de2 (áudio), 05ff793 (notificações/sala) e 1573a6f (interface/regressões), seguido do fechamento documental rc.6. Todas as reservas desta tarefa liberadas. Build, 35 testes, pacote Linux e smoke do executável aprovados; um teste bloqueado pela política ICE. Ver DESKTOP_NATIVE.md. Windows/toasts e reprodução física com arquivo original continuam pendentes. Push da branch autorizado explicitamente; main preservada, sem merge/release/force push.
