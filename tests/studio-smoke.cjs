@@ -20,8 +20,18 @@ const fs = require("node:fs/promises");
       : r.abort(),
   );
   const open = async () => {
-    if(await p.getByRole("dialog",{name:"Configurações do cbsHUB",exact:true}).isVisible())await p.getByRole("button",{name:"Editar temas",exact:true}).click();
-    else await p.getByRole("button",{name:"Abrir cbsHUB Studio",exact:true}).click();
+    if (
+      await p
+        .getByRole("dialog", { name: "Configurações do cbsHUB", exact: true })
+        .isVisible()
+    )
+      await p
+        .getByRole("button", { name: "Editar temas", exact: true })
+        .click();
+    else
+      await p
+        .getByRole("button", { name: "Abrir cbsHUB Studio", exact: true })
+        .click();
   };
   const bg = () =>
     p.evaluate(() =>
@@ -126,13 +136,11 @@ const fs = require("node:fs/promises");
       c.getContext("2d").fillRect(0, 0, 8, 8);
       return c.toDataURL("image/png").split(",")[1];
     });
-    await p
-      .getByLabel("Imagem de fundo", { exact: true })
-      .setInputFiles({
-        name: "wallpaper.png",
-        mimeType: "image/png",
-        buffer: Buffer.from(image, "base64"),
-      });
+    await p.getByLabel("Imagem de fundo", { exact: true }).setInputFiles({
+      name: "wallpaper.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(image, "base64"),
+    });
     await p
       .getByRole("button", { name: "Remover imagem", exact: true })
       .waitFor();
@@ -187,6 +195,20 @@ const fs = require("node:fs/promises");
       path: "/workspace/cbshub-onboarding/studio-mobile.png",
     });
     await p.keyboard.press("Escape");
+    if (
+      await p
+        .getByRole("button", {
+          name: "Descartar alterações e fechar",
+          exact: true,
+        })
+        .isVisible()
+    )
+      await p
+        .getByRole("button", {
+          name: "Descartar alterações e fechar",
+          exact: true,
+        })
+        .click();
     await p.getByRole("dialog").waitFor({ state: "hidden" });
     assert.deepEqual(errors, []);
     console.log("PASS mobile, Escape e ausência de erros JS");

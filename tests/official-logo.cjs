@@ -16,7 +16,9 @@ const { chromium } = require("playwright"),
   const mark = fs.readFileSync("public/brand/mark.svg", "utf8");
   assert.deepEqual(
     [...mark.matchAll(/<path[^>]*>/g)].map((x) => x[0].replace(/\/>$/, ">")),
-    [...source.toString().matchAll(/<path[^>]*>/g)].map((x) => x[0].replace(/\/>$/, ">")),
+    [...source.toString().matchAll(/<path[^>]*>/g)].map((x) =>
+      x[0].replace(/\/>$/, ">"),
+    ),
   );
   const ico = fs.readFileSync("public/brand/app.ico");
   assert.equal(ico.readUInt16LE(2), 1);
@@ -46,6 +48,10 @@ const { chromium } = require("playwright"),
     for (const theme of ["Clássico", "Moderno Roxo"]) {
       await page
         .getByRole("button", { name: "Configurações do perfil", exact: true })
+        .click();
+      await page
+        .getByRole("tablist", { name: "Seções das configurações" })
+        .getByRole("tab", { name: "Aparência", exact: true })
         .click();
       await page.getByRole("button", { name: theme, exact: true }).click();
       await page.keyboard.press("Escape");

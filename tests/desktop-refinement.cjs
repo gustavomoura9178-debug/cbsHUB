@@ -94,6 +94,10 @@ const { chromium } = require("playwright"),
       .getByRole("button", { name: "Configurações do perfil", exact: true })
       .click();
     await page
+      .getByRole("tablist", { name: "Seções das configurações" })
+      .getByRole("tab", { name: "Aparência", exact: true })
+      .click();
+    await page
       .getByRole("button", { name: "Velvet Nocturne", exact: true })
       .waitFor();
     assert.equal(
@@ -216,7 +220,7 @@ const { chromium } = require("playwright"),
     assert.equal(
       await page
         .locator('[data-call-card="test-remote"]')
-        .getByText("22 ms · 0% perda", { exact: true })
+        .getByText("Conectado · 22 ms · 0% perda", { exact: true })
         .count(),
       1,
     );

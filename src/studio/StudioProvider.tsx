@@ -58,6 +58,7 @@ function read(): Saved {
   }
 }
 interface StudioContext {
+  dirty: boolean;
   selectPreset: (theme: Theme) => void;
   theme: Theme;
   library: Entry[];
@@ -101,6 +102,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
     }
   }
   const context: StudioContext = {
+    dirty: !!draft && JSON.stringify(draft) !== JSON.stringify(saved.active),
     selectPreset: (next) => {
       if (persist({ ...saved, active: validateTheme(next) })) setDraft(null);
     },

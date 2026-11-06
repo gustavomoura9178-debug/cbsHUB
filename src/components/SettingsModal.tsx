@@ -1,3 +1,4 @@
+import { settingsDirty } from "../lib/settingsDrafts";
 import { useShallow } from "zustand/react/shallow";
 import { MicrophoneLevelMeter } from "./MicrophoneLevelMeter";
 import { useSettingsNavigation } from "../lib/settingsNavigation";
@@ -48,8 +49,14 @@ import { webrtcEngine } from "../lib/webrtcEngine";
 
 export const SettingsModal: React.FC = () => {
   const settingsTab = useSettingsNavigation((s) => s.tab);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const closeSettings = (open: boolean) => {
+    if (!open && settingsDirty()) {
+      setConfirmDiscard(true);
+      return;
+    }
     setIsSettingsOpen(open);
+    setConfirmDiscard(false);
     if (!open) studio.cancel();
   };
   const voicePreferences = useVoicePreferences();
@@ -168,35 +175,6 @@ export const SettingsModal: React.FC = () => {
           </div>
         </DialogHeader>
 
-        <div className="px-5 py-3 flex gap-2 items-center flex-wrap">
-          <span className="text-sm">Aparência</span>
-          {PRESETS.filter((t) =>
-            [
-              "Clássico",
-              "Moderno Roxo",
-              "Sakura Dream",
-              "Velvet Nocturne",
-            ].includes(t.name),
-          ).map((t) => (
-            <Button
-              key={t.name}
-              size="sm"
-              variant={studio.theme.name === t.name ? "default" : "outline"}
-              onClick={() => studio.selectPreset(t)}
-            >
-              {t.name}
-            </Button>
-          ))}
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              studio.begin();
-            }}
-          >
-            Editar temas
-          </Button>
-        </div>
         {/* Abas e Conteúdo */}
         <Tabs
           value={settingsTab}
@@ -233,7 +211,35 @@ export const SettingsModal: React.FC = () => {
             <TabsContent value="diagnostics" className="m-0">
               <CallDiagnosticsPanel />
             </TabsContent>
-            <TabsContent value="appearance" className="m-0 space-y-4">
+            <TabsContent
+              forceMount
+              hidden={settingsTab !== "appearance"}
+              value="appearance"
+              className="m-0 space-y-4"
+            >
+              {" "}
+              <div className="px-5 py-3 flex gap-2 items-center flex-wrap">
+                <span className="text-sm">Aparência</span>
+                {PRESETS.filter((t) =>
+                  [
+                    "Clássico",
+                    "Moderno Roxo",
+                    "Sakura Dream",
+                    "Velvet Nocturne",
+                  ].includes(t.name),
+                ).map((t) => (
+                  <Button
+                    key={t.name}
+                    size="sm"
+                    variant={
+                      studio.theme.name === t.name ? "default" : "outline"
+                    }
+                    onClick={() => studio.selectPreset(t)}
+                  >
+                    {t.name}
+                  </Button>
+                ))}
+              </div>
               <StudioDialog embedded />
               <h3 className="font-semibold">Densidade das mensagens</h3>
               <p className="text-sm text-muted-foreground">
@@ -268,7 +274,12 @@ export const SettingsModal: React.FC = () => {
               {appearanceError && <p role="alert">{appearanceError}</p>}
             </TabsContent>
             {/* ABA 1: PERFIL & IDENTIDADE */}
-            <TabsContent value="profile" className="m-0">
+            <TabsContent
+              forceMount
+              hidden={settingsTab !== "profile"}
+              value="profile"
+              className="m-0"
+            >
               <ProfileDialog embedded />
             </TabsContent>
             {/* ABA 2: ÁUDIO, VÍDEO & ESTÚDIO */}
@@ -665,6 +676,35 @@ export const SettingsModal: React.FC = () => {
           </div>
         </Tabs>
 
+        {confirmDiscard && (
+          <section
+            role="alert"
+            aria-label="Alterações não salvas"
+            className="border-t border-border p-3 space-y-2"
+          >
+            <p className="text-sm">
+              Há alterações não salvas. Deseja descartá-las?
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setConfirmDiscard(false)}
+              >
+                Continuar editando
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  studio.cancel();
+                  setConfirmDiscard(false);
+                  setIsSettingsOpen(false);
+                }}
+              >
+                Descartar alterações e fechar
+              </Button>
+            </div>
+          </section>
+        )}
         {/* Rodapé */}
         <DialogFooter className="p-4 border-t border-border/60 bg-card/40 flex items-center justify-between shrink-0">
           <div className="text-caption text-muted-foreground flex items-center gap-1.5">

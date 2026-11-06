@@ -1,3 +1,4 @@
+import { useSettingsDrafts } from "../lib/settingsDrafts";
 import { AvatarCrop } from "./AvatarCrop";
 import {
   Children,
@@ -253,6 +254,14 @@ export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
     },
   })!;
   const [cropFile, setCropFile] = useState<File | null>(null);
+  useEffect(() => {
+    if (!embedded) return;
+    useSettingsDrafts.setState({
+      profile:
+        JSON.stringify(draft) !== JSON.stringify(profiles.own) || !!cropFile,
+    });
+    return () => useSettingsDrafts.setState({ profile: false });
+  }, [embedded, draft, profiles.own, cropFile]);
   async function upload(file: File | undefined, kind: "avatar" | "banner") {
     if (!file) return;
     if (kind === "avatar") {
