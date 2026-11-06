@@ -1,4 +1,4 @@
-import {AvatarCrop} from "./AvatarCrop";
+import { AvatarCrop } from "./AvatarCrop";
 import {
   Children,
   isValidElement,
@@ -202,25 +202,27 @@ const privacyLabels = {
   allowCalls: "Permitir chamadas de participantes",
   allowReactions: "Permitir reações às minhas mensagens",
 } as const;
-export function ProfileDialog() {
+export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
   const profiles = useProfiles();
   const participants = useHubStore((s) => s.participants);
   const selected = Object.values(participants).find(
     (p) => p.clientId === profiles.selected,
   );
   const self =
-    profiles.selected === "self" || profiles.selected === profiles.own.ownerId;
+    embedded ||
+    profiles.selected === "self" ||
+    profiles.selected === profiles.own.ownerId;
   const [draft, setDraft] = useState<UserProfile>(
       structuredClone(profiles.own),
     ),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (profiles.editing) {
+    if (embedded || profiles.editing) {
       setDraft(structuredClone(profiles.own));
       setError("");
     }
-  }, [profiles.editing, profiles.own]);
+  }, [embedded || profiles.editing, profiles.own]);
   const patch = (p: Partial<UserProfile>) =>
     setDraft((current) => ({ ...current, ...p }));
   const blocked = !!selected && profiles.blocked.includes(selected.clientId);
@@ -250,10 +252,13 @@ export function ProfileDialog() {
       shareImages: true,
     },
   })!;
-  const [cropFile,setCropFile] = useState<File|null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
   async function upload(file: File | undefined, kind: "avatar" | "banner") {
     if (!file) return;
-    if(kind === "avatar") {setCropFile(file);return;}
+    if (kind === "avatar") {
+      setCropFile(file);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -265,7 +270,433 @@ export function ProfileDialog() {
       setBusy(false);
     }
   }
-  return (
+  const content = (
+    <>
+      {embedded ? (
+        <>
+          <h3 className="font-semibold">Editar perfil</h3>
+          <p className="text-xs text-muted-foreground">
+            As alterações só são aplicadas ao salvar.
+          </p>
+        </>
+      ) : (
+        <>
+          {" "}
+          <DialogTitle>
+            {embedded || profiles.editing
+              ? "Editar perfil"
+              : profiles.full
+                ? "Perfil completo"
+                : "Perfil"}
+          </DialogTitle>
+          <DialogDescription>
+            {embedded || profiles.editing
+              ? "Personalize sua identidade. As alterações só são aplicadas ao salvar."
+              : "Identidade compartilhada com participantes desta sala."}
+          </DialogDescription>
+        </>
+      )}{" "}
+      {embedded || profiles.editing ? (
+        <>
+          <div className="profile-editor-grid">
+            <div>
+              <Tabs defaultValue="identity">
+                <TabsList
+                  aria-label="Seções do perfil"
+                  className="w-full grid grid-cols-3"
+                >
+                  <TabsTrigger value="identity">Identidade</TabsTrigger>
+                  <TabsTrigger value="style">Aparência</TabsTrigger>
+                  <TabsTrigger value="privacy">Privacidade</TabsTrigger>
+                </TabsList>
+                <TabsContent value="identity" className="profile-fields">
+                  <label>
+                    Nome de exibição
+                    <Input
+                      aria-label="Nome de exibição"
+                      value={draft.displayName}
+                      maxLength={40}
+                      onChange={(e) => patch({ displayName: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Nome de usuário
+                    <Input
+                      aria-label="Nome de usuário"
+                      value={draft.username}
+                      maxLength={24}
+                      onChange={(e) =>
+                        patch({ username: e.target.value.toLowerCase() })
+                      }
+                    />
+                  </label>
+                  <p className="profile-help">
+                    Disponibilidade verificada entre participantes conhecidos
+                    nesta sala. Reserva global depende de um servidor de contas.
+                  </p>
+                  <label>
+                    Biografia
+                    <textarea
+                      aria-label="Biografia"
+                      value={draft.bio}
+                      maxLength={500}
+                      onChange={(e) => patch({ bio: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Status personalizado
+                    <Input
+                      aria-label="Status personalizado"
+                      value={draft.status}
+                      maxLength={100}
+                      onChange={(e) => patch({ status: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Emoji de status
+                    <Input
+                      aria-label="Emoji de status"
+                      value={draft.emoji}
+                      maxLength={16}
+                      onChange={(e) => patch({ emoji: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Presença
+                    <ProfileSelect
+                      aria-label="Presença"
+                      value={draft.presence}
+                      onChange={(e) =>
+                        patch({ presence: e.target.value as Presence })
+                      }
+                    >
+                      {Object.entries(PRESENCES).map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                    </ProfileSelect>
+                  </label>
+                  <p className="profile-help">
+                    Invisível exibe Offline no perfil. Participar de uma sala
+                    ainda revela sua presença na conexão P2P.
+                  </p>
+                  <label>
+                    Links HTTPS (até 3, um por linha)
+                    <textarea
+                      aria-label="Links do perfil"
+                      value={draft.links.join("\n")}
+                      onChange={(e) =>
+                        patch({
+                          links: e.target.value.split("\n").filter(Boolean),
+                        })
+                      }
+                    />
+                  </label>
+                  {(["avatar", "banner"] as const).map((kind) => (
+                    <div className="profile-upload" key={kind}>
+                      <label>
+                        {kind === "avatar"
+                          ? "Avatar (original até 20 MB)"
+                          : "Banner (até 2 MB)"}
+                        <Input
+                          type="file"
+                          aria-label={`Upload de ${kind}`}
+                          accept="image/png,image/jpeg,image/webp"
+                          disabled={busy}
+                          onChange={(e) => {
+                            void upload(e.target.files?.[0], kind);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!draft[kind]}
+                        onClick={() => patch({ [kind]: "" })}
+                      >
+                        Remover {kind}
+                      </Button>
+                    </div>
+                  ))}
+                  <p className="profile-help">
+                    PNG, JPEG ou WebP. Imagens são recortadas e reencodadas
+                    localmente; não há upload para servidor.
+                  </p>
+                </TabsContent>
+                <TabsContent value="style" className="profile-fields">
+                  {(["color", "background", "gradient"] as const).map(
+                    (key, i) => (
+                      <label key={key}>
+                        {
+                          [
+                            "Cor principal",
+                            "Fundo do cartão",
+                            "Segunda cor do gradiente",
+                          ][i]
+                        }
+                        <div className="flex gap-2">
+                          <input
+                            aria-label={`Seletor ${key}`}
+                            type="color"
+                            value={draft.appearance[key]}
+                            onChange={(e) =>
+                              patch({
+                                appearance: {
+                                  ...draft.appearance,
+                                  [key]: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <Input
+                            aria-label={`HEX ${key}`}
+                            value={draft.appearance[key]}
+                            maxLength={7}
+                            onChange={(e) => {
+                              if (/^#[a-f0-9]{6}$/i.test(e.target.value))
+                                patch({
+                                  appearance: {
+                                    ...draft.appearance,
+                                    [key]: e.target.value,
+                                  },
+                                });
+                            }}
+                          />
+                        </div>
+                      </label>
+                    ),
+                  )}
+                  <label className="profile-switch">
+                    Usar gradiente
+                    <Switch
+                      aria-label="Usar gradiente"
+                      checked={draft.appearance.useGradient}
+                      onCheckedChange={(useGradient) =>
+                        patch({
+                          appearance: { ...draft.appearance, useGradient },
+                        })
+                      }
+                    />
+                  </label>
+                  <label>
+                    Borda do avatar
+                    <ProfileSelect
+                      aria-label="Borda do avatar"
+                      value={draft.appearance.border}
+                      onChange={(e) =>
+                        patch({
+                          appearance: {
+                            ...draft.appearance,
+                            border: e.target
+                              .value as UserProfile["appearance"]["border"],
+                          },
+                        })
+                      }
+                    >
+                      <option value="none">Sem borda</option>
+                      <option value="ring">Anel</option>
+                      <option value="double">Dupla</option>
+                    </ProfileSelect>
+                  </label>
+                  <label>
+                    Estilo do cartão
+                    <ProfileSelect
+                      aria-label="Estilo do cartão"
+                      value={draft.appearance.card}
+                      onChange={(e) =>
+                        patch({
+                          appearance: {
+                            ...draft.appearance,
+                            card: e.target
+                              .value as UserProfile["appearance"]["card"],
+                          },
+                        })
+                      }
+                    >
+                      <option value="soft">Suave</option>
+                      <option value="outlined">Contornado</option>
+                      <option value="glass">Translúcido</option>
+                    </ProfileSelect>
+                  </label>
+                  <label>
+                    Tema do perfil
+                    <ProfileSelect
+                      aria-label="Tema do perfil"
+                      value={draft.appearance.theme}
+                      onChange={(e) =>
+                        patch({
+                          appearance: {
+                            ...draft.appearance,
+                            theme: e.target
+                              .value as UserProfile["appearance"]["theme"],
+                          },
+                        })
+                      }
+                    >
+                      <option value="inherit">Tema do aplicativo</option>
+                      <option value="dark">Escuro</option>
+                      <option value="light">Claro</option>
+                    </ProfileSelect>
+                  </label>
+                </TabsContent>
+                <TabsContent value="privacy" className="profile-fields">
+                  <label>
+                    Visibilidade do perfil
+                    <ProfileSelect
+                      aria-label="Visibilidade do perfil"
+                      value={draft.privacy.visibility}
+                      onChange={(e) =>
+                        patch({
+                          privacy: {
+                            ...draft.privacy,
+                            visibility: e.target.value as "room" | "private",
+                          },
+                        })
+                      }
+                    >
+                      <option value="room">Participantes da sala</option>
+                      <option value="private">Somente eu</option>
+                    </ProfileSelect>
+                  </label>
+                  {Object.entries(privacyLabels).map(([key, label]) => (
+                    <label className="profile-switch" key={key}>
+                      {label}
+                      <Switch
+                        aria-label={label}
+                        checked={
+                          draft.privacy[key as keyof typeof privacyLabels]
+                        }
+                        onCheckedChange={(v) =>
+                          patch({ privacy: { ...draft.privacy, [key]: v } })
+                        }
+                      />
+                    </label>
+                  ))}
+                  <p className="profile-help">
+                    Nome de exibição, mensagens e mídia de uma sala não são
+                    privados. Dados já compartilhados não podem ser apagados de
+                    outros dispositivos. Permissões e bloqueios são locais; sem
+                    conta autenticada, identidades podem ser recriadas.
+                  </p>
+                  <h3 className="text-sm font-semibold">
+                    Bloqueados neste dispositivo
+                  </h3>
+                  {profiles.blocked.length === 0 ? (
+                    <p className="profile-help">
+                      Nenhuma identidade bloqueada.
+                    </p>
+                  ) : (
+                    profiles.blocked.map((id) => (
+                      <div className="flex gap-2 items-center" key={id}>
+                        <span className="truncate text-xs">
+                          {Object.values(participants).find(
+                            (p) => p.clientId === id,
+                          )?.nickname || `Identidade ${id.slice(0, 8)}`}
+                        </span>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => profiles.block(id, false)}
+                        >
+                          Desbloquear
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+            <aside>
+              <h3 className="text-sm font-medium mb-3">Pré-visualização</h3>
+              <ProfileCard profile={preview} full />
+              <p className="profile-help">
+                A prévia mostra seus campos completos. A aba Privacidade
+                controla o que é enviado.
+              </p>
+            </aside>
+          </div>
+          <div role="alert" className="profile-error">
+            {error || profiles.error}
+          </div>
+          <footer className="profile-actions">
+            <Button
+              variant="ghost"
+              onClick={() =>
+                embedded
+                  ? setDraft(structuredClone(profiles.own))
+                  : profiles.close()
+              }
+            >
+              Cancelar
+            </Button>
+            <Button disabled={busy} onClick={() => profiles.save(draft)}>
+              Salvar perfil
+            </Button>
+          </footer>
+        </>
+      ) : (
+        <>
+          {displayed ? (
+            <ProfileCard profile={displayed} full={profiles.full} />
+          ) : (
+            <div className="profile-private">
+              <Shield className="size-8" />
+              <h2>
+                {blocked
+                  ? "Perfil bloqueado"
+                  : selected?.nickname || "Perfil indisponível"}
+              </h2>
+              <p>
+                {blocked
+                  ? "Você ocultou esta identidade neste dispositivo."
+                  : "Este participante não compartilhou um perfil ou está desconectado."}
+              </p>
+            </div>
+          )}
+          <div role="alert" className="profile-error">
+            {profiles.error}
+          </div>
+          <footer className="profile-actions">
+            {self ? (
+              <Button onClick={profiles.edit}>
+                <Pencil className="size-4 mr-2" />
+                Editar perfil
+              </Button>
+            ) : (
+              selected && (
+                <Button
+                  variant={blocked ? "secondary" : "destructive"}
+                  onClick={() => profiles.block(selected.clientId, !blocked)}
+                >
+                  {blocked ? "Desbloquear" : "Bloquear usuário"}
+                </Button>
+              )
+            )}
+            {!profiles.full && displayed && (
+              <Button variant="outline" onClick={profiles.expand}>
+                Ver perfil completo
+              </Button>
+            )}
+          </footer>
+        </>
+      )}
+      <AvatarCrop
+        embedded={embedded}
+        file={cropFile}
+        onClose={() => setCropFile(null)}
+        onSave={(image) =>
+          setDraft((current) => ({ ...current, avatar: image }))
+        }
+      />
+    </>
+  );
+  return embedded ? (
+    <section className="profile-embedded" aria-label="Editor de perfil">
+      {content}
+    </section>
+  ) : (
     <Dialog
       open={profiles.selected !== null}
       onOpenChange={(open) => {
@@ -275,397 +706,8 @@ export function ProfileDialog() {
       <DialogContent
         className={`profile-window ${profiles.full ? "profile-full" : ""}`}
       >
-        <DialogTitle>
-          {profiles.editing
-            ? "Editar perfil"
-            : profiles.full
-              ? "Perfil completo"
-              : "Perfil"}
-        </DialogTitle>
-        <DialogDescription>
-          {profiles.editing
-            ? "Personalize sua identidade. As alterações só são aplicadas ao salvar."
-            : "Identidade compartilhada com participantes desta sala."}
-        </DialogDescription>
-        {profiles.editing ? (
-          <>
-            <div className="profile-editor-grid">
-              <div>
-                <Tabs defaultValue="identity">
-                  <TabsList className="w-full grid grid-cols-3">
-                    <TabsTrigger value="identity">Identidade</TabsTrigger>
-                    <TabsTrigger value="style">Aparência</TabsTrigger>
-                    <TabsTrigger value="privacy">Privacidade</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="identity" className="profile-fields">
-                    <label>
-                      Nome de exibição
-                      <Input
-                        aria-label="Nome de exibição"
-                        value={draft.displayName}
-                        maxLength={40}
-                        onChange={(e) => patch({ displayName: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Nome de usuário
-                      <Input
-                        aria-label="Nome de usuário"
-                        value={draft.username}
-                        maxLength={24}
-                        onChange={(e) =>
-                          patch({ username: e.target.value.toLowerCase() })
-                        }
-                      />
-                    </label>
-                    <p className="profile-help">
-                      Disponibilidade verificada entre participantes conhecidos
-                      nesta sala. Reserva global depende de um servidor de
-                      contas.
-                    </p>
-                    <label>
-                      Biografia
-                      <textarea
-                        aria-label="Biografia"
-                        value={draft.bio}
-                        maxLength={500}
-                        onChange={(e) => patch({ bio: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Status personalizado
-                      <Input
-                        aria-label="Status personalizado"
-                        value={draft.status}
-                        maxLength={100}
-                        onChange={(e) => patch({ status: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Emoji de status
-                      <Input
-                        aria-label="Emoji de status"
-                        value={draft.emoji}
-                        maxLength={16}
-                        onChange={(e) => patch({ emoji: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Presença
-                      <ProfileSelect
-                        aria-label="Presença"
-                        value={draft.presence}
-                        onChange={(e) =>
-                          patch({ presence: e.target.value as Presence })
-                        }
-                      >
-                        {Object.entries(PRESENCES).map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </ProfileSelect>
-                    </label>
-                    <p className="profile-help">
-                      Invisível exibe Offline no perfil. Participar de uma sala
-                      ainda revela sua presença na conexão P2P.
-                    </p>
-                    <label>
-                      Links HTTPS (até 3, um por linha)
-                      <textarea
-                        aria-label="Links do perfil"
-                        value={draft.links.join("\n")}
-                        onChange={(e) =>
-                          patch({
-                            links: e.target.value.split("\n").filter(Boolean),
-                          })
-                        }
-                      />
-                    </label>
-                    {(["avatar", "banner"] as const).map((kind) => (
-                      <div className="profile-upload" key={kind}>
-                        <label>
-                          {kind === "avatar"
-                            ? "Avatar (original até 20 MB)"
-                            : "Banner (até 2 MB)"}
-                          <Input
-                            type="file"
-                            aria-label={`Upload de ${kind}`}
-                            accept="image/png,image/jpeg,image/webp"
-                            disabled={busy}
-                            onChange={(e) => {
-                              void upload(e.target.files?.[0], kind);
-                              e.target.value = "";
-                            }}
-                          />
-                        </label>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          disabled={!draft[kind]}
-                          onClick={() => patch({ [kind]: "" })}
-                        >
-                          Remover {kind}
-                        </Button>
-                      </div>
-                    ))}
-                    <p className="profile-help">
-                      PNG, JPEG ou WebP. Imagens são recortadas e reencodadas
-                      localmente; não há upload para servidor.
-                    </p>
-                  </TabsContent>
-                  <TabsContent value="style" className="profile-fields">
-                    {(["color", "background", "gradient"] as const).map(
-                      (key, i) => (
-                        <label key={key}>
-                          {
-                            [
-                              "Cor principal",
-                              "Fundo do cartão",
-                              "Segunda cor do gradiente",
-                            ][i]
-                          }
-                          <div className="flex gap-2">
-                            <input
-                              aria-label={`Seletor ${key}`}
-                              type="color"
-                              value={draft.appearance[key]}
-                              onChange={(e) =>
-                                patch({
-                                  appearance: {
-                                    ...draft.appearance,
-                                    [key]: e.target.value,
-                                  },
-                                })
-                              }
-                            />
-                            <Input
-                              aria-label={`HEX ${key}`}
-                              value={draft.appearance[key]}
-                              maxLength={7}
-                              onChange={(e) => {
-                                if (/^#[a-f0-9]{6}$/i.test(e.target.value))
-                                  patch({
-                                    appearance: {
-                                      ...draft.appearance,
-                                      [key]: e.target.value,
-                                    },
-                                  });
-                              }}
-                            />
-                          </div>
-                        </label>
-                      ),
-                    )}
-                    <label className="profile-switch">
-                      Usar gradiente
-                      <Switch
-                        aria-label="Usar gradiente"
-                        checked={draft.appearance.useGradient}
-                        onCheckedChange={(useGradient) =>
-                          patch({
-                            appearance: { ...draft.appearance, useGradient },
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Borda do avatar
-                      <ProfileSelect
-                        aria-label="Borda do avatar"
-                        value={draft.appearance.border}
-                        onChange={(e) =>
-                          patch({
-                            appearance: {
-                              ...draft.appearance,
-                              border: e.target
-                                .value as UserProfile["appearance"]["border"],
-                            },
-                          })
-                        }
-                      >
-                        <option value="none">Sem borda</option>
-                        <option value="ring">Anel</option>
-                        <option value="double">Dupla</option>
-                      </ProfileSelect>
-                    </label>
-                    <label>
-                      Estilo do cartão
-                      <ProfileSelect
-                        aria-label="Estilo do cartão"
-                        value={draft.appearance.card}
-                        onChange={(e) =>
-                          patch({
-                            appearance: {
-                              ...draft.appearance,
-                              card: e.target
-                                .value as UserProfile["appearance"]["card"],
-                            },
-                          })
-                        }
-                      >
-                        <option value="soft">Suave</option>
-                        <option value="outlined">Contornado</option>
-                        <option value="glass">Translúcido</option>
-                      </ProfileSelect>
-                    </label>
-                    <label>
-                      Tema do perfil
-                      <ProfileSelect
-                        aria-label="Tema do perfil"
-                        value={draft.appearance.theme}
-                        onChange={(e) =>
-                          patch({
-                            appearance: {
-                              ...draft.appearance,
-                              theme: e.target
-                                .value as UserProfile["appearance"]["theme"],
-                            },
-                          })
-                        }
-                      >
-                        <option value="inherit">Tema do aplicativo</option>
-                        <option value="dark">Escuro</option>
-                        <option value="light">Claro</option>
-                      </ProfileSelect>
-                    </label>
-                  </TabsContent>
-                  <TabsContent value="privacy" className="profile-fields">
-                    <label>
-                      Visibilidade do perfil
-                      <ProfileSelect
-                        aria-label="Visibilidade do perfil"
-                        value={draft.privacy.visibility}
-                        onChange={(e) =>
-                          patch({
-                            privacy: {
-                              ...draft.privacy,
-                              visibility: e.target.value as "room" | "private",
-                            },
-                          })
-                        }
-                      >
-                        <option value="room">Participantes da sala</option>
-                        <option value="private">Somente eu</option>
-                      </ProfileSelect>
-                    </label>
-                    {Object.entries(privacyLabels).map(([key, label]) => (
-                      <label className="profile-switch" key={key}>
-                        {label}
-                        <Switch
-                          aria-label={label}
-                          checked={
-                            draft.privacy[key as keyof typeof privacyLabels]
-                          }
-                          onCheckedChange={(v) =>
-                            patch({ privacy: { ...draft.privacy, [key]: v } })
-                          }
-                        />
-                      </label>
-                    ))}
-                    <p className="profile-help">
-                      Nome de exibição, mensagens e mídia de uma sala não são
-                      privados. Dados já compartilhados não podem ser apagados
-                      de outros dispositivos. Permissões e bloqueios são locais;
-                      sem conta autenticada, identidades podem ser recriadas.
-                    </p>
-                    <h3 className="text-sm font-semibold">
-                      Bloqueados neste dispositivo
-                    </h3>
-                    {profiles.blocked.length === 0 ? (
-                      <p className="profile-help">
-                        Nenhuma identidade bloqueada.
-                      </p>
-                    ) : (
-                      profiles.blocked.map((id) => (
-                        <div className="flex gap-2 items-center" key={id}>
-                          <span className="truncate text-xs">
-                            {Object.values(participants).find(
-                              (p) => p.clientId === id,
-                            )?.nickname || `Identidade ${id.slice(0, 8)}`}
-                          </span>
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => profiles.block(id, false)}
-                          >
-                            Desbloquear
-                          </Button>
-                        </div>
-                      ))
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </div>
-              <aside>
-                <h3 className="text-sm font-medium mb-3">Pré-visualização</h3>
-                <ProfileCard profile={preview} full />
-                <p className="profile-help">
-                  A prévia mostra seus campos completos. A aba Privacidade
-                  controla o que é enviado.
-                </p>
-              </aside>
-            </div>
-            <div role="alert" className="profile-error">
-              {error || profiles.error}
-            </div>
-            <footer className="profile-actions">
-              <Button variant="ghost" onClick={profiles.close}>
-                Cancelar
-              </Button>
-              <Button disabled={busy} onClick={() => profiles.save(draft)}>
-                Salvar perfil
-              </Button>
-            </footer>
-          </>
-        ) : (
-          <>
-            {displayed ? (
-              <ProfileCard profile={displayed} full={profiles.full} />
-            ) : (
-              <div className="profile-private">
-                <Shield className="size-8" />
-                <h2>
-                  {blocked
-                    ? "Perfil bloqueado"
-                    : selected?.nickname || "Perfil indisponível"}
-                </h2>
-                <p>
-                  {blocked
-                    ? "Você ocultou esta identidade neste dispositivo."
-                    : "Este participante não compartilhou um perfil ou está desconectado."}
-                </p>
-              </div>
-            )}
-            <div role="alert" className="profile-error">
-              {profiles.error}
-            </div>
-            <footer className="profile-actions">
-              {self ? (
-                <Button onClick={profiles.edit}>
-                  <Pencil className="size-4 mr-2" />
-                  Editar perfil
-                </Button>
-              ) : (
-                selected && (
-                  <Button
-                    variant={blocked ? "secondary" : "destructive"}
-                    onClick={() => profiles.block(selected.clientId, !blocked)}
-                  >
-                    {blocked ? "Desbloquear" : "Bloquear usuário"}
-                  </Button>
-                )
-              )}
-              {!profiles.full && displayed && (
-                <Button variant="outline" onClick={profiles.expand}>
-                  Ver perfil completo
-                </Button>
-              )}
-            </footer>
-          </>
-        )}
+        {content}
       </DialogContent>
-      <AvatarCrop file={cropFile} onClose={()=>setCropFile(null)} onSave={image=>setDraft(current=>({...current,avatar:image}))} />
     </Dialog>
   );
 }

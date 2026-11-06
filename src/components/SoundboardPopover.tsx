@@ -1,3 +1,4 @@
+import { AudioTrimEditor } from "./AudioTrimEditor";
 import React, { useMemo, useState } from "react";
 import {
   Volume2,
@@ -55,6 +56,7 @@ export const SoundboardPopover: React.FC<Props> = ({
     inVoice = useHubStore((s) => s.inVoiceCall),
     deafened = useHubStore((s) => s.isDeafened);
   const mode = useSoundPreferences((s) => s.mode);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [search, setSearch] = useState(""),
     [tab, setTab] = useState("all"),
     [category, setCategory] = useState("all");
@@ -98,6 +100,7 @@ export const SoundboardPopover: React.FC<Props> = ({
   };
   const save = async (clip: SoundboardClip) => {
     await storageDb.saveSoundboardClip(clip);
+    soundboardEngine.invalidateClip(clip.id);
     await webrtcEngine.loadSoundboardClips();
   };
   return (
@@ -105,7 +108,7 @@ export const SoundboardPopover: React.FC<Props> = ({
       <Popover>
         <PopoverTrigger asChild>
           {trigger || (
-            <Button variant="secondary" aria-label="Abrir Soundboard">
+            <Button variant="secondary" aria-label="Abrir Efeitos Sonoros">
               <Volume2 className="size-4" />
             </Button>
           )}
@@ -117,7 +120,7 @@ export const SoundboardPopover: React.FC<Props> = ({
         >
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="font-semibold">Soundboard</h3>
+              <h3 className="font-semibold">Efeitos Sonoros</h3>
               <p className="text-xs text-muted-foreground">
                 {inVoice
                   ? "Sons enviados à chamada"
@@ -274,7 +277,10 @@ export const SoundboardPopover: React.FC<Props> = ({
                     variant="ghost"
                     className="size-7"
                     aria-label={`Editar ${clip.name}`}
-                    onClick={() => setEditing({ ...clip })}
+                    onClick={() => {
+                      setConfirmDelete(false);
+                      setEditing({ ...clip });
+                    }}
                   >
                     <Settings2 className="size-3" />
                   </Button>
@@ -395,20 +401,43 @@ export const SoundboardPopover: React.FC<Props> = ({
                   }
                 />
               </label>
+              {!editing.isBuiltIn && editing.audioBlob && (
+                <AudioTrimEditor
+                  source={editing.originalAudioBlob || editing.audioBlob}
+                  onApply={(blob, seconds) =>
+                    setEditing({
+                      ...editing,
+                      audioBlob: blob,
+                      originalAudioBlob:
+                        editing.originalAudioBlob || editing.audioBlob,
+                      durationSec: seconds,
+                    })
+                  }
+                />
+              )}
+              {editing.isBuiltIn && (
+                <p className="text-xs text-muted-foreground">
+                  Efeito sintetizado: corte disponível para arquivos importados.
+                </p>
+              )}
               <DialogFooter>
                 {!editing.isBuiltIn && (
                   <Button
                     variant="destructive"
                     disabled={busy}
                     onClick={() =>
-                      void run(async () => {
-                        await storageDb.deleteSoundboardClip(editing.id);
-                        await webrtcEngine.loadSoundboardClips();
-                        setEditing(null);
-                      })
+                      confirmDelete
+                        ? void run(async () => {
+                            await storageDb.deleteSoundboardClip(editing.id);
+                            await webrtcEngine.loadSoundboardClips();
+                            setEditing(null);
+                          })
+                        : setConfirmDelete(true)
                     }
                   >
-                    Excluir som
+                    {confirmDelete
+                      ? "Confirmar exclusão do som e original"
+                      : "Excluir som"}
                   </Button>
                 )}
                 <Button variant="outline" onClick={() => setEditing(null)}>

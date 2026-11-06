@@ -130,6 +130,7 @@ class SoundboardEngine {
   }
 
   private bufferCache: Map<string, AudioBuffer> = new Map();
+  public invalidateClip(id:string){this.bufferCache.delete(id);}
   private activeHandles: Set<ActiveSoundHandle> = new Set();
   private pipelineInputGetter: (() => GainNode | null) | null = null;
   private pipelineContextGetter: (() => AudioContext | null) | null = null;

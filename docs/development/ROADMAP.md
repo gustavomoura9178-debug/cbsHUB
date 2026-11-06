@@ -79,3 +79,12 @@ Após SECURITY-002, revisar BACKEND_PROPOSAL antes de implementar contas e infra
 3. Windows/ícones/instalação/janelas reais, leitor de tela/contraste e carga prolongada → depende de plataforma e medição. Selecionar novo rc antes de distribuir candidato.
 4. Revisar BACKEND_PROPOSAL → serviço/sessões/migração de identidades → perfis/preferências/salas/chat/ACL → DM/notificações/arquivos/pastas/GIFs. Não criar servidor paralelo ou UI falsa antes dos contratos aprovados.
 5. ABR/telemetria de tela por par e dividir bundle → depende de baseline físico e perfis CPU/memória para decidir mudanças mensuráveis.
+
+
+## Após DESKTOP-004 / rc.3 — 05/11/2026
+
+1. Revisar commits da branch desktop-refinement, incluindo contratos de fechamento/editores/telemetria. Depende desta entrega; não fazer merge sem autorização.
+2. Executar matriz física em 2 e depois 3–6 máquinas, redes diferentes, TURN/STUN, queda/restauração, suspensão, câmera/tela/efeitos simultâneos e troca de dispositivo. Depende de hardware/rede acessível. É gate de estabilidade.
+3. Windows/Tray/ícones/janelas/instalação, acessibilidade com leitor de tela e carga prolongada. Depende de plataforma/medição; não inferir aprovação de headless.
+4. ABR/telemetria simultânea de todos os pares e otimização do bundle com perfis CPU/memória. Depende de baseline físico; dados sem amostra continuam indisponíveis.
+5. Revisar BACKEND_PROPOSAL antes de contas/ACL/salas globais/DM/anexos/sync. Planejar migração sem perder identidades/dados locais. Notificações de mensagens do SO exigem escopo/permissões/testes próprios, sem depender obrigatoriamente de backend para o caso local.

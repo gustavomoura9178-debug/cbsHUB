@@ -69,14 +69,13 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
 
   return (
     <div
-      className={`relative rounded-xl border transition-all duration-200 overflow-hidden flex items-center justify-center select-none group bg-card ${
-        isCompact
-          ? "h-20 w-32 shrink-0"
-          : "w-full h-full min-h-[140px] aspect-video"
+      data-call-card={participant.peerId}
+      className={`call-participant-card relative rounded-xl border transition-colors duration-200 overflow-hidden flex items-center justify-center select-none group bg-card ${
+        isCompact ? "h-20 w-32 shrink-0" : "w-full h-full min-h-0"
       } ${
         isSpeakingNow
-          ? "border-success ring-2 ring-success/30 shadow-lg shadow-emerald-500/10"
-          : "border-white/[0.07] hover:border-white/20"
+          ? "border-success ring-2 ring-success/30 shadow-lg shadow-success/10"
+          : "border-border hover:border-primary/40"
       }`}
     >
       {!isLocal && (
@@ -103,7 +102,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
             name={participant.nickname}
             color={participant.avatarColor}
             speaking={isSpeakingNow}
-            className={isCompact ? "size-10" : "size-16"}
+            className={isCompact ? "size-10" : "call-card-avatar"}
           />
         </div>
       )}
@@ -245,7 +244,7 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
         }
       }}
       onClick={onFocus}
-      className={`relative rounded-xl border border-border bg-black overflow-hidden flex items-center justify-center select-none group cursor-pointer aspect-video w-full h-full min-h-[140px] shadow-lg transition-all ${
+      className={`relative rounded-xl border border-border bg-black overflow-hidden flex items-center justify-center select-none group cursor-pointer w-full h-full min-h-0 shadow-lg transition-all ${
         isFocused ? "ring-2 ring-primary" : "hover:border-primary/50"
       }`}
     >
@@ -270,7 +269,7 @@ export const ScreenShareTile: React.FC<ScreenShareTileProps> = ({
       </div>
 
       {/* Overlay no Hover: Assistir no Palco */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-20">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 z-20">
         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-lg transform group-hover:scale-110 transition-transform">
           <Maximize2 className="w-5 h-5" />
         </div>

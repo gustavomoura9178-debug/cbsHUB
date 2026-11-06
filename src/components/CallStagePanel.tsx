@@ -1,3 +1,5 @@
+import { useElementSize } from "../hooks/useElementSize";
+import { callGrid } from "../lib/callGrid";
 import { useShallow } from "zustand/react/shallow";
 import { useMediaOutput } from "../hooks/useMediaOutput";
 import React, { useRef, useState, useEffect } from "react";
@@ -20,12 +22,14 @@ import {
 import { useHubStore } from "../store/useHubStore";
 import { webrtcEngine } from "../lib/webrtcEngine";
 import { UserCallCard, ScreenShareTile } from "./UserCallCard";
-import { CallControlDock } from "./CallControlDock";
+import { CallControls } from "./CallControls";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipTrigger, TooltipContent } from "./ui/tooltip";
 import type { Participant } from "../types/cbshub";
 
 export const CallStagePanel: React.FC = () => {
+  const gridBounds = useElementSize();
+
   const {
     inVoiceCall,
     callStageMode,
@@ -120,6 +124,26 @@ export const CallStagePanel: React.FC = () => {
       spotlightVideoRef.current.play().catch(() => {});
     }
   }, [focusedItem?.stream, callStageMode]);
+
+  useEffect(() => {
+    const state = useHubStore.getState();
+    const key = state.focusedPeerStreamKey;
+    const id = key?.startsWith("screen-") ? key.slice(7) : null;
+    const valid =
+      id &&
+      (state.participants[id]?.isLocal
+        ? state.localScreenStream
+        : state.remoteStreams[id]?.screen);
+    const expected = valid ? id : focusedItem?.participant.peerId;
+    if (state.callStageMode === "spotlight" && expected)
+      webrtcEngine.observeScreenTelemetry(expected);
+    if (
+      state.callStageMode === "spotlight" &&
+      state.telemetry.active &&
+      state.telemetry.sourcePeerId !== expected
+    )
+      state.setTelemetry({ active: false });
+  }, [focusedPeerStreamKey, focusedItem?.participant.peerId]);
 
   // Redimensionamento arrastando a borda inferior
   const handleResizeMouseDown = (e: React.MouseEvent) => {
@@ -315,53 +339,69 @@ export const CallStagePanel: React.FC = () => {
           />
 
           {/* HUD de Telemetria no Topo Esquerdo */}
-          {showHud && telemetry.active && (
-            <div className="absolute top-3 left-3 z-20 backdrop-blur-md bg-black/80 border border-border rounded-xl px-3 py-2 shadow-2xl text-xs space-y-1">
-              <div className="flex items-center gap-2 border-b border-border pb-1 mb-1">
-                <span className="w-2 h-2 rounded-full bg-success animate-ping" />
-                <span className="font-extrabold text-white uppercase text-caption tracking-wider">
-                  {isLocal
-                    ? "Sua Transmissão Local"
-                    : `Tela de ${focusedItem.participant.nickname}`}
-                </span>
-                <span className="text-micro px-1.5 py-0.2 bg-primary/20 text-primary-foreground rounded font-mono font-bold">
-                  Ao vivo
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 text-foreground font-mono text-caption">
-                <span className="font-semibold text-white">
-                  {telemetry.resolution}
-                </span>
-                <span className="text-zinc-600">•</span>
-                <span className="text-success font-bold">
-                  {telemetry.fps} FPS
-                </span>
-                <span className="text-zinc-600">•</span>
-                <span className="text-primary font-bold">
-                  {telemetry.bitrateMbps} Mbps
-                </span>
-                <span className="text-zinc-600">•</span>
-                <span className="text-warning font-bold">
-                  {telemetry.rttMs} ms
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between text-2xs text-muted-foreground pt-0.5">
-                <span className="flex items-center gap-1">
-                  <Activity className="w-3 h-3 text-success" />
-                  <span className="font-semibold uppercase text-micro">
-                    {telemetry.abrStatus === "optimal"
-                      ? "Qualidade estável"
-                      : telemetry.abrStatus === "throttled"
-                        ? "Qualidade ajustada"
-                        : "Recuperando qualidade"}
+          {showHud &&
+            telemetry.active &&
+            telemetry.sourcePeerId === focusedItem.participant.peerId && (
+              <div
+                data-stream-metrics={telemetry.sourcePeerId}
+                className="absolute top-3 left-3 z-20 backdrop-blur-md bg-black/80 border border-border rounded-xl px-3 py-2 shadow-2xl text-xs space-y-1"
+              >
+                <div className="flex items-center gap-2 border-b border-border pb-1 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-success animate-ping" />
+                  <span className="font-extrabold text-white uppercase text-caption tracking-wider">
+                    {isLocal
+                      ? "Sua Transmissão Local"
+                      : `Tela de ${focusedItem.participant.nickname}`}
                   </span>
-                </span>
-                <span>Perda: {telemetry.packetsLostPercent}%</span>
+                  <span className="text-micro px-1.5 py-0.2 bg-primary/20 text-primary-foreground rounded font-mono font-bold">
+                    Ao vivo
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 text-foreground font-mono text-caption">
+                  <span className="font-semibold text-white">
+                    {telemetry.resolution}
+                  </span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-success font-bold">
+                    {telemetry.fps > 0
+                      ? `${telemetry.fps} FPS`
+                      : "FPS indisponível"}
+                  </span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-primary font-bold">
+                    {telemetry.bitrateMeasured
+                      ? `${telemetry.bitrateMbps} Mbps`
+                      : "Bitrate indisponível"}
+                  </span>
+                  <span className="text-zinc-600">•</span>
+                  <span className="text-warning font-bold">
+                    {telemetry.rttMs > 0
+                      ? `${telemetry.rttMs} ms (enlace)`
+                      : "RTT indisponível"}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-2xs text-muted-foreground pt-0.5">
+                  <span className="flex items-center gap-1">
+                    <Activity className="w-3 h-3 text-success" />
+                    <span className="font-semibold uppercase text-micro">
+                      {telemetry.abrStatus === "optimal"
+                        ? "Qualidade estável"
+                        : telemetry.abrStatus === "throttled"
+                          ? "Qualidade ajustada"
+                          : "Recuperando qualidade"}
+                    </span>
+                  </span>
+                  <span>
+                    Perda:{" "}
+                    {telemetry.lossMeasured
+                      ? telemetry.packetsLostPercent + "%"
+                      : "indisponível"}
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Botões do Topo Direito */}
           <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
@@ -440,7 +480,7 @@ export const CallStagePanel: React.FC = () => {
           </div>
 
           <div className="pl-2 shrink-0">
-            <CallControlDock />
+            <CallControls />
           </div>
         </div>
 
@@ -458,14 +498,7 @@ export const CallStagePanel: React.FC = () => {
   /* ========================================================================= */
   const totalTiles = participantsInVoice.length + screenSharers.length;
 
-  const getGridColsClass = () => {
-    if (totalTiles <= 1) return "grid-cols-1 max-w-xl";
-    if (totalTiles === 2) return "grid-cols-1 sm:grid-cols-2 max-w-4xl";
-    if (totalTiles <= 4) return "grid-cols-1 sm:grid-cols-2 max-w-4xl";
-    if (totalTiles <= 6)
-      return "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-6xl";
-    return "grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 max-w-6xl";
-  };
+  const geometry = callGrid(gridBounds.width, gridBounds.height, totalTiles);
 
   return (
     <div
@@ -493,7 +526,11 @@ export const CallStagePanel: React.FC = () => {
             aria-pressed={expanded}
             onClick={() => setExpanded(!expanded)}
           >
-            {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+            {expanded ? (
+              <Minimize2 className="size-3.5" />
+            ) : (
+              <Maximize2 className="size-3.5" />
+            )}
           </Button>
           <Button
             size="icon-sm"
@@ -508,9 +545,18 @@ export const CallStagePanel: React.FC = () => {
         </div>
       </div>
       {/* Grade de Cards Responsiva */}
-      <div className="flex-1 overflow-y-auto p-4 flex items-center justify-center">
+      <div
+        ref={gridBounds.ref}
+        className="call-grid-area min-h-0 flex-1 overflow-auto p-3"
+      >
         <div
-          className={`grid gap-3 w-full mx-auto items-center justify-center ${getGridColsClass()}`}
+          className="call-responsive-grid grid gap-3 mx-auto"
+          style={{
+            gridTemplateColumns: `repeat(${geometry.columns},minmax(0,1fr))`,
+            gridAutoRows: `${geometry.height}px`,
+            width:
+              geometry.width * geometry.columns + 12 * (geometry.columns - 1),
+          }}
         >
           {/* Tiles de Transmissão de Tela */}
           {screenSharers.map(({ participant, stream, key }) => (
@@ -535,7 +581,7 @@ export const CallStagePanel: React.FC = () => {
       {/* Dock de Controles Centralizada na Base */}
       <div className="pb-3 flex items-center justify-center pointer-events-none">
         <div className="pointer-events-auto">
-          <CallControlDock />
+          <CallControls />
         </div>
       </div>
 

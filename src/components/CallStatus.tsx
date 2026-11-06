@@ -62,12 +62,12 @@ export function CallQualityBadge({ peerId }: { peerId: string }) {
   return (
     <span
       className={`rounded-md bg-overlay px-2 py-1 text-micro ${quality && bad ? "text-warning" : "text-white"}`}
-      title="Qualidade da conexão de voz; amostragem a cada 2 segundos"
+      title="Qualidade observada deste enlace de voz entre vocês; não mede a internet do participante. Amostragem a cada 2 segundos"
     >
       {!quality
-        ? "Qualidade: aguardando"
+        ? "Enlace: aguardando"
         : quality.state !== "connected"
-          ? "Voz: reconectando"
+          ? "Enlace: reconectando"
           : `${quality.rttMs === null ? "RTT indisponível" : quality.rttMs + " ms"} · ${quality.loss === null ? "perda indisponível" : quality.loss + "% perda"}`}
     </span>
   );

@@ -34,6 +34,11 @@ export interface DesktopSourceItem {
 }
 
 export interface StreamTelemetry {
+  sourcePeerId?:string;
+  observedLinkPeerId?:string;
+  direction?:"outgoing"|"incoming";
+  lossMeasured?:boolean;
+  bitrateMeasured?:boolean;
   active: boolean;
   resolution: string;
   fps: number;
@@ -100,6 +105,7 @@ export interface SoundboardClip {
   name: string;
   emoji: string;
   isBuiltIn: boolean; // true = som sintetizado/embutido; false = arquivo importado pelo usuário
+  originalAudioBlob?:Blob;
   audioBlob?: Blob; // Armazenado no IndexedDB para clipes customizados (.mp3, .wav, .ogg)
   synthPreset?:
     | "airhorn"
@@ -162,6 +168,7 @@ export type SignalingPacket =
     };
 
 export interface CbsHubElectronAPI {
+  getDesktopState:()=>Promise<{trayAvailable:boolean;hidden:boolean}>;
   getWindowState: () => Promise<{isMaximized:boolean}>;
   onWindowStateChanged: (listener:(state:{isMaximized:boolean})=>void) => ()=>void;
   getDesktopSources: () => Promise<DesktopSourceItem[]>;

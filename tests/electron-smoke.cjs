@@ -3,6 +3,6 @@ const {_electron}=require('playwright');const assert=require('node:assert/strict
 await page.evaluate(()=>{const script=document.createElement('script');script.textContent='window.__cspExecuted=true';document.head.appendChild(script);});
 assert.equal(await page.evaluate(()=>window.__cspExecuted),undefined);
 await page.getByRole('button',{name:'Entrar na voz',exact:true}).click();
-await page.getByRole('button',{name:'Desligar voz e manter conversa',exact:true}).waitFor();
-await page.getByRole('button',{name:'Desligar voz e manter conversa',exact:true}).click();
+await page.getByRole('button',{name:'Desconectar voz',exact:true}).waitFor();
+await page.getByRole('button',{name:'Desconectar voz',exact:true}).click();
 assert.equal(await page.evaluate(()=>typeof window.require),'undefined');assert.equal(await page.evaluate(()=>window.cbsHubAPI.setCaptureSource('invalid-source',true)),false);await page.reload();await page.waitForFunction(()=>typeof window.cbsHubAPI?.getDesktopSources==='function');assert.equal(await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].webContents.getLastWebPreferences().sandbox),true);console.log('PASS Electron production + reload, sandboxed preload, invalid capture denied');}finally{await app?.close();fs.rmSync(profile,{recursive:true,force:true});}})().catch(e=>{console.error(e);process.exitCode=1;});

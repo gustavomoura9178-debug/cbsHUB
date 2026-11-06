@@ -1,4 +1,4 @@
-import {OfficialLogo} from "./OfficialLogo";
+import { OfficialLogo } from "./OfficialLogo";
 import {
   AudioLines,
   Palette,
@@ -8,6 +8,7 @@ import {
   PanelLeftOpen,
   Settings2,
   UsersRound,
+  Plus,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
@@ -90,6 +91,28 @@ export function WorkspaceRail({
         </TooltipTrigger>
         <TooltipContent side="right">Membros da sala</TooltipContent>
       </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rail-button"
+            aria-label="Adicionar ou entrar em sala"
+            onClick={() => {
+              if (!sidebarOpen) onToggleSidebar();
+              window.setTimeout(
+                () => document.getElementById("join-room")?.focus(),
+                0,
+              );
+            }}
+          >
+            <Plus className="size-5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          Adicionar ou entrar em sala
+        </TooltipContent>
+      </Tooltip>
       <div className="flex-1" />
       <Button
         variant="ghost"
@@ -123,8 +146,8 @@ export function WorkspaceRail({
             variant="ghost"
             size="icon"
             className="rail-button"
-            aria-label="Soundboard rápido"
-            title="Soundboard"
+            aria-label="Efeitos Sonoros rápidos"
+            title="Efeitos Sonoros"
           >
             <AudioLines className="size-5" />
           </Button>

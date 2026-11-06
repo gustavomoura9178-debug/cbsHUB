@@ -101,7 +101,32 @@ const preset = (
   colors: { ...DEFAULT_THEME.colors, ...colors },
 });
 export const PRESETS: Theme[] = [
-  preset("Clássico", {background:'#090909',sidebar:'#111111',messages:'#090909',editor:'#191919',button:'#757575',buttonText:'#ffffff',accent:'#bdbdbd',border:'#282828',hover:'#242424',focus:'#cccccc'}, {layout:{...DEFAULT_THEME.layout,sidebarWidth:240,membersOpen:false,density:0.85,radius:4,spacing:0.85,shadow:0}}),
+  preset(
+    "Clássico",
+    {
+      background: "#090909",
+      sidebar: "#111111",
+      messages: "#090909",
+      editor: "#191919",
+      button: "#757575",
+      buttonText: "#ffffff",
+      accent: "#bdbdbd",
+      border: "#282828",
+      hover: "#242424",
+      focus: "#cccccc",
+    },
+    {
+      layout: {
+        ...DEFAULT_THEME.layout,
+        sidebarWidth: 240,
+        membersOpen: false,
+        density: 0.85,
+        radius: 4,
+        spacing: 0.85,
+        shadow: 0,
+      },
+    },
+  ),
   structuredClone(DEFAULT_THEME),
   preset(
     "Light Modern",
@@ -161,6 +186,45 @@ export const PRESETS: Theme[] = [
     hover: "#342647",
     focus: "#e6c5ff",
   }),
+  preset(
+    "Sakura Dream",
+    {
+      background: "#fff8f3",
+      sidebar: "#fadce8",
+      messages: "#fff8f3",
+      editor: "#fffdfb",
+      button: "#f5a9c5",
+      buttonText: "#55445a",
+      text: "#55445a",
+      muted: "#705567",
+      accent: "#873f6c",
+      border: "#c59eb1",
+      hover: "#eadcf7",
+      focus: "#873f6c",
+    },
+    {
+      mode: "light",
+      layout: { ...DEFAULT_THEME.layout, radius: 18, shadow: 0.1 },
+    },
+  ),
+  preset(
+    "Velvet Nocturne",
+    {
+      background: "#171318",
+      sidebar: "#251d24",
+      messages: "#171318",
+      editor: "#30232c",
+      button: "#b99a62",
+      buttonText: "#171318",
+      text: "#e8dcc7",
+      muted: "#baa9a8",
+      accent: "#d8b675",
+      border: "#745762",
+      hover: "#482631",
+      focus: "#d8b675",
+    },
+    { layout: { ...DEFAULT_THEME.layout, radius: 8, shadow: 0.18 } },
+  ),
   preset("Custom", {}),
 ];
 function object(

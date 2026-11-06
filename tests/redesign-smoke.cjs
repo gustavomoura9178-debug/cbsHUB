@@ -78,7 +78,13 @@ const assert = require("node:assert/strict");
     await composer.fill("Regressão visual");
     await composer.press("Shift+Enter");
     await composer.press("Enter");
-    await p.getByText("Regressão visual", { exact: true }).waitFor();
+    await p
+      .getByRole("log", { name: "Mensagens da sala" })
+      .getByText("Regressão visual", { exact: true })
+      .waitFor();
+    await p.waitForFunction(
+      () => document.getElementById("message-composer").value === "",
+    );
     await p.screenshot({
       path: "/workspace/cbshub-onboarding/redesign-desktop.png",
     });

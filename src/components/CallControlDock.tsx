@@ -462,12 +462,12 @@ export const CallControlDock: React.FC = () => {
         trigger={
           <Button
             variant="secondary"
-            aria-label="Soundboard da chamada"
-            title="Soundboard"
+            aria-label="Efeitos Sonoros da chamada"
+            title="Efeitos Sonoros"
             className="h-10 px-3 rounded-lg border border-border/60"
           >
             <Volume2 className="size-4 text-primary" />
-            <span className="sr-only">Soundboard</span>
+            <span className="sr-only">Efeitos Sonoros</span>
           </Button>
         }
       />

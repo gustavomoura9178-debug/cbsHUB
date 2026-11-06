@@ -71,6 +71,9 @@ const assert = require("node:assert/strict");
       .getByRole("button", { name: "Reduzir painel", exact: true })
       .waitFor();
     await page
+      .getByRole("button", { name: "Dispositivos e opções", exact: true })
+      .click();
+    await page
       .getByRole("button", { name: "Ligar câmera", exact: true })
       .click();
     await page.waitForFunction(() => s.getState().isWebcamActive);
@@ -125,7 +128,7 @@ const assert = require("node:assert/strict");
     );
     await page.evaluate(() => m.setState({ error: null }));
     await page
-      .getByRole("button", { name: "Soundboard da chamada", exact: true })
+      .getByRole("button", { name: "Efeitos Sonoros da chamada", exact: true })
       .click();
     const favorite = page.getByRole("button", {
       name: "Favoritar Buzina de Estádio",

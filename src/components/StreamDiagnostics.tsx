@@ -5,7 +5,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 export function StreamDiagnostics() {
   const telemetry = useHubStore((state) => state.telemetry);
-  const active = telemetry.active;
+  const participants = useHubStore((s) => s.participants);
+  const active = telemetry.active && !!telemetry.sourcePeerId;
+  const source = telemetry.sourcePeerId
+    ? participants[telemetry.sourcePeerId]
+    : undefined;
+  const link = telemetry.observedLinkPeerId
+    ? participants[telemetry.observedLinkPeerId]
+    : undefined;
   const metrics = [
     {
       label: "Quadros",
@@ -62,9 +69,27 @@ export function StreamDiagnostics() {
         </dl>
         {active && (
           <div className="flex justify-between gap-3 text-caption text-muted-foreground pb-3">
-            <span>{telemetry.bitrateMbps} Mbps</span>
-            <span>Perda {telemetry.packetsLostPercent}%</span>
+            <span>
+              {telemetry.bitrateMeasured
+                ? telemetry.bitrateMbps + " Mbps"
+                : "Bitrate indisponível"}
+            </span>
+            <span>
+              Perda{" "}
+              {telemetry.lossMeasured
+                ? telemetry.packetsLostPercent + "%"
+                : "indisponível"}
+            </span>
           </div>
+        )}
+        {active && (
+          <p className="text-xs text-muted-foreground">
+            {telemetry.direction === "outgoing"
+              ? "Saída local"
+              : "Recepção de " + (source?.nickname || "participante")}
+            {link ? " · enlace com " + link.nickname : ""}. RTT mede este
+            enlace, não a internet do participante.
+          </p>
         )}
         <p className="text-caption text-muted-foreground leading-relaxed">
           {active

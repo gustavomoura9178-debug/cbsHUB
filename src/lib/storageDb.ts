@@ -295,6 +295,7 @@ class StorageDb {
   /* ========================================================================= */
 
   public async saveSoundboardClip(clip: SoundboardClip): Promise<void> {
+    if(clip.originalAudioBlob&&clip.originalAudioBlob.size>MAX_CLIP_SIZE_BYTES)throw Error("Original excede 5 MB.");
     if (clip.audioBlob && clip.audioBlob.size > MAX_CLIP_SIZE_BYTES) {
       throw new Error(`Arquivo de áudio muito grande (${(clip.audioBlob.size / (1024 * 1024)).toFixed(1)}MB). O limite é de 5MB.`);
     }

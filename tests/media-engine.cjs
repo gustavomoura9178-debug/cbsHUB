@@ -91,6 +91,7 @@ const assert = require("node:assert/strict");
       e.localPeer = {
         id: local.peerId,
         destroyed: false,
+        open: true,
         disconnected: false,
         call: (peer, stream, options) =>
           makeCall(options.metadata.channel, stream),
