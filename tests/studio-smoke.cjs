@@ -26,7 +26,8 @@ const fs = require("node:fs/promises");
         .isVisible()
     )
       await p
-        .getByRole("button", { name: "Editar temas", exact: true })
+        .getByRole("tablist", { name: "Seções das configurações" })
+        .getByRole("tab", { name: "Aparência", exact: true })
         .click();
     else
       await p
