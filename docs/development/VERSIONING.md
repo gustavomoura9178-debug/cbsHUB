@@ -16,3 +16,6 @@ DESKTOP-004 identifica o candidato de revisão **2.0.0-rc.3**, com package.json/
 HOTFIX-005 identifica o candidato de revisão **2.0.0-rc.4**. Package e entrada raiz do lock mudam apenas o identificador, sem resolver/atualizar dependências. Nenhuma promoção automática para estável, merge ou publicação de instalador. A denominação de produto 3.0 não altera esta política.
 
 HOTFIX-006 identifica o candidato **2.0.0-rc.5** para não reutilizar rc.4 com conteúdo novo. Nenhuma dependência ou lock de resolução mudou; somente versão raiz. Distribuição estável continua sujeita aos gates manuais/revisão.
+
+
+DESKTOP-007 identifica o candidato **2.0.0-rc.6**. Package e raiz do lock concordam sem atualização de dependências. Pacote Linux gerado para verificação; não representa instalador Windows validado nem promoção a release estável.

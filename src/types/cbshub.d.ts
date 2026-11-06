@@ -173,7 +173,15 @@ export type SignalingPacket =
       soundName: string;
     };
 
+export interface NativeNotice {
+  id: string;
+  kind: "message" | "call";
+  title: string;
+  body: string;
+}
 export interface CbsHubElectronAPI {
+  notifyNative: (notice: NativeNotice) => Promise<boolean>;
+  onNotificationActivated: (listener: (id: string) => void) => () => void;
   updateTrayState: (state: {
     inVoiceCall: boolean;
     reconnecting: boolean;

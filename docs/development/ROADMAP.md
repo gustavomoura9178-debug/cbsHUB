@@ -98,3 +98,10 @@ Após SECURITY-002, revisar BACKEND_PROPOSAL antes de implementar contas e infra
 5. Só então decidir release estável/assinatura/distribuição com revisão e autorização. Backend/contas/ACL/sincronização exigem aprovação da proposta e infraestrutura; não são dependência oculta deste hotfix nem suporte já entregue.
 
 HOTFIX-006 / rc.5 substitui rc.4 como candidato de revisão. Lacunas de interface descritas em HOTFIX_ACCEPTANCE.md corrigidas e verificadas. Próximo gate permanece a matriz física/Windows e revisão dos commits; backend e novas funcionalidades não foram iniciados. A aprovação da implementação não aprova transporte real nem release estável.
+
+
+## Próximos passos após DESKTOP-007
+1. Revisar rc.6 e integrar apenas após aprovação do mantenedor.
+2. Em instalação Windows, validar toasts de mensagem/voz e botão Atender, foco/segundo plano, expiração e mudança de sala; depende de ambiente Windows com notificações habilitadas.
+3. Reproduzir o problema de efeitos com arquivo original e duas máquinas; verificar áudio nos dois sentidos, memória e reconexão. Depende de mídia física/rede de teste autorizada com ICE disponível.
+4. Somente após os gates anteriores avaliar promoção de release. Inicialização com Windows continua fora desta entrega.

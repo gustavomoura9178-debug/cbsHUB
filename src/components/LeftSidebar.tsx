@@ -132,7 +132,7 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
   const favoriteRooms = rooms.filter((room) => favorites.includes(room));
   const recentRoomList = rooms.filter((room) => !favorites.includes(room));
   const join = async (room: string) => {
-    if (!room.trim()) return;
+    if (!room.trim() || room === roomId) return;
     await webrtcEngine.joinRoom(room);
     setSlug("");
     onNavigate?.();

@@ -89,7 +89,7 @@ export function RoomTopBar({ membersOpen, onToggleMembers }: Props) {
         </p>
       </div>
       <div className="room-actions">
-        <StreamDiagnostics />
+
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

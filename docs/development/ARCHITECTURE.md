@@ -108,3 +108,7 @@ BackgroundNotice isola a confirmação única de execução em segundo plano; ma
 
 ## HOTFIX-006 — apresentação — 06/11/2026 UTC
 Preferências locais de identidade em src/chat/viewState.ts usam JSON v1 aditivo com dois booleanos; não mudam banco/protocolo nem identidade do autor. MessageRow aplica avatar opcional no modo confortável e cor HEX com contraste >=4,5 contra fundo de mensagens, com fallback de tema. LocalConnectionBadge consome sinalização/presença locais; quality[peerId] permanece medição remota do enlace. Spotlight reutiliza useElementSize/callGrid; CallControls compact abre o dock existente via Popover. Logo usa keyframes distintos com janela comum totalmente revelada de 46% a 60% em 2,6 s (364 ms). Sem alteração do motor, IPC, backend, formato de temas ou assets.
+
+
+## Incremento DESKTOP-007 — rc.6
+Notificação renderer → preload notifyNative → IPC cbs:notify com allowedSender/schema → Electron Notification. Ativação retorna apenas ID, consumido uma vez após revalidar sessão/sala/participante. Identificação de voz é por presença na sala; sem novo backend. Efeitos são decodificados em AudioContext separado e enviados pelo mixer existente, com orçamento de cache/concorrência. O transporte e a arquitetura P2P permanecem. Ver DESKTOP_NATIVE.md.

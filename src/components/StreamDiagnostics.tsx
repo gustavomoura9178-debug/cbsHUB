@@ -34,16 +34,11 @@ export function StreamDiagnostics() {
           <PopoverTrigger asChild>
             <Button
               variant="ghost"
-              size="sm"
-              className="diagnostics-trigger"
+              size="icon-sm"
+              className="native-window-button no-drag"
               aria-label="Diagnóstico da transmissão"
             >
               <Activity className="size-4" />
-              <span>
-                {active && telemetry.rttMs > 0
-                  ? `${telemetry.rttMs} ms`
-                  : "Conexão"}
-              </span>
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>

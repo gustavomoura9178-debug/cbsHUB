@@ -1,3 +1,4 @@
+import { StreamDiagnostics } from "./StreamDiagnostics";
 import { OfficialLogo } from "./OfficialLogo";
 import React, { useState, useEffect } from "react";
 import { Minus, Square, X, Pin, Radio, SlidersHorizontal } from "lucide-react";
@@ -68,6 +69,7 @@ export const TitleBar: React.FC = () => {
         </span>
       </div>
       <div className="flex items-center gap-1 no-drag">
+        <StreamDiagnostics />
         <Tooltip>
           <TooltipTrigger asChild>
             <button

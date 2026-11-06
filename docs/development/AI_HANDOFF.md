@@ -1,3 +1,5 @@
+> Estado atual: **DESKTOP-007 · 2.0.0-rc.6 · 06/11/2026 (America/Sao_Paulo)**. Leia [DESKTOP_NATIVE.md](DESKTOP_NATIVE.md). Build, 35 testes e pacote/smoke Linux aprovados; um teste bloqueado por ICE. Registros abaixo são históricos; validações Windows e duas máquinas continuam pendentes.
+
 > Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
 
 > Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
@@ -225,3 +227,7 @@ Branch fix/hotfix-acceptance-gaps-2026-11-06, base 16afa14 (PR #13 já integrado
 EXECUTADO: build/tsc PASSED; suíte 33 scripts, 32 PASSED/1 BLOCKED por ICE (exit 1); zero falhas restantes. Teste integrado adicional dos controles compactos PASSED. Pacote e smoke Linux rc.5 PASSED. Evidências em hotfix-006-results.json. Windows, audição bidirecional em dispositivos físicos após queda e revisão assistiva não executados. Sem produção aprovada ou merge automático.
 
 Outra IA: preservar cbshub-message-identity-v1 (dois booleanos, versão 1), fallback de contraste dos nomes, LocalConnectionBadge independente do booleano global reconnecting, callGrid no spotlight e CallControls compact. Não voltar a dimensões fixas nas miniaturas ou animation-delay global da parte inferior, que encurta a pausa compartilhada. Ler os limites ambientais e o roteiro manual em HOTFIX_ACCEPTANCE.md. Não tentar contornar a política administrada WebRtcIPHandling.
+
+
+## Passagem DESKTOP-007 — 06/11/2026 — Codex/OpenAI
+Branch `fix/native-notifications-call-stability-2026-11-06`, base 1a9d3e9, conteúdo 4361de2 (áudio), 05ff793 (notificações/sala) e 1573a6f (interface/regressões). Ler DESKTOP_NATIVE.md e desktop-007-results.json antes de continuar. Reserva liberada; envio autorizado pelo usuário, sem merge em main. Próxima tarefa: matriz Windows instalada (toasts, Atender, foco/segundo plano, convite expirado/troca de sala) e reprodução da queda com arquivo original em dois dispositivos. Não contornar a política ICE. Splash de 5 s e controles sempre visíveis substituem explicitamente as decisões antigas de splash sem atraso/dock recolhível. Novo preload expõe 12 métodos fechados. Preservar limites de áudio, callback único e guardas de sala/geração/bloqueio. Não declarar a causa original da queda definitivamente resolvida sem reprodução.

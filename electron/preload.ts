@@ -2,6 +2,15 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopSourceItem, CbsHubElectronAPI } from "../src/types/cbshub";
 
 const api: CbsHubElectronAPI = {
+  notifyNative: (notice) => ipcRenderer.invoke("cbs:notify", notice),
+  onNotificationActivated: (listener) => {
+    const handler = (_event: Electron.IpcRendererEvent, id: unknown) => {
+      if (typeof id === "string" && id.length <= 120) listener(id);
+    };
+    ipcRenderer.on("cbs:notification-activated", handler);
+    return () =>
+      ipcRenderer.removeListener("cbs:notification-activated", handler);
+  },
   updateTrayState: (state) =>
     ipcRenderer.send("cbs:tray-state", {
       inVoiceCall: state.inVoiceCall,

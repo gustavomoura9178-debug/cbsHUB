@@ -1,3 +1,4 @@
+import { validateNotice, callToastXml } from "./notifications";
 import { BackgroundNotice } from "./background";
 import {
   trustedRenderer,
@@ -17,6 +18,7 @@ import {
   Menu,
   nativeImage,
   dialog,
+  Notification,
 } from "electron";
 import path from "node:path";
 import fs from "node:fs";
@@ -107,6 +109,7 @@ function refreshTrayMenu() {
     ]),
   );
 }
+app.setAppUserModelId("com.will.cbshub");
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 function restoreWindow() {
@@ -258,6 +261,62 @@ function createWindow(): void {
     mainWindow = null;
   });
 }
+
+const notices = new Map<string, Notification>();
+const seenNotices = new Set<string>();
+let lastNotice = 0;
+ipcMain.handle("cbs:notify", (event, input: unknown) => {
+  if (!allowedSender(event)) return false;
+  const request = validateNotice(input);
+  if (!request || !Notification.isSupported() || seenNotices.has(request.id))
+    return false;
+  seenNotices.add(request.id);
+  if (seenNotices.size > 200)
+    seenNotices.delete(seenNotices.values().next().value!);
+  if (
+    request.kind === "message" &&
+    mainWindow?.isFocused() &&
+    mainWindow.isVisible()
+  )
+    return false;
+  if (Date.now() - lastNotice < 1000) return false;
+  lastNotice = Date.now();
+  while (notices.size >= 10) {
+    const key = notices.keys().next().value!;
+    notices.get(key)?.close();
+    notices.delete(key);
+  }
+  const notice = new Notification({
+    title: request.title,
+    body: request.body,
+    ...(request.kind === "call" && process.platform === "win32"
+      ? { toastXml: callToastXml(request.title, request.body) }
+      : {}),
+    ...(request.kind === "call" && process.platform === "darwin"
+      ? { actions: [{ type: "button" as const, text: "Atender" }] }
+      : {}),
+  });
+  notices.set(request.id, notice);
+  let activated = false;
+  const accept = () => {
+    if (activated || !notices.has(request.id)) return;
+    activated = true;
+    restoreWindow();
+    mainWindow?.webContents.send("cbs:notification-activated", request.id);
+    notice.close();
+    notices.delete(request.id);
+  };
+  notice.on("click", accept);
+  notice.on("action", accept);
+  notice.on("close", () => notices.delete(request.id));
+  notice.on("failed", () => notices.delete(request.id));
+  setTimeout(() => {
+    notice.close();
+    notices.delete(request.id);
+  }, 30000).unref();
+  notice.show();
+  return true;
+});
 
 ipcMain.on("cbs:tray-state", (event, state: unknown) => {
   if (!allowedSender(event) || !state || typeof state !== "object") return;

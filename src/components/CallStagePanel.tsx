@@ -500,10 +500,9 @@ export const CallStagePanel: React.FC = () => {
               ))}
             </div>
           </div>
-
-          <div className="pl-2 shrink-0">
-            <CallControls compact />
-          </div>
+        </div>
+        <div className="flex justify-center shrink-0">
+          <CallControls />
         </div>
 
         {/* Handle de Redimensionamento */}
