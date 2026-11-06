@@ -20,20 +20,24 @@ export function ConnectionScreen() {
   const signaling = useMediaState((s) => s.signaling),
     reconnecting = useMediaState((s) => s.reconnecting),
     attempt = useMediaState((s) => s.recoveryAttempt),
-    quality = useMediaState((s) => s.quality);
+    quality = useMediaState((s) => s.quality),
+    phase = useMediaState((s) => s.recoveryPhase);
   const inVoice = useHubStore((s) => s.inVoiceCall),
     connected = useHubStore((s) => s.isConnected);
   const wasConnected = useRef(false),
     [blocked, setBlocked] = useState(false);
   if (signaling === "online" || connected) wasConnected.current = true;
+  const localOutage = useRef(false);
+  if (!reconnecting) localOutage.current = false;
+  else if (!connected && (signaling === "offline" || signaling === "failed"))
+    localOutage.current = true;
   const usableVoice = Object.values(quality).some(
-    (q) => q.state === "connected",
+    (q) => q.state === "connected" && q.flowing !== false,
   );
   const impaired =
     wasConnected.current &&
-    !connected &&
-    signaling !== "online" &&
-    signaling !== "idle" &&
+    ((!connected && signaling !== "online" && signaling !== "idle") ||
+      (localOutage.current && (phase === "media" || phase === "discovery"))) &&
     reconnecting &&
     !usableVoice;
   useEffect(() => {
@@ -53,7 +57,14 @@ export function ConnectionScreen() {
     >
       <AnimatedLogo />
       <h2>Reconectando...</h2>
-      <p>Sinalização indisponível · tentativa {attempt} de 8</p>
+      <p>
+        {phase === "media"
+          ? "Aguardando confirmação de mídia"
+          : phase === "discovery"
+            ? "Redescobrindo participantes"
+            : "Recuperando sinalização"}{" "}
+        · tentativa {attempt} de 8
+      </p>
       <p className="text-xs text-muted-foreground">
         Os estados de microfone e áudio foram preservados.
       </p>

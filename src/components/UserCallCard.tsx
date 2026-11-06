@@ -79,7 +79,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
       }`}
     >
       {!isLocal && (
-        <div className="absolute top-2 left-2 z-10">
+        <div className="call-card-quality absolute top-2 left-2 z-10">
           <CallQualityBadge peerId={participant.peerId} />
         </div>
       )}
@@ -117,7 +117,7 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({
 
       {/* 3. Rodapé Inferior: Nickname (Esquerda) e Badges de Mídia (Direita) */}
       <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-1 pointer-events-none z-10">
-        <div className="bg-overlay backdrop-blur-md px-2 py-0.5 rounded-md border border-border text-white text-caption font-medium flex items-center gap-1 truncate max-w-[70%]">
+        <div className="call-card-name bg-overlay backdrop-blur-md px-2 py-0.5 rounded-md border border-border text-white text-caption font-medium flex items-center gap-1 truncate max-w-[70%]">
           <span className="truncate">{participant.nickname}</span>
           {isLocal && (
             <span className="text-micro font-mono text-muted-foreground shrink-0">
