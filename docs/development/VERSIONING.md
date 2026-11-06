@@ -12,3 +12,5 @@ SECURITY-002 identifica o próximo candidato como **2.0.0-rc.2**. rc.1 permanece
 
 
 DESKTOP-004 identifica o candidato de revisão **2.0.0-rc.3**, com package.json/raiz do lock consistentes e nenhuma mudança de dependências. A direção de produto “3.0” não equivale a uma release 3.0.0 validada. Nenhum artefato anterior é promovido como estável; distribuição depende dos gates físicos e de revisão.
+
+HOTFIX-005 identifica o candidato de revisão **2.0.0-rc.4**. Package e entrada raiz do lock mudam apenas o identificador, sem resolver/atualizar dependências. Nenhuma promoção automática para estável, merge ou publicação de instalador. A denominação de produto 3.0 não altera esta política.

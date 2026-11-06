@@ -1,3 +1,5 @@
+> Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
+
 > Atualização atual: **2.0.0-rc.2 / SECURITY-002**. Leia [SECURITY_UPDATE.md](SECURITY_UPDATE.md). Estados anteriores são históricos.
 
 > Estado atual em 05/11/2026: candidato **2.0.0-rc.1**, estabilização STABILIZE-001. Consulte [STABILIZATION.md](STABILIZATION.md). As seções anteriores abaixo são históricas.
@@ -201,3 +203,13 @@ Para outra IA: ler DESKTOP_REFINEMENT.md antes de editar. Studio.begin e Profile
 
 ## Publicação para revisão — DESKTOP-004 — 05/11/2026
 Codex/OpenAI · feat/desktop-refinement-2026-11-05 · entrega rc.3 até dbd7a27. Branch enviada com sucesso ao GitHub conforme o item de disponibilização para revisão do pedido. Main conferida em 29e60c1 e preservada, sem alterações simultâneas encontradas; nenhum merge, force push, tag de release ou publicação de instalador. Este é o registro documental posterior. Checkout estava limpo antes do push. Testes anteriores permanecem 26 PASSED/1 BLOCKED (27 scripts), build/audit zero/pacote Linux verificados; nenhuma reexecução necessária para este registro documental. Pendências físicas/backend/notificações continuam em DESKTOP_REFINEMENT.md.
+
+## HOTFIX-005 — passagem — 06/11/2026 UTC — Codex/OpenAI
+
+Branch hotfix/stability-desktop-2026-11-05, base b8983d6; commits de conteúdo e573b61, be773a3, 6194b4a, df71b48, f489dd3 e 3ad21b0. Ler HOTFIX_STABILITY.md antes de editar; substitui o estado rc.3 como candidato atual rc.4. Preferências/bancos e paths oficiais preservados. API preload tem dez métodos; tray-state aceita somente inVoiceCall/reconnecting booleanos do renderer principal. Aviso da bandeja é local em userData/desktop-notice.json. Fechar não destrói janela/captura; sem tray, minimiza.
+
+Não concluir recuperação em peer.open: confirmar diretório e novos pacotes RTP. Novos campos recoveryPhase/recoveryMissingMedia/quality.flowing não significam certificação de audição. Preservar limites e generation/identity guards. A tela completa acompanha interrupção local persistente; falha isolada de outro participante fica nos indicadores. Perfil/Aparência ficam montados para conservar draft; não recolocar Escape direto em App, pois ignoraria a proteção de descarte. Ajustar testes pela aba Aparência, sem botão legado Editar temas. trimStartSec/trimEndSec são aditivos e referem-se ao originalAudioBlob, não ao arquivo já cortado. Parar renderer antes de empacotar e reiniciá-lo após editar motor, evitando contaminação de testes por HMR.
+
+Próxima IA: executar a matriz física de rede/Windows antes de propor release. Backend continua somente proposta; identidade e remoção de salas locais/P2P, sem reserva global, DM/anexos/GIFs nem notificações do SO. Não iniciar novas features antes da revisão deste hotfix. Resultados exatos e tentativas anteriores em HOTFIX_STABILITY.md e ACTIVITY_LOG.md.
+
+Resultado final EXECUTADO — HOTFIX-005: build/tsc PASSED; suíte 31 scripts, 30 PASSED/1 BLOCKED (media-transport sem candidatos ICE locais), nenhuma falha restante; exit 1 é o bloqueio. Resumo em hotfix-005-results.json. npm audit --omit=dev: zero vulnerabilidades reportadas. Pacote Linux rc.4 e smoke do executável passaram. Renderer foi parado antes de empacotar. Windows, audição real em dois dispositivos após queda, captura física e revisão assistiva permanecem manuais. Nenhuma aprovação de produção ou publicação de binário.

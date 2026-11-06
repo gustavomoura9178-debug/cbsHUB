@@ -1,3 +1,5 @@
+> Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
+
 # Problemas conhecidos
 
 Data: 05/11/2026 (America/Sao_Paulo). Responsável: Codex/OpenAI.
@@ -107,3 +109,11 @@ Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px
 Corrigidos: espera de Peer.open/reconstrução travada, identidade local antes do ID remoto, cards fixos, editores encadeados, nome que sobrevivia ao Cancelar, defaults fictícios FPS/RTT e atribuição errada de snapshot de tela/foco. Telemetria de recepção acompanha foco e ignora resultados antigos; ABR por todos os pares ainda não foi implementado.
 
 BLOCKED permanece media-transport sem ICE; sem validação física de reconexão, áudio/vídeo/suspensão ou Windows/Tray. Headless usa minimizar como fallback de bandeja e não comprova clique nativo. Backend/ACL/DM/anexos/sync global e notificações de mensagens do SO continuam ausentes. Corte de waveform refere-se a arquivos importados; sintetizadores mantêm metadados e reprodução. Não há benchmark físico CPU/GPU/memória. Persistem avisos do bundler e limitações anteriores de armazenamento/EXIF/plataformas. Relatório detalhado em DESKTOP_REFINEMENT.md.
+
+## HOTFIX-005 — limites atuais — 06/11/2026 UTC
+
+Caminhos de recuperação prematura/beacon obsoleto corrigidos no código e cobertos por testes controlados. Não declarar todas as quedas reais resolvidas: continua pendente ouvir áudio nos dois sentidos entre computadores após perda de rede, teste ICE/STUN/TURN, webcam/tela restauradas e carga com vários participantes. Chromium deste ambiente não fornece candidatos ICE locais; media-transport é BLOCKED, não PASSED.
+
+Windows: ícone/menu da bandeja, aviso inicial, captura em segundo plano e ciclo X/restaurar/encerrar exigem teste físico. Linux headless usa fallback minimizar; teste de processo não é teste da bandeja Windows. Contraste/leitor de tela, primeira pintura e dispositivos físicos permanecem na matriz manual. Bundle principal >500 kB e avisos customResolver/freeze persistem; boot-theme.js clássico é intencionalmente copiado de public, sem bundling, para rodar antes do renderer. Sem dependências novas.
+
+Arquitetura continua sem servidor autenticado/ACL global; backend próprio é proposta. Notificações do SO, DM/anexos/pastas/GIFs e garantia de durabilidade quando IndexedDB indisponível permanecem fora deste hotfix. Cards extremadamente pequenos conservam identificadores acessíveis/title, mas reduzem texto/controles visuais. Detalhes/evidências em HOTFIX_STABILITY.md.
