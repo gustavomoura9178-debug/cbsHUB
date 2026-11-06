@@ -50,7 +50,7 @@ vm.runInNewContext(preload, {
   },
   console,
 });
-assert.equal(Object.keys(api).length, 9);
+assert.equal(Object.keys(api).length, 10);
 assert(!/^\s*(import|export) /m.test(preload));
 console.log(
   "PASS desktop origins, links, capture arguments and executable CJS preload",

@@ -34,11 +34,11 @@ export interface DesktopSourceItem {
 }
 
 export interface StreamTelemetry {
-  sourcePeerId?:string;
-  observedLinkPeerId?:string;
-  direction?:"outgoing"|"incoming";
-  lossMeasured?:boolean;
-  bitrateMeasured?:boolean;
+  sourcePeerId?: string;
+  observedLinkPeerId?: string;
+  direction?: "outgoing" | "incoming";
+  lossMeasured?: boolean;
+  bitrateMeasured?: boolean;
   active: boolean;
   resolution: string;
   fps: number;
@@ -105,7 +105,9 @@ export interface SoundboardClip {
   name: string;
   emoji: string;
   isBuiltIn: boolean; // true = som sintetizado/embutido; false = arquivo importado pelo usuário
-  originalAudioBlob?:Blob;
+  originalAudioBlob?: Blob;
+  trimStartSec?: number;
+  trimEndSec?: number;
   audioBlob?: Blob; // Armazenado no IndexedDB para clipes customizados (.mp3, .wav, .ogg)
   synthPreset?:
     | "airhorn"
@@ -124,7 +126,11 @@ export interface SoundboardClip {
 
 export type SignalingPacket =
   | { type: "chat_operation"; operation: ChatOperation }
-  | { type: "chat_operations_sync"; roomId: string; operations: ChatOperation[] }
+  | {
+      type: "chat_operations_sync";
+      roomId: string;
+      operations: ChatOperation[];
+    }
   | { type: "chat_ack"; roomId: string; messageId: string }
   | { type: "profile_update"; profile: PublicProfile | null }
   // Descoberta & Presença Mesh
@@ -168,9 +174,15 @@ export type SignalingPacket =
     };
 
 export interface CbsHubElectronAPI {
-  getDesktopState:()=>Promise<{trayAvailable:boolean;hidden:boolean}>;
-  getWindowState: () => Promise<{isMaximized:boolean}>;
-  onWindowStateChanged: (listener:(state:{isMaximized:boolean})=>void) => ()=>void;
+  updateTrayState: (state: {
+    inVoiceCall: boolean;
+    reconnecting: boolean;
+  }) => void;
+  getDesktopState: () => Promise<{ trayAvailable: boolean; hidden: boolean }>;
+  getWindowState: () => Promise<{ isMaximized: boolean }>;
+  onWindowStateChanged: (
+    listener: (state: { isMaximized: boolean }) => void,
+  ) => () => void;
   getDesktopSources: () => Promise<DesktopSourceItem[]>;
   setCaptureSource: (
     sourceId: string,

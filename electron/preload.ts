@@ -2,6 +2,11 @@ import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopSourceItem, CbsHubElectronAPI } from "../src/types/cbshub";
 
 const api: CbsHubElectronAPI = {
+  updateTrayState: (state) =>
+    ipcRenderer.send("cbs:tray-state", {
+      inVoiceCall: state.inVoiceCall,
+      reconnecting: state.reconnecting,
+    }),
   getDesktopState: () => ipcRenderer.invoke("cbs:desktop-state"),
   getWindowState: () => ipcRenderer.invoke("cbs:window-state"),
   onWindowStateChanged: (listener) => {
