@@ -55,20 +55,39 @@ export function MediaNotice() {
 }
 export function CallQualityBadge({ peerId }: { peerId: string }) {
   const quality = useMediaState((s) => s.quality[peerId]);
-  const bad =
-    quality?.state !== "connected" ||
-    (quality.loss ?? 0) > 5 ||
-    (quality.rttMs ?? 0) > 300;
+  const unstable =
+    quality?.state === "connected" &&
+    ((quality.loss ?? 0) > 5 || (quality.rttMs ?? 0) > 300);
+  const status = !quality
+    ? "Aguardando enlace"
+    : quality.state === "closed"
+      ? "Desconectado"
+      : quality.state === "failed"
+        ? "Desconectado"
+        : quality.state === "disconnected"
+          ? "Reconectando"
+          : quality.state !== "connected" || quality.flowing === false
+            ? "Conectando mídia"
+            : unstable
+              ? "Instável"
+              : "Conectado";
+  const metrics =
+    quality?.state === "connected" && quality.flowing !== false
+      ? ` · ${quality.rttMs === null ? "RTT indisponível" : quality.rttMs + " ms"} · ${quality.loss === null ? "perda indisponível" : quality.loss + "% perda"}`
+      : "";
   return (
     <span
-      className={`rounded-md bg-overlay px-2 py-1 text-micro ${quality && bad ? "text-warning" : "text-white"}`}
-      title="Qualidade observada deste enlace de voz entre vocês; não mede a internet do participante. Amostragem a cada 2 segundos"
+      className={`call-quality-badge rounded-md bg-overlay px-2 py-1 text-micro ${unstable || quality?.state !== "connected" ? "text-warning" : "text-white"}`}
+      title={`${status}${metrics}. Medição observada deste enlace WebRTC, não da internet do participante.`}
+      aria-label={`${status}${metrics}`}
     >
-      {!quality
-        ? "Enlace: aguardando"
-        : quality.state !== "connected"
-          ? "Enlace: reconectando"
-          : `${quality.rttMs === null ? "RTT indisponível" : quality.rttMs + " ms"} · ${quality.loss === null ? "perda indisponível" : quality.loss + "% perda"}`}
+      <span className="quality-text">
+        {status}
+        {metrics}
+      </span>
+      <span className="quality-dot" aria-hidden="true">
+        ●
+      </span>
     </span>
   );
 }

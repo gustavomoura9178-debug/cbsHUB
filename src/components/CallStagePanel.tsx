@@ -498,7 +498,12 @@ export const CallStagePanel: React.FC = () => {
   /* ========================================================================= */
   const totalTiles = participantsInVoice.length + screenSharers.length;
 
-  const geometry = callGrid(gridBounds.width, gridBounds.height, totalTiles);
+  const geometry = callGrid(
+    gridBounds.width,
+    gridBounds.height,
+    totalTiles,
+    gridBounds.gap,
+  );
 
   return (
     <div
@@ -547,7 +552,7 @@ export const CallStagePanel: React.FC = () => {
       {/* Grade de Cards Responsiva */}
       <div
         ref={gridBounds.ref}
-        className="call-grid-area min-h-0 flex-1 overflow-auto p-3"
+        className="call-grid-area min-h-0 flex-1 overflow-hidden p-3"
       >
         <div
           className="call-responsive-grid grid gap-3 mx-auto"
@@ -555,7 +560,9 @@ export const CallStagePanel: React.FC = () => {
             gridTemplateColumns: `repeat(${geometry.columns},minmax(0,1fr))`,
             gridAutoRows: `${geometry.height}px`,
             width:
-              geometry.width * geometry.columns + 12 * (geometry.columns - 1),
+              geometry.width * geometry.columns +
+              geometry.gap * (geometry.columns - 1),
+            gap: geometry.gap,
           }}
         >
           {/* Tiles de Transmissão de Tela */}

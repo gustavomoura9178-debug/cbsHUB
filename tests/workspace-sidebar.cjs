@@ -110,6 +110,10 @@ const { chromium } = require("playwright"),
       await page
         .getByRole("button", { name: "Configurações do perfil", exact: true })
         .click();
+      await page
+        .getByRole("tablist", { name: "Seções das configurações" })
+        .getByRole("tab", { name: "Aparência", exact: true })
+        .click();
       await page.getByRole("button", { name: theme, exact: true }).click();
       await page.keyboard.press("Escape");
       for (const width of [1100, 800]) {

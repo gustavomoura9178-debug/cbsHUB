@@ -1,7 +1,7 @@
 {
   "name": "cbshub",
   "private": true,
-  "version": "2.0.0-rc.3",
+  "version": "2.0.0-rc.4",
   "description": "Ultra-quality P2P voice, webcam and screen sharing desktop hub",
   "type": "module",
   "main": "dist-electron/main.js",

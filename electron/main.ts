@@ -1,3 +1,4 @@
+import { BackgroundNotice } from "./background";
 import {
   trustedRenderer,
   externalLink,
@@ -15,6 +16,7 @@ import {
   Tray,
   Menu,
   nativeImage,
+  dialog,
 } from "electron";
 import path from "node:path";
 import fs from "node:fs";
@@ -38,6 +40,73 @@ const rendererUrl =
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
+let trayCallState = { inVoiceCall: false, reconnecting: false };
+const noticePath = () =>
+  path.join(app.getPath("userData"), "desktop-notice.json");
+let noticeAcknowledged = false;
+try {
+  noticeAcknowledged =
+    JSON.parse(fs.readFileSync(noticePath(), "utf8")).acknowledged === true;
+} catch {}
+const backgroundNotice = new BackgroundNotice(noticeAcknowledged);
+function hideToBackground() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!tray || tray.isDestroyed()) {
+    mainWindow.minimize();
+    return;
+  }
+  const win = mainWindow;
+  void backgroundNotice.request(
+    () =>
+      dialog.showMessageBox(win, {
+        type: "info",
+        title: "cbsHUB em segundo plano",
+        message: "O cbsHUB continuará na bandeja.",
+        detail:
+          "Chamadas, microfone e mensagens continuam ativos. Use Abrir para voltar ou Encerrar cbsHUB no menu da bandeja para sair.",
+        buttons: ["Entendi"],
+        noLink: true,
+      }),
+    () => {
+      if (!win.isDestroyed()) win.hide();
+    },
+    () => quitting,
+    () => {
+      fs.mkdirSync(app.getPath("userData"), { recursive: true });
+      const temporary = noticePath() + ".tmp";
+      fs.writeFileSync(temporary, JSON.stringify({ acknowledged: true }));
+      fs.renameSync(temporary, noticePath());
+    },
+  );
+}
+function refreshTrayMenu() {
+  if (!tray || tray.isDestroyed()) return;
+  const status = trayCallState.reconnecting
+    ? "Reconectando à sala"
+    : trayCallState.inVoiceCall
+      ? "Em chamada"
+      : "Disponível";
+  tray.setToolTip("cbsHUB — " + status);
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: "Abrir cbsHUB", click: restoreWindow },
+      {
+        label: mainWindow?.isVisible() ? "Ocultar janela" : "Mostrar janela",
+        click: () =>
+          mainWindow?.isVisible() ? hideToBackground() : restoreWindow(),
+      },
+      { label: status, enabled: false },
+      { type: "separator" },
+      {
+        label: "Encerrar cbsHUB",
+        click: () => {
+          quitting = true;
+          app.quit();
+        },
+      },
+    ]),
+  );
+}
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 function restoreWindow() {
@@ -50,6 +119,7 @@ function restoreWindow() {
   mainWindow.focus();
 }
 function createTray() {
+  if (tray && !tray.isDestroyed()) return;
   if (app.commandLine.getSwitchValue("ozone-platform") === "headless") {
     console.warn(
       "[Desktop] Sem display para bandeja; fechar minimizará a janela.",
@@ -65,20 +135,7 @@ function createTray() {
     const icon = nativeImage.createFromPath(iconPath);
     if (icon.isEmpty()) throw Error("Ícone de bandeja indisponível");
     tray = new Tray(icon);
-    tray.setToolTip("cbsHUB — ativo em segundo plano");
-    tray.setContextMenu(
-      Menu.buildFromTemplate([
-        { label: "Abrir cbsHUB", click: restoreWindow },
-        { type: "separator" },
-        {
-          label: "Encerrar cbsHUB",
-          click: () => {
-            quitting = true;
-            app.quit();
-          },
-        },
-      ]),
-    );
+    refreshTrayMenu();
     tray.on("click", restoreWindow);
     tray.on("double-click", restoreWindow);
   } catch (error) {
@@ -193,13 +250,27 @@ function createWindow(): void {
   mainWindow.on("close", (event) => {
     if (quitting) return;
     event.preventDefault();
-    if (tray && !tray.isDestroyed()) mainWindow?.hide();
-    else mainWindow?.minimize();
+    hideToBackground();
   });
+  mainWindow.on("show", refreshTrayMenu);
+  mainWindow.on("hide", refreshTrayMenu);
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
 }
+
+ipcMain.on("cbs:tray-state", (event, state: unknown) => {
+  if (!allowedSender(event) || !state || typeof state !== "object") return;
+  const x = state as Record<string, unknown>;
+  if (
+    Object.keys(x).some((k) => !["inVoiceCall", "reconnecting"].includes(k)) ||
+    typeof x.inVoiceCall !== "boolean" ||
+    typeof x.reconnecting !== "boolean"
+  )
+    return;
+  trayCallState = { inVoiceCall: x.inVoiceCall, reconnecting: x.reconnecting };
+  refreshTrayMenu();
+});
 
 ipcMain.handle("cbs:desktop-state", (event) => {
   if (!allowedSender(event)) throw Error("Origem IPC não autorizada.");

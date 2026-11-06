@@ -19,6 +19,7 @@ export function AddSoundDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const [range, setRange] = useState({ start: 0, end: 0 });
   const [file, setFile] = useState<File | null>(null),
     [edited, setEdited] = useState<Blob | null>(null),
     [duration, setDuration] = useState(0),
@@ -63,6 +64,8 @@ export function AddSoundDialog({
         audioBlob: edited,
         originalAudioBlob: file,
         durationSec: duration,
+        trimStartSec: range.start,
+        trimEndSec: range.end,
       });
       await webrtcEngine.loadSoundboardClips();
       onOpenChange(false);
@@ -107,7 +110,9 @@ export function AddSoundDialog({
           <>
             <AudioTrimEditor
               source={file}
-              onApply={(blob, seconds) => {
+              onPendingChange={() => setEdited(null)}
+              onApply={(blob, seconds, start, end) => {
+                setRange({ start, end });
                 setEdited(blob);
                 setDuration(seconds);
               }}

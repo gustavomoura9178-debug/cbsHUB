@@ -1,3 +1,4 @@
+import { useMediaState } from "./lib/mediaState";
 import { BootSplash, ConnectionScreen } from "./components/ConnectionScreen";
 import { usePushToTalk } from "./hooks/usePushToTalk";
 import { useShallow } from "zustand/react/shallow";
@@ -33,6 +34,14 @@ import { ProfileDialog } from "./profiles/ProfileDialog";
 
 export const App: React.FC = () => {
   usePushToTalk();
+  const trayInVoice = useHubStore((s) => s.inVoiceCall),
+    trayReconnecting = useMediaState((s) => s.reconnecting);
+  useEffect(() => {
+    window.cbsHubAPI?.updateTrayState?.({
+      inVoiceCall: trayInVoice,
+      reconnecting: trayReconnecting,
+    });
+  }, [trayInVoice, trayReconnecting]);
   const [booting, setBooting] = useState(true);
   const {
     isSettingsOpen,
@@ -101,10 +110,6 @@ export const App: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (isSettingsOpen) {
-          setIsSettingsOpen(false);
-          window.dispatchEvent(new Event("cbshub-settings-dismissed"));
-        }
         if (isScreenPickerOpen) setIsScreenPickerOpen(false);
       }
     };

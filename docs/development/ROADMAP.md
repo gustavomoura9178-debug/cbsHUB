@@ -88,3 +88,11 @@ Após SECURITY-002, revisar BACKEND_PROPOSAL antes de implementar contas e infra
 3. Windows/Tray/ícones/janelas/instalação, acessibilidade com leitor de tela e carga prolongada. Depende de plataforma/medição; não inferir aprovação de headless.
 4. ABR/telemetria simultânea de todos os pares e otimização do bundle com perfis CPU/memória. Depende de baseline físico; dados sem amostra continuam indisponíveis.
 5. Revisar BACKEND_PROPOSAL antes de contas/ACL/salas globais/DM/anexos/sync. Planejar migração sem perder identidades/dados locais. Notificações de mensagens do SO exigem escopo/permissões/testes próprios, sem depender obrigatoriamente de backend para o caso local.
+
+## Próximos gates após HOTFIX-005 — 06/11/2026 UTC
+
+1. Revisar separadamente os commits de rede, Electron e UI do rc.4. Dependência: resultados e arquivos de HOTFIX_STABILITY.md.
+2. Validar áudio bidirecional físico após queda curta/prolongada, perda ICE e falha de sinalização, cancelamento/saída e bandeja; validar webcam/tela/efeitos simultâneos. Dependência: dois computadores/redes, sinalização e ICE/STUN/TURN disponíveis. Coletar diagnóstico por peerId.
+3. Validar bandeja/ícones/primeiro aviso/encerramento, dispositivos, janelas e acessibilidade no Windows. Dependência: desktop gráfico e artefato de teste Windows; Linux headless não aprova esse gate.
+4. Medir CPU/memória/GPU com vários participantes e revisar contraste/leitor de tela. Dependência: cenários físicos dos itens 2–3.
+5. Só então decidir release estável/assinatura/distribuição com revisão e autorização. Backend/contas/ACL/sincronização exigem aprovação da proposta e infraestrutura; não são dependência oculta deste hotfix nem suporte já entregue.

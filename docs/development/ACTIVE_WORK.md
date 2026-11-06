@@ -1,3 +1,5 @@
+> Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
+
 # Trabalho ativo e reservas
 
 Data: 05/11/2026 (America/Sao_Paulo). Responsável: Codex/OpenAI.
@@ -161,3 +163,10 @@ Codex/OpenAI · feat/desktop-refinement-2026-11-05 · base 29e60c1. PR #11 integ
 
 ## DESKTOP-004 — 05/11/2026 — concluído localmente para revisão
 Codex/OpenAI · feat/desktop-refinement-2026-11-05 · base 29e60c1 · conteúdo até f9c5513 e fechamento documental posterior. Reservas liberadas. Build/tsc/pacote Linux passaram; suíte 26 PASSED/1 BLOCKED por ICE; audit zero. Detalhes e pendências em DESKTOP_REFINEMENT.md. Disponibilizar branch para revisão conforme entrega solicitada, sem release, force push ou merge em main.
+
+## HOTFIX-005 — ativo — 05/11/2026
+Codex/OpenAI · hotfix/stability-desktop-2026-11-05 · base b8983d6 (PR #12 integrado), árvore limpa. Recuperação recovery/pre-stability-hotfix-2026-11-05. Auditar e corrigir recuperação do diretório/fluxo de mídia, estados individuais, lacunas da bandeja, cards sem overflow, rascunhos de configurações e intervalo de áudio persistido. Preservar stack, dados e SVG oficial. Rede e UI em commits distintos. Testes físicos/ICE não serão declarados sem execução.
+
+## HOTFIX-005 — concluído para revisão — 06/11/2026 UTC
+
+Codex/OpenAI · hotfix/stability-desktop-2026-11-05 · base b8983d6 · commits e573b61, be773a3, 6194b4a, df71b48, f489dd3 e 3ad21b0, seguidos do fechamento documental rc.4. Reservas desta sessão liberadas. Build/tsc, 30 testes e pacote/smoke Linux passaram; media-transport BLOCKED por ICE. Pendências físicas e tentativas anteriores em HOTFIX_STABILITY.md/ACTIVITY_LOG.md. Main preservada; disponibilizar branch para revisão, sem merge/release automática.

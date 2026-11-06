@@ -1,3 +1,4 @@
+import { useSettingsDrafts } from "../lib/settingsDrafts";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   Download,
@@ -137,6 +138,11 @@ export function StudioDialog({ embedded = false }: { embedded?: boolean }) {
   const t = studio.theme;
   const [nameDraft, setNameDraft] = useState(t.name);
   useEffect(() => setNameDraft(t.name), [t.name, studio.open]);
+  useEffect(() => {
+    if (!embedded) return;
+    useSettingsDrafts.setState({ theme: studio.dirty || nameDraft !== t.name });
+    return () => useSettingsDrafts.setState({ theme: false });
+  }, [embedded, studio.dirty, nameDraft, t.name]);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);

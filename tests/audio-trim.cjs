@@ -125,7 +125,24 @@ function wav() {
       .getByRole("button", { name: "Editar Meu recorte", exact: true })
       .click();
     await page.getByRole("spinbutton", { name: "Início do corte" }).waitFor();
+    assert.equal(
+      await page
+        .getByRole("spinbutton", { name: "Início do corte" })
+        .inputValue(),
+      "0.2",
+    );
+    assert.equal(
+      await page.getByRole("spinbutton", { name: "Fim do corte" }).inputValue(),
+      "0.6",
+    );
+    await page.getByRole("spinbutton", { name: "Início do corte" }).fill("0");
     await page.getByRole("spinbutton", { name: "Fim do corte" }).fill(".2");
+    assert.equal(
+      await page
+        .getByRole("button", { name: "Salvar som", exact: true })
+        .isEnabled(),
+      false,
+    );
     await page
       .getByRole("button", { name: "Aplicar corte", exact: true })
       .click();
