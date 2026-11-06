@@ -1,3 +1,4 @@
+import { decodeEditableAudio } from "./audioTrim";
 import type { SoundboardClip } from "../types/cbshub";
 import { useHubStore } from "../store/useHubStore";
 import { storageDb } from "./storageDb";
@@ -93,6 +94,8 @@ interface ActiveSoundHandle {
 class SoundboardEngine {
   private localCtx: AudioContext | null = null;
   private playbackGeneration = 0;
+  private pendingPlayback = 0;
+  private pendingDecodes = 0;
   private monitorGains = new Map<AudioContext, GainNode>();
   constructor() {
     useHubStore.subscribe((state, previous) => {
@@ -130,7 +133,9 @@ class SoundboardEngine {
   }
 
   private bufferCache: Map<string, AudioBuffer> = new Map();
-  public invalidateClip(id:string){this.bufferCache.delete(id);}
+  public invalidateClip(id: string) {
+    this.bufferCache.delete(id);
+  }
   private activeHandles: Set<ActiveSoundHandle> = new Set();
   private pipelineInputGetter: (() => GainNode | null) | null = null;
   private pipelineContextGetter: (() => AudioContext | null) | null = null;
@@ -238,41 +243,53 @@ class SoundboardEngine {
     clip: SoundboardClip,
     previewOnly = false,
   ): Promise<void> {
-    const ctx = this.getAudioContext();
-    const state = useHubStore.getState();
-    const soundboardMasterVolume = state.soundboardVolume ?? 0.85;
-    const clipVolume = clip.volume ?? 0.85;
-    const finalVolume = Math.max(
-      0,
-      Math.min(2.0, clipVolume * soundboardMasterVolume),
-    );
+    if (this.pendingPlayback >= 2 || this.activeHandles.size >= 8)
+      throw new Error("Aguarde os efeitos atuais terminarem.");
+    this.pendingPlayback++;
+    try {
+      const ctx = this.getAudioContext();
+      const state = useHubStore.getState();
+      const soundboardMasterVolume = state.soundboardVolume ?? 0.85;
+      const clipVolume = Number.isFinite(clip.volume) ? clip.volume! : 0.85;
+      const finalVolume = Math.max(
+        0,
+        Math.min(2.0, clipVolume * soundboardMasterVolume),
+      );
 
-    // Nó de ganho mestre para esta instância do clipe
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(finalVolume, ctx.currentTime);
+      // Nó de ganho mestre para esta instância do clipe
+      const masterGain = ctx.createGain();
+      masterGain.gain.setValueAtTime(finalVolume, ctx.currentTime);
 
-    // 1. Roteamento Local (respeitando isDeafened)
-    masterGain.connect(this.localMonitor(ctx));
+      // 1. Roteamento Local (respeitando isDeafened)
+      masterGain.connect(this.localMonitor(ctx));
 
-    // 2. Roteamento WebRTC (caso esteja em call de voz e o nó de soundboard exista)
-    const pipelineNode = this.pipelineInputGetter
-      ? this.pipelineInputGetter()
-      : null;
-    if (!previewOnly && state.inVoiceCall && pipelineNode) {
-      try {
-        masterGain.connect(pipelineNode);
-      } catch (err) {
-        console.warn(
-          "[SoundboardEngine] Não foi possível conectar ao pipeline WebRTC:",
-          err,
-        );
+      // 2. Roteamento WebRTC (caso esteja em call de voz e o nó de soundboard exista)
+      const pipelineNode = this.pipelineInputGetter
+        ? this.pipelineInputGetter()
+        : null;
+      if (!previewOnly && state.inVoiceCall && pipelineNode) {
+        try {
+          masterGain.connect(pipelineNode);
+        } catch (err) {
+          console.warn(
+            "[SoundboardEngine] Não foi possível conectar ao pipeline WebRTC:",
+            err,
+          );
+        }
       }
-    }
 
-    if (clip.audioBlob) {
-      await this.playAudioBlobOnNode(clip.audioBlob, clip.id, ctx, masterGain);
-    } else if (clip.synthPreset) {
-      this.playSynthPresetOnNode(clip.synthPreset, ctx, masterGain);
+      if (clip.audioBlob) {
+        await this.playAudioBlobOnNode(
+          clip.audioBlob,
+          clip.id,
+          ctx,
+          masterGain,
+        );
+      } else if (clip.synthPreset) {
+        this.playSynthPresetOnNode(clip.synthPreset, ctx, masterGain);
+      }
+    } finally {
+      this.pendingPlayback--;
     }
   }
 
@@ -310,8 +327,31 @@ class SoundboardEngine {
       let buffer = this.bufferCache.get(cacheKey);
 
       if (!buffer) {
-        const arrayBuffer = await blob.arrayBuffer();
-        buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+        // Decode in an isolated context with metadata/size limits, never in the live voice context.
+        if (this.pendingDecodes >= 2)
+          throw new Error("Aguarde a preparação dos efeitos.");
+        this.pendingDecodes++;
+        try {
+          buffer = await decodeEditableAudio(blob);
+        } finally {
+          this.pendingDecodes--;
+        }
+        const bytes = buffer.length * buffer.numberOfChannels * 4;
+        if (bytes > 48 * 1024 * 1024)
+          throw new Error("Áudio decodificado excede 48 MB.");
+        let cachedBytes = [...this.bufferCache.values()].reduce(
+          (sum, b) => sum + b.length * b.numberOfChannels * 4,
+          0,
+        );
+        while (
+          this.bufferCache.size &&
+          cachedBytes + bytes > 64 * 1024 * 1024
+        ) {
+          const key = this.bufferCache.keys().next().value!;
+          const old = this.bufferCache.get(key)!;
+          cachedBytes -= old.length * old.numberOfChannels * 4;
+          this.bufferCache.delete(key);
+        }
         // Guarda no cache em memória
         if (cacheKey && !cacheKey.startsWith("preview-")) {
           if (this.bufferCache.size >= 24)
