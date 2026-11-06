@@ -1,3 +1,4 @@
+import { createAudioPeakGuard, safeAudioGain } from "./audioPeakGuard";
 import { decodeEditableAudio } from "./audioTrim";
 import type { SoundboardClip } from "../types/cbshub";
 import { useHubStore } from "../store/useHubStore";
@@ -124,7 +125,9 @@ class SoundboardEngine {
     let gain = this.monitorGains.get(ctx);
     if (!gain) {
       gain = ctx.createGain();
-      gain.connect(ctx.destination);
+      const peakGuard = createAudioPeakGuard(ctx);
+      gain.connect(peakGuard);
+      peakGuard.connect(ctx.destination);
       gain.gain.value = useHubStore.getState().isDeafened ? 0 : 1;
       this.monitorGains.set(ctx, gain);
       this.setOutput(ctx, useHubStore.getState().audioConfig.outputDeviceId);
@@ -249,7 +252,10 @@ class SoundboardEngine {
     try {
       const ctx = this.getAudioContext();
       const state = useHubStore.getState();
-      const soundboardMasterVolume = state.soundboardVolume ?? 0.85;
+      const soundboardMasterVolume = safeAudioGain(
+        state.soundboardVolume ?? 0.85,
+        0.85,
+      );
       const clipVolume = Number.isFinite(clip.volume) ? clip.volume! : 0.85;
       const finalVolume = Math.max(
         0,
@@ -300,7 +306,7 @@ class SoundboardEngine {
     const ctx = this.getAudioContext();
     const masterGain = ctx.createGain();
     masterGain.gain.setValueAtTime(
-      Math.max(0, Math.min(1.5, volume)),
+      safeAudioGain(volume, 0.85, 1.5),
       ctx.currentTime,
     );
     masterGain.connect(this.localMonitor(ctx));
