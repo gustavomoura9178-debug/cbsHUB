@@ -214,9 +214,6 @@ const { chromium } = require("playwright"),
       measurements[0].cards[0].height < measurements[1].cards[0].height,
       "spotlight cards must grow with stage height",
     );
-    await p
-      .getByRole("button", { name: "Dispositivos e opções", exact: true })
-      .click();
     const mutedBefore = await p.evaluate(() => s.getState().isMuted);
     await p
       .getByRole("button", {

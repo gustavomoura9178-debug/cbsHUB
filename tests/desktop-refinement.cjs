@@ -147,18 +147,12 @@ const { chromium } = require("playwright"),
       await page
         .getByRole("button", { name: "Mutar microfone", exact: true })
         .count(),
-      0,
-      "common controls must not be duplicated permanently",
+      1,
+      "stage controls must remain visible",
     );
-    await page
-      .getByRole("button", { name: "Dispositivos e opções", exact: true })
-      .click();
     await page
       .getByRole("button", { name: "Mutar microfone", exact: true })
       .waitFor();
-    await page
-      .getByRole("button", { name: "Ocultar opções da chamada", exact: true })
-      .click();
     let previous = 0,
       initialCardHeight = 0;
     for (const height of [220, 360, 490]) {

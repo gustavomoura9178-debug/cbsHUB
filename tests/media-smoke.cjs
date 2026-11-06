@@ -71,9 +71,6 @@ const assert = require("node:assert/strict");
       .getByRole("button", { name: "Reduzir painel", exact: true })
       .waitFor();
     await page
-      .getByRole("button", { name: "Dispositivos e opções", exact: true })
-      .click();
-    await page
       .getByRole("button", { name: "Ligar câmera", exact: true })
       .click();
     await page.waitForFunction(() => s.getState().isWebcamActive);

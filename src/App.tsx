@@ -75,22 +75,24 @@ export const App: React.FC = () => {
 
   // 1. Inicialização do microfone e da sala executada apenas UMA VEZ no mount
   useEffect(() => {
-    if (localStorage.getItem("cbshub-room-removed-active") === "1" && !roomId) {
-      setBooting(false);
-      return;
-    }
     let active = true;
-    const initialRoom = roomId || "cbs-irmandade";
-    webrtcEngine
-      .joinRoom(initialRoom, false)
-      .catch((err) => {
-        console.warn("[App] Erro ao conectar na sala inicial:", err);
-      })
-      .finally(() => {
-        if (active) setBooting(false);
-      });
+    let timer: ReturnType<typeof setTimeout>;
+    const minimum = new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, 5000);
+    });
+    const removed =
+      localStorage.getItem("cbshub-room-removed-active") === "1" && !roomId;
+    const startup = removed
+      ? Promise.resolve()
+      : webrtcEngine
+          .joinRoom(roomId || "cbs-irmandade", false)
+          .catch((err) => console.warn("[App] Inicialização", err));
+    void Promise.all([startup, minimum]).then(() => {
+      if (active) setBooting(false);
+    });
     return () => {
       active = false;
+      clearTimeout(timer);
       webrtcEngine.leaveRoom();
     };
   }, []); // Array de dependências vazio estrito
@@ -125,6 +127,13 @@ export const App: React.FC = () => {
     setIsScreenPickerOpen,
   ]);
 
+  if (booting)
+    return (
+      <TooltipProvider>
+        <TitleBar />
+        <BootSplash />
+      </TooltipProvider>
+    );
   return (
     <TooltipProvider delayDuration={150}>
       <div className="workspace-root">
