@@ -12,6 +12,14 @@
 
 # Changelog
 
+## UI-009 — refinamento de temas, botões e menus (rc.7, sem mudança de versão)
+
+- **Temas** (exceto Clássico, que não mudou): Sakura Dream com texto e botão mais escuros (contraste do botão 4,8 → 5,9) e barra lateral mais suave; Velvet Nocturne com vinho/dourado menos saturados; OLED Black com barra lateral e hover visíveis sobre o preto; Gamer Neon e Moderno Roxo com hover e bordas mais equilibrados. Todos os pares de texto continuam acima de 4,5:1. Fundo e botão do Moderno Roxo e o fundo do Light Modern foram mantidos porque os testes os fixam.
+- **Botões:** transições específicas, estado pressionado, realce interno discreto só nos temas modernos, variante `success`/`destructive` com texto legível (novos tokens `--success-foreground` e ajuste de `--destructive-foreground`; antes era branco sobre fundo claro).
+- **Menus e popovers:** sombra segue o controle de sombra do tema, menus longos rolam em vez de serem cortados, margem de colisão com a borda da janela, estado pressionado nos itens.
+- **Switch, Input, Tabs:** trilho com contorno visível quando desligado, polegar com contraste, hover e foco com borda de destaque.
+- **Não validado aqui:** build e testes Playwright (sem dependências instaladas neste ambiente). Verificados apenas sintaxe TS e contraste dos presets. Revisar visualmente cada tema antes de integrar.
+
 ## Não lançado — 05/11/2026
 
 Responsável: Codex/OpenAI. Branch `audit/cbshub-v2-2026-11-05`.

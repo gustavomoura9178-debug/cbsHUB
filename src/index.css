@@ -21,8 +21,9 @@
   --accent: hsl(220 13% 21%);
   --accent-foreground: var(--foreground);
   --destructive: hsl(354 78% 67%);
-  --destructive-foreground: hsl(0 0% 100%);
+  --destructive-foreground: hsl(354 60% 9%);
   --success: hsl(163 62% 65%);
+  --success-foreground: hsl(166 40% 9%);
   --warning: hsl(38 86% 67%);
   --border: hsl(220 12% 21%);
   --input: hsl(220 12% 25%);
@@ -59,6 +60,7 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-border: var(--border);
   --color-input: var(--input);
@@ -507,7 +509,7 @@ html[data-studio-motion="reduced"] *, html[data-studio-motion="reduced"] *::befo
 .studio-embedded h3 { font-size:var(--text-sm);font-weight:600; }
 .settings-window .profile-editor-grid { grid-template-columns:minmax(0,1.1fr) minmax(230px,1fr); }
 [data-theme-preset="velvet"] :is(.room-title,.navigation-heading h1,.settings-window h2,.studio-heading h3) { font-family:var(--title-font);letter-spacing:.02em; }
-[data-theme-preset="velvet"] .workspace-sidebar { border-color:var(--studio-highlight); }
+[data-theme-preset="velvet"] .workspace-sidebar { border-color:color-mix(in srgb,var(--studio-highlight) 38%,var(--border)); }
 [data-theme-preset="sakura"] .workspace-mark { background:var(--accent); }
 [data-theme-preset="sakura"] .navigation-heading { background:radial-gradient(ellipse at top right,color-mix(in srgb,var(--studio-highlight) 9%,transparent),transparent 75%); }
 @media(max-width:800px){.studio-embedded .studio-body,.settings-window .profile-editor-grid {grid-template-columns:1fr;}.studio-embedded .studio-editor{padding:12px 0;}.studio-presets{grid-template-columns:repeat(2,minmax(0,1fr));}.studio-embedded .studio-preview-column{border-left:0;}}
@@ -529,3 +531,15 @@ html[data-studio-motion="reduced"] *, html[data-studio-motion="reduced"] *::befo
 
 .call-spotlight-footer { height:clamp(2.75rem,30cqh,6rem); }
 .call-spotlight-area { gap:calc(var(--space-panel) * .4); }
+
+/* Refinamento de interação: hover, pressionado e foco mais claros.
+   O Clássico (data-workspace-style="classic") mantém o visual compacto e chapado. */
+.chat-reactions button { transition:border-color var(--duration-ui),background-color var(--duration-ui); }
+.chat-reactions button:hover { border-color:var(--primary); background:color-mix(in srgb,var(--primary) 12%,var(--card)); }
+.studio-preset { transition:border-color var(--duration-ui),background-color var(--duration-ui); }
+.studio-preset:hover { background:color-mix(in srgb,var(--accent) 45%,transparent); }
+[data-workspace-style="modern"] .room-item[data-active="true"] { box-shadow:inset 2px 0 0 var(--primary); }
+[data-workspace-style="modern"] .chat-composer:focus-within { box-shadow:var(--elevation-panel),0 0 0 3px color-mix(in srgb,var(--primary) 14%,transparent); }
+[data-workspace-style="modern"] [role="menu"] [role="menuitem"],
+[data-workspace-style="modern"] [role="menu"] [role="menuitemcheckbox"],
+[data-workspace-style="modern"] [role="menu"] [role="menuitemradio"] { min-height:1.875rem; }

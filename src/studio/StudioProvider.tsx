@@ -222,7 +222,13 @@ export function StudioProvider({ children }: { children: ReactNode }) {
             : "#6eddbd",
       "--warning": theme.mode === "light" ? "#7a4d18" : "#f0bd68",
       "--destructive": theme.mode === "light" ? "#9f254c" : "#f1788a",
-      "--destructive-foreground": "#ffffff",
+      "--destructive-foreground": theme.mode === "light" ? "#ffffff" : "#2b0b12",
+      "--success-foreground":
+        theme.name === "Velvet Nocturne"
+          ? "#171318"
+          : theme.mode === "light"
+            ? "#ffffff"
+            : "#0b1f19",
       "--title-font":
         theme.name === "Velvet Nocturne"
           ? 'Georgia, "Times New Roman", serif'
