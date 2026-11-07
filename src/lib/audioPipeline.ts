@@ -1,4 +1,6 @@
-import type { AudioProcessingConfig } from '../types/cbshub';
+import { createAudioPeakGuard, safeAudioGain } from "./audioPeakGuard";
+import { callEvent } from "./callDiagnostics";
+import type { AudioProcessingConfig } from "../types/cbshub";
 
 const NOISE_GATE_WORKLET_CODE = `
 class KrispLikeNoiseGateProcessor extends AudioWorkletProcessor {
@@ -6,7 +8,7 @@ class KrispLikeNoiseGateProcessor extends AudioWorkletProcessor {
     super();
     this.enabled = true;
     this.currentGain = 1.0;
-    this.sampleRate = 48000;
+    this.sampleRate = sampleRate;
     this.openThresholdDb = -36.0;
     this.closeThresholdDb = -42.0;
     this.isOpen = false;
@@ -27,12 +29,12 @@ class KrispLikeNoiseGateProcessor extends AudioWorkletProcessor {
     const output = outputs[0];
     if (!input || input.length === 0) return true;
 
-    const channelCount = input.length;
+    const channelCount = Math.min(input.length, output.length);
     const frameLength = input[0].length;
 
     if (!this.enabled) {
       for (let ch = 0; ch < channelCount; ch++) {
-        output[ch].set(input[ch]);
+        for (let i = 0; i < frameLength; i++) output[ch][i] = Number.isFinite(input[ch][i]) ? input[ch][i] : 0;
       }
       return true;
     }
@@ -40,7 +42,7 @@ class KrispLikeNoiseGateProcessor extends AudioWorkletProcessor {
     let sumSquares = 0;
     const primaryChannel = input[0];
     for (let i = 0; i < frameLength; i++) {
-      const sample = primaryChannel[i];
+      const sample = Number.isFinite(primaryChannel[i]) ? primaryChannel[i] : 0;
       sumSquares += sample * sample;
     }
     const rms = Math.sqrt(sumSquares / frameLength);
@@ -64,7 +66,7 @@ class KrispLikeNoiseGateProcessor extends AudioWorkletProcessor {
       this.currentGain = targetGain + coef * (this.currentGain - targetGain);
 
       for (let ch = 0; ch < channelCount; ch++) {
-        output[ch][i] = input[ch][i] * this.currentGain;
+        output[ch][i] = (Number.isFinite(input[ch][i]) ? input[ch][i] : 0) * this.currentGain;
       }
     }
 
@@ -85,6 +87,7 @@ export class VoiceAudioPipeline {
   private highPassFilter: BiquadFilterNode | null = null;
   private lowPassFilter: BiquadFilterNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
+  private outputPeakGuard: WaveShaperNode | null = null;
   private compressorNode: DynamicsCompressorNode | null = null;
   private gainNode: GainNode | null = null;
   private analyserNode: AnalyserNode | null = null;
@@ -97,7 +100,11 @@ export class VoiceAudioPipeline {
   private isDestroyed = false;
   private isMicMuted = false;
 
-  constructor(stream: MediaStream, config: AudioProcessingConfig, onSpeakingChange?: SpeakingCallback) {
+  constructor(
+    stream: MediaStream,
+    config: AudioProcessingConfig,
+    onSpeakingChange?: SpeakingCallback,
+  ) {
     this.rawStream = stream;
     this.config = { ...config };
     if (onSpeakingChange) {
@@ -106,10 +113,16 @@ export class VoiceAudioPipeline {
   }
 
   public async initialize(): Promise<MediaStream> {
-    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    this.audioCtx = new AudioCtx({ sampleRate: 48000, latencyHint: 'interactive' });
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
+    this.audioCtx = new AudioCtx({
+      sampleRate: 48000,
+      latencyHint: "interactive",
+    });
 
-    if (this.audioCtx.state === 'suspended') {
+    if (this.audioCtx.state === "suspended") {
       await this.audioCtx.resume();
     }
 
@@ -117,32 +130,53 @@ export class VoiceAudioPipeline {
 
     // Biquad High-Pass Filter @ 80Hz, Q=0.707 (Corta ruído de mesa / coolers)
     this.highPassFilter = this.audioCtx.createBiquadFilter();
-    this.highPassFilter.type = 'highpass';
-    this.highPassFilter.frequency.setValueAtTime(this.config.highPassFilter80Hz ? 80 : 10, this.audioCtx.currentTime);
+    this.highPassFilter.type = "highpass";
+    this.highPassFilter.frequency.setValueAtTime(
+      this.config.highPassFilter80Hz ? 80 : 10,
+      this.audioCtx.currentTime,
+    );
     this.highPassFilter.Q.setValueAtTime(0.707, this.audioCtx.currentTime);
 
     // Biquad Low-Pass Filter @ 14000Hz (Corta chiado agudo elétrico)
     this.lowPassFilter = this.audioCtx.createBiquadFilter();
-    this.lowPassFilter.type = 'lowpass';
-    this.lowPassFilter.frequency.setValueAtTime(14000, this.audioCtx.currentTime);
+    this.lowPassFilter.type = "lowpass";
+    this.lowPassFilter.frequency.setValueAtTime(
+      14000,
+      this.audioCtx.currentTime,
+    );
 
     // Injeção do AudioWorkletProcessor KrispLikeNoiseGate via Blob URL
     try {
-      const blob = new Blob([NOISE_GATE_WORKLET_CODE], { type: 'application/javascript' });
+      const blob = new Blob([NOISE_GATE_WORKLET_CODE], {
+        type: "application/javascript",
+      });
       const blobUrl = URL.createObjectURL(blob);
-      await this.audioCtx.audioWorklet.addModule(blobUrl);
-      URL.revokeObjectURL(blobUrl);
+      try {
+        await this.audioCtx.audioWorklet.addModule(blobUrl);
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
 
-      this.workletNode = new AudioWorkletNode(this.audioCtx, 'krisp-like-noise-gate');
-      this.workletNode.port.postMessage({ enabled: this.config.neuralNoiseGate });
-    } catch {
+      this.workletNode = new AudioWorkletNode(
+        this.audioCtx,
+        "krisp-like-noise-gate",
+      );
+      this.workletNode.port.postMessage({
+        enabled: this.config.neuralNoiseGate,
+      });
+    } catch (error) {
       // Fallback sem falhar o stream caso Worklet não seja suportado
+      callEvent("audio_processor_error");
+      console.warn("[Audio] Noise gate unavailable", error);
       this.workletNode = null;
     }
 
     // Compressor vocal dinâmico
     this.compressorNode = this.audioCtx.createDynamicsCompressor();
-    this.compressorNode.threshold.setValueAtTime(-18, this.audioCtx.currentTime);
+    this.compressorNode.threshold.setValueAtTime(
+      -18,
+      this.audioCtx.currentTime,
+    );
     this.compressorNode.knee.setValueAtTime(12, this.audioCtx.currentTime);
     this.compressorNode.ratio.setValueAtTime(4, this.audioCtx.currentTime);
     this.compressorNode.attack.setValueAtTime(0.003, this.audioCtx.currentTime);
@@ -150,7 +184,10 @@ export class VoiceAudioPipeline {
 
     // Ganho do microfone (micGain)
     this.gainNode = this.audioCtx.createGain();
-    this.gainNode.gain.setValueAtTime(this.config.micGain, this.audioCtx.currentTime);
+    this.gainNode.gain.setValueAtTime(
+      safeAudioGain(this.config.micGain),
+      this.audioCtx.currentTime,
+    );
 
     // Analisador para VU meter e detecção de fala Discord-style
     this.analyserNode = this.audioCtx.createAnalyser();
@@ -159,18 +196,28 @@ export class VoiceAudioPipeline {
 
     // Nó de mute suave exclusivo do Microfone (corta voz sem cortar o Soundboard!)
     this.micMuteNode = this.audioCtx.createGain();
-    this.micMuteNode.gain.setValueAtTime(this.isMicMuted ? 0 : 1, this.audioCtx.currentTime);
+    this.micMuteNode.gain.setValueAtTime(
+      this.isMicMuted ? 0 : 1,
+      this.audioCtx.currentTime,
+    );
 
     // Destino final para envio WebRTC
     this.destinationNode = this.audioCtx.createMediaStreamDestination();
 
-    // Nó de entrada do Soundboard (conectado direto ao destino WebRTC, pós-filtros e pós-gate)
+    // Protect the sum of microphone and effects before WebRTC, independently of mute/gate.
+    this.outputPeakGuard = createAudioPeakGuard(this.audioCtx);
+    this.outputPeakGuard.connect(this.destinationNode);
+
+    // Entrada dos efeitos pós-filtros/gate, mas antes da proteção final de picos.
     this.soundboardInputNode = this.audioCtx.createGain();
-    this.soundboardInputNode.gain.setValueAtTime(1.0, this.audioCtx.currentTime);
-    this.soundboardInputNode.connect(this.destinationNode);
+    this.soundboardInputNode.gain.setValueAtTime(
+      1.0,
+      this.audioCtx.currentTime,
+    );
+    this.soundboardInputNode.connect(this.outputPeakGuard);
 
     // Encadeamento do Pipeline de Áudio:
-    // source -> highPass -> lowPass -> [worklet] -> compressor -> gain -> analyser -> micMuteNode -> destination
+    // source -> highPass -> lowPass -> [worklet] -> compressor -> gain -> analyser -> micMuteNode -> outputPeakGuard -> destination
     let lastNode: AudioNode = this.sourceNode;
     lastNode.connect(this.highPassFilter);
     lastNode = this.highPassFilter;
@@ -192,7 +239,27 @@ export class VoiceAudioPipeline {
     lastNode.connect(this.analyserNode);
 
     this.analyserNode.connect(this.micMuteNode);
-    this.micMuteNode.connect(this.destinationNode);
+    this.micMuteNode.connect(this.outputPeakGuard);
+
+    // A crashed processor otherwise emits silence forever. Bypass only the gate,
+    // retaining filters, gain, mute, peak guard and the same outgoing track.
+    if (this.workletNode) {
+      const gate = this.workletNode;
+      gate.addEventListener(
+        "processorerror",
+        () => {
+          if (this.isDestroyed || this.workletNode !== gate) return;
+          callEvent("audio_processor_error");
+          this.lowPassFilter?.disconnect(gate);
+          gate.disconnect();
+          gate.port.close();
+          this.workletNode = null;
+          if (this.compressorNode)
+            this.lowPassFilter?.connect(this.compressorNode);
+        },
+        { once: true },
+      );
+    }
 
     this.processedStream = this.destinationNode.stream;
 
@@ -232,7 +299,10 @@ export class VoiceAudioPipeline {
       // Anel verde ativo quando o volume passar de -42 dB
       if (db > -42) lastLoudAt = Date.now();
       const isSpeaking = Date.now() - lastLoudAt < 180;
-      const normalizedLevel = Math.min(100, Math.max(0, Math.round(((db + 60) / 60) * 100)));
+      const normalizedLevel = Math.min(
+        100,
+        Math.max(0, Math.round(((db + 60) / 60) * 100)),
+      );
 
       if (this.onSpeakingChange) {
         this.onSpeakingChange(isSpeaking, normalizedLevel);
@@ -243,7 +313,11 @@ export class VoiceAudioPipeline {
   public setMicMuted(muted: boolean): void {
     this.isMicMuted = muted;
     if (this.micMuteNode && this.audioCtx) {
-      this.micMuteNode.gain.setTargetAtTime(muted ? 0 : 1, this.audioCtx.currentTime, 0.015);
+      this.micMuteNode.gain.setTargetAtTime(
+        muted ? 0 : 1,
+        this.audioCtx.currentTime,
+        0.015,
+      );
     }
     if (muted && this.onSpeakingChange) {
       this.onSpeakingChange(false, 0);
@@ -263,15 +337,29 @@ export class VoiceAudioPipeline {
 
     if (this.highPassFilter && this.audioCtx) {
       const targetFreq = this.config.highPassFilter80Hz ? 80 : 10;
-      this.highPassFilter.frequency.setTargetAtTime(targetFreq, this.audioCtx.currentTime, 0.05);
+      this.highPassFilter.frequency.setTargetAtTime(
+        targetFreq,
+        this.audioCtx.currentTime,
+        0.05,
+      );
     }
 
     if (this.workletNode) {
-      this.workletNode.port.postMessage({ enabled: this.config.neuralNoiseGate });
+      this.workletNode.port.postMessage({
+        enabled: this.config.neuralNoiseGate,
+      });
     }
 
-    if (this.gainNode && this.audioCtx && typeof newConfig.micGain === 'number') {
-      this.gainNode.gain.setTargetAtTime(newConfig.micGain, this.audioCtx.currentTime, 0.05);
+    if (
+      this.gainNode &&
+      this.audioCtx &&
+      typeof newConfig.micGain === "number"
+    ) {
+      this.gainNode.gain.setTargetAtTime(
+        safeAudioGain(newConfig.micGain),
+        this.audioCtx.currentTime,
+        0.05,
+      );
     }
   }
 
@@ -288,38 +376,77 @@ export class VoiceAudioPipeline {
     }
 
     if (this.sourceNode) {
-      try { this.sourceNode.disconnect(); } catch { /* ignore */ }
+      try {
+        this.sourceNode.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     if (this.highPassFilter) {
-      try { this.highPassFilter.disconnect(); } catch { /* ignore */ }
+      try {
+        this.highPassFilter.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     if (this.lowPassFilter) {
-      try { this.lowPassFilter.disconnect(); } catch { /* ignore */ }
+      try {
+        this.lowPassFilter.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     if (this.workletNode) {
-      try { this.workletNode.disconnect(); } catch { /* ignore */ }
+      this.workletNode.port.close();
+      try {
+        this.workletNode.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     if (this.compressorNode) {
-      try { this.compressorNode.disconnect(); } catch { /* ignore */ }
+      try {
+        this.compressorNode.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     if (this.gainNode) {
-      try { this.gainNode.disconnect(); } catch { /* ignore */ }
+      try {
+        this.gainNode.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     if (this.analyserNode) {
-      try { this.analyserNode.disconnect(); } catch { /* ignore */ }
+      try {
+        this.analyserNode.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     if (this.micMuteNode) {
-      try { this.micMuteNode.disconnect(); } catch { /* ignore */ }
+      try {
+        this.micMuteNode.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     if (this.soundboardInputNode) {
-      try { this.soundboardInputNode.disconnect(); } catch { /* ignore */ }
+      try {
+        this.soundboardInputNode.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
 
-    if (this.audioCtx && this.audioCtx.state !== 'closed') {
+    this.outputPeakGuard?.disconnect();
+    this.outputPeakGuard = null;
+    if (this.audioCtx && this.audioCtx.state !== "closed") {
       this.audioCtx.close().catch(() => {});
     }
 
-    this.processedStream?.getTracks().forEach(track => track.stop());
+    this.processedStream?.getTracks().forEach((track) => track.stop());
     this.audioCtx = null;
     this.processedStream = null;
   }

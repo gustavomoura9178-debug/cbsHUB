@@ -185,3 +185,9 @@ Branch fix/native-notifications-call-stability-2026-11-06, base 1a9d3e9 (PR ante
 
 ## DESKTOP-007 — concluído para revisão — 06/11/2026 — Codex/OpenAI
 Branch `fix/native-notifications-call-stability-2026-11-06`, base 1a9d3e9; 4361de2 (áudio), 05ff793 (notificações/sala) e 1573a6f (interface/regressões), seguido do fechamento documental rc.6. Todas as reservas desta tarefa liberadas. Build, 35 testes, pacote Linux e smoke do executável aprovados; um teste bloqueado pela política ICE. Ver DESKTOP_NATIVE.md. Windows/toasts e reprodução física com arquivo original continuam pendentes. Push da branch autorizado explicitamente; main preservada, sem merge/release/force push.
+
+## AUDIO-008 — ativo — 06/11/2026 — Codex/OpenAI
+Branch fix/audio-peak-stability-2026-11-06, base 0d7a750 (PR #15 integrado, conteúdo idêntico a bb70a13), recuperação recovery/pre-audio-peak-2026-11-06. Reserva: saída de áudio saturada, falha do processador, interrupção da captura sem abandonar chamada, testes e diagnósticos. Usuário relata saída da sala da ligação após grito/efeito alto, sem encerramento do aplicativo. Correlação não prova causa; validar sinais sintéticos e interrupção controlada, preservar WebRTC/P2P e limites existentes.
+
+## AUDIO-008 — concluído para revisão — 06/11/2026 — Codex/OpenAI
+Branch fix/audio-peak-stability-2026-11-06, base 0d7a750; conteúdo/teste 2166a62 e fechamento documental posterior rc.7. Reservas liberadas. Build e pacote Linux aprovados; testes consolidados 36 PASSED/1 BLOCKED (ICE), sem falhas restantes, retomados após interrupção do ambiente. Evidências em AUDIO_PEAK_STABILITY.md e audio-008-results.json. Aceite no hardware afetado/duas máquinas permanece pendente; main preservada.

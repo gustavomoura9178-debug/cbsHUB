@@ -105,6 +105,7 @@ class WebRTCEngine {
   private chatClock = 0;
   private roomGeneration = 0;
   private micGeneration = 0;
+  private lastMicRecoveryAt = -Infinity;
   private cameraGeneration = 0;
   private screenGeneration = 0;
   private joiningVoice = false;
@@ -2233,6 +2234,7 @@ class WebRTCEngine {
     if (state.inVoiceCall || this.joiningVoice) return;
     const generation = this.roomGeneration;
     this.joiningVoice = true;
+    this.lastMicRecoveryAt = -Infinity;
     try {
       await this.setupLocalMicrophone();
     } catch {
@@ -2854,13 +2856,27 @@ class WebRTCEngine {
       this.audioPipeline = pipeline;
       this.rawMicStream = stream;
       stream.getAudioTracks()[0].onended = () => {
-        if (this.rawMicStream === stream) {
-          this.leaveVoiceCall("microphone_ended");
+        if (
+          this.rawMicStream !== stream ||
+          useMediaState.getState().microphoneBusy ||
+          !useHubStore.getState().inVoiceCall
+        )
+          return;
+        callEvent("microphone_interrupted", { reason: "microphone_ended" });
+        // Capture/driver failure must not remove the user, stop remote playback,
+        // or close healthy peer connections. Try one reacquisition per 10 s.
+        if (Date.now() - this.lastMicRecoveryAt < 10000) {
           mediaError(
-            "Microfone desconectado",
-            "Selecione um dispositivo e entre novamente.",
+            "Microfone interrompido",
+            "A chamada continua. Selecione o microfone novamente.",
           );
+          return;
         }
+        this.lastMicRecoveryAt = Date.now();
+        callEvent("microphone_recovery");
+        void this.setupLocalMicrophone().catch(() => {
+          // setupLocalMicrophone reports the capture error and preserves the session.
+        });
       };
       callEvent("microphone_ready");
       useHubStore.getState().setLocalVoiceStream(processed);
