@@ -1,3 +1,5 @@
+> Atualização atual: **AUDIO-008 · 2.0.0-rc.7 · 06/11/2026 (America/Sao_Paulo)**. Leia [AUDIO_PEAK_STABILITY.md](AUDIO_PEAK_STABILITY.md). Interrupção de microfone deixa de encerrar a chamada; picos de áudio protegidos. Aceite no hardware afetado continua pendente. Registros abaixo são históricos.
+
 > Estado atual: **DESKTOP-007 · 2.0.0-rc.6 · 06/11/2026 (America/Sao_Paulo)**. Leia [DESKTOP_NATIVE.md](DESKTOP_NATIVE.md). Build, 35 testes e pacote/smoke Linux aprovados; um teste bloqueado por ICE. Registros abaixo são históricos; validações Windows e duas máquinas continuam pendentes.
 
 > Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
@@ -148,3 +150,7 @@ EXECUTADO: build/tsc PASSED; suíte 33 scripts, 32 PASSED/1 BLOCKED por ICE (exi
 
 ## DESKTOP-007 — candidato rc.6 para revisão
 Splash mínima de 5 s, dock sempre visível/centralizado, diagnóstico somente ícone na titlebar, sala atual sem reentrada e limites/isolamento dos efeitos implementados. Notificações Electron para mensagens em segundo plano e entrada de participante em voz com ação Atender. Chamadas continuam por sala; não há ligação direta/DM ou push com processo encerrado. Evidências e limites em DESKTOP_NATIVE.md. Sem mudanças em shadcn/Tailwind, autenticação ou dependências.
+
+
+## AUDIO-008 — rc.7
+Corrigido o caminho confirmado de saída automática quando a captura do microfone termina. Recuperação com replaceTrack e orçamento de tentativas mantém a sala/recepção; erro persistente pede seleção do microfone. Proteção de pico da soma de voz/efeitos e fallback de processador implementados sem substituir arquitetura, componentes ou dependências. Validações executadas e matriz física em AUDIO_PEAK_STABILITY.md. Ainda não comprovada a causa do término da captura no dispositivo do usuário.

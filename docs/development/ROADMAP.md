@@ -105,3 +105,7 @@ HOTFIX-006 / rc.5 substitui rc.4 como candidato de revisão. Lacunas de interfac
 2. Em instalação Windows, validar toasts de mensagem/voz e botão Atender, foco/segundo plano, expiração e mudança de sala; depende de ambiente Windows com notificações habilitadas.
 3. Reproduzir o problema de efeitos com arquivo original e duas máquinas; verificar áudio nos dois sentidos, memória e reconexão. Depende de mídia física/rede de teste autorizada com ICE disponível.
 4. Somente após os gates anteriores avaliar promoção de release. Inicialização com Windows continua fora desta entrega.
+
+
+## Prioridade após AUDIO-008
+Validar rc.7 no hardware afetado com o arquivo original, recepção/envio, mute/deafen, câmera e tela. Se houver nova queda, obter diagnóstico exportado e distinguir microphone_interrupted/audio_processor_error de media_timeout/media_failed/sinalização. Corrigir o gatilho comprovado antes de promover release; não tentar contornar política ICE do ambiente cloud.

@@ -112,3 +112,7 @@ Preferências locais de identidade em src/chat/viewState.ts usam JSON v1 aditivo
 
 ## Incremento DESKTOP-007 — rc.6
 Notificação renderer → preload notifyNative → IPC cbs:notify com allowedSender/schema → Electron Notification. Ativação retorna apenas ID, consumido uma vez após revalidar sessão/sala/participante. Identificação de voz é por presença na sala; sem novo backend. Efeitos são decodificados em AudioContext separado e enviados pelo mixer existente, com orçamento de cache/concorrência. O transporte e a arquitetura P2P permanecem. Ver DESKTOP_NATIVE.md.
+
+
+## AUDIO-008 — captura não determina participação
+Microfone e efeitos somam em proteção de pico antes do MediaStreamDestination. Gate continua exclusivo do microfone; mute não corta efeitos. Interrupção da captura tenta setupLocalMicrophone/replaceTrack dentro da sessão existente, sem leaveVoiceCall. Orçamento de uma recuperação por 10 s e gerações existentes impedem loops/ressurreição após sair. Falha do worklet desconecta somente o gate. Ver AUDIO_PEAK_STABILITY.md.

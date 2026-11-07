@@ -1,3 +1,5 @@
+> Atualização atual: **AUDIO-008 · 2.0.0-rc.7 · 06/11/2026 (America/Sao_Paulo)**. Leia [AUDIO_PEAK_STABILITY.md](AUDIO_PEAK_STABILITY.md). Interrupção de microfone deixa de encerrar a chamada; picos de áudio protegidos. Aceite no hardware afetado continua pendente. Registros abaixo são históricos.
+
 > Estado atual: **DESKTOP-007 · 2.0.0-rc.6 · 06/11/2026 (America/Sao_Paulo)**. Leia [DESKTOP_NATIVE.md](DESKTOP_NATIVE.md). Build, 35 testes e pacote/smoke Linux aprovados; um teste bloqueado por ICE. Registros abaixo são históricos; validações Windows e duas máquinas continuam pendentes.
 
 > Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
@@ -231,3 +233,7 @@ Outra IA: preservar cbshub-message-identity-v1 (dois booleanos, versão 1), fall
 
 ## Passagem DESKTOP-007 — 06/11/2026 — Codex/OpenAI
 Branch `fix/native-notifications-call-stability-2026-11-06`, base 1a9d3e9, conteúdo 4361de2 (áudio), 05ff793 (notificações/sala) e 1573a6f (interface/regressões). Ler DESKTOP_NATIVE.md e desktop-007-results.json antes de continuar. Reserva liberada; envio autorizado pelo usuário, sem merge em main. Próxima tarefa: matriz Windows instalada (toasts, Atender, foco/segundo plano, convite expirado/troca de sala) e reprodução da queda com arquivo original em dois dispositivos. Não contornar a política ICE. Splash de 5 s e controles sempre visíveis substituem explicitamente as decisões antigas de splash sem atraso/dock recolhível. Novo preload expõe 12 métodos fechados. Preservar limites de áudio, callback único e guardas de sala/geração/bloqueio. Não declarar a causa original da queda definitivamente resolvida sem reprodução.
+
+
+## Passagem AUDIO-008 — Codex/OpenAI — 06/11/2026
+Branch fix/audio-peak-stability-2026-11-06, base 0d7a750; implementação/teste em 2166a62, documentação/versão em commit posterior. Ler AUDIO_PEAK_STABILITY.md. Não reintroduzir leaveVoiceCall no onended do microfone: falha de captura não significa término da chamada. Preservar proteção pós-mix, gate/mute separados dos efeitos, validação do ganho e tentativas limitadas. Não atribuir a queda a volume/rede sem relatório do incidente. Próximo responsável deve testar no dispositivo afetado e usar diagnóstico de microfone/processador/rede para distinguir gatilhos. Reiniciar renderer após mudanças de módulos antes de rodar testes que importam o motor dinamicamente: HMR pode fornecer instância diferente da usada pelo App. Não adaptar testes para esconder esse problema de ambiente.

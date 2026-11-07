@@ -1,3 +1,5 @@
+> Atualização atual: **AUDIO-008 · 2.0.0-rc.7 · 06/11/2026 (America/Sao_Paulo)**. Leia [AUDIO_PEAK_STABILITY.md](AUDIO_PEAK_STABILITY.md). Interrupção de microfone deixa de encerrar a chamada; picos de áudio protegidos. Aceite no hardware afetado continua pendente. Registros abaixo são históricos.
+
 > Estado atual: **DESKTOP-007 · 2.0.0-rc.6 · 06/11/2026 (America/Sao_Paulo)**. Leia [DESKTOP_NATIVE.md](DESKTOP_NATIVE.md). Build, 35 testes e pacote/smoke Linux aprovados; um teste bloqueado por ICE. Registros abaixo são históricos; validações Windows e duas máquinas continuam pendentes.
 
 > Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
@@ -131,3 +133,7 @@ Cards locais sem indicador, identidade das mensagens ausente, miniaturas fixas/s
 2. A queda relatada com determinados efeitos não foi reproduzida com o arquivo original. Decodificação isolada, limites e rejeição segura foram testados localmente; falta audição bidirecional e carga real em dois dispositivos. Sons antigos acima dos limites são recusados, preservando o original salvo.
 3. `media-transport.cjs` permanece BLOCKED: sem candidatos ICE devido à política administrada. Não é falha funcional comprovada nem teste aprovado.
 4. Convites nativos indicam entrada em voz na sala atual; não são chamadas diretas entre contas. Alertas têm limite de frequência/expiração e requerem processo em execução. Nenhuma garantia de entrega push fora do Electron.
+
+
+## AUDIO-008 — limite do aceite
+O caminho onended→leaveVoiceCall foi removido e verificado com interrupção controlada. Ainda não há evidência de que o grito/efeito cause onended no driver do usuário: reprodução física/arquivo original/relatório do incidente continuam necessários. Proteção de picos limita amostras e pode distorcer sinais extremos; não normaliza volume percebido. Se o dispositivo não puder ser readquirido, a chamada permanece ativa recebendo áudio, com aviso para selecionar o microfone. Fallback do gate preserva voz mas desativa esse processador até reconstruir o pipeline. ICE/Windows físico seguem pendentes.

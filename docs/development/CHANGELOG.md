@@ -1,3 +1,5 @@
+> Atualização atual: **AUDIO-008 · 2.0.0-rc.7 · 06/11/2026 (America/Sao_Paulo)**. Leia [AUDIO_PEAK_STABILITY.md](AUDIO_PEAK_STABILITY.md). Interrupção de microfone deixa de encerrar a chamada; picos de áudio protegidos. Aceite no hardware afetado continua pendente. Registros abaixo são históricos.
+
 > Estado atual: **DESKTOP-007 · 2.0.0-rc.6 · 06/11/2026 (America/Sao_Paulo)**. Leia [DESKTOP_NATIVE.md](DESKTOP_NATIVE.md). Build, 35 testes e pacote/smoke Linux aprovados; um teste bloqueado por ICE. Registros abaixo são históricos; validações Windows e duas máquinas continuam pendentes.
 
 > Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
@@ -153,3 +155,10 @@ EXECUTADO: build/tsc PASSED; suíte 33 scripts, 32 PASSED/1 BLOCKED por ICE (exi
 - Clique na sala atual preserva sessão; áudio validado/decodificado fora do contexto da chamada, com limites de memória e concorrência.
 - Três novos scripts de regressão, fixtures atualizadas, versão/relatório de entrega. Sem novas dependências.
 - Build e pacote/smoke Linux aprovados; 35 testes aprovados e um bloqueado (ICE). Windows e mídia real ainda exigem aceite manual.
+
+
+## 2.0.0-rc.7 — AUDIO-008 — 06/11/2026
+- Microfone interrompido deixa de expulsar usuário da voz; readquire captura/substitui trilha quando possível, sem fechar pares, com tentativas limitadas e erro acionável se falhar.
+- Proteção final de picos na soma de microfone/efeitos e no retorno local, validação de ganhos e canais/amostras do gate.
+- Fallback de falha do processador preserva stream/mute; novos eventos de diagnóstico sem registrar áudio.
+- Regressão de áudio forte/agudo, falhas de captura/processador e cancelamento durante saída. Sem novas dependências. Causa física do relato ainda exige validação no dispositivo afetado.

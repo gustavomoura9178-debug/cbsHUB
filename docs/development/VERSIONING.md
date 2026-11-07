@@ -19,3 +19,6 @@ HOTFIX-006 identifica o candidato **2.0.0-rc.5** para não reutilizar rc.4 com c
 
 
 DESKTOP-007 identifica o candidato **2.0.0-rc.6**. Package e raiz do lock concordam sem atualização de dependências. Pacote Linux gerado para verificação; não representa instalador Windows validado nem promoção a release estável.
+
+
+AUDIO-008 avança para **2.0.0-rc.7**, apenas versão raiz de package/lock. Não reutilizar o pacote rc.6 para a nova correção. Identificação de candidato não aprova produção nem release estável.
