@@ -1,10 +1,4 @@
-> Atualização atual: **AUDIO-008 · 2.0.0-rc.7 · 06/11/2026 (America/Sao_Paulo)**. Leia [AUDIO_PEAK_STABILITY.md](AUDIO_PEAK_STABILITY.md). Interrupção de microfone deixa de encerrar a chamada; picos de áudio protegidos. Aceite no hardware afetado continua pendente. Registros abaixo são históricos.
-
-> Estado atual: **DESKTOP-007 · 2.0.0-rc.6 · 06/11/2026 (America/Sao_Paulo)**. Leia [DESKTOP_NATIVE.md](DESKTOP_NATIVE.md). Build, 35 testes e pacote/smoke Linux aprovados; um teste bloqueado por ICE. Registros abaixo são históricos; validações Windows e duas máquinas continuam pendentes.
-
-> Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
-
-> Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
+> Os relatórios de cada fase foram removidos desta árvore; continuam no histórico git (commit `dfa74ba`). Os registros abaixo são históricos.
 
 # Problemas conhecidos
 
@@ -69,7 +63,7 @@ Chat 2.0: sem backend para ACL/autenticação; histórico relay não assinado, a
 
 K04/K05 receberam correções locais: VAD remoto fecha contexto, configurações não capturam para enumerar, mic sob demanda, falha de permissão não entra na voz e saída encerra tracks. K06 recebeu separação entrada/saída e câmera para entrada tardia, testadas com adapters e captura sintética; matriz física pendente. K08: faixa UI/store alinhada à reprodução de 0–100%, sem amplificação 200%. K10: defaults nativos persistidos e favoritos/edição verificados após reload. K12: tela e retorno Soundboard respeitam deafen inclusive durante som; sinalização de sistema não foi redesenhada. K13: pacotes de fala só nas transições e sustentação 180 ms, sem benchmark multipar. K02 mitigado por gerações/cleanup; não declarar concorrência integralmente resolvida.
 
-MEDIA-001: teste WebRTC local não recebeu candidatos ICE e NÃO passou. Sem confirmação em duas máquinas, hotplug físico, saída real de áudio, Electron picker/loopback, rede externa/TURN ou 3–6 pares. K07 continua (ABR/telemetria de tela globais), K01/K16 permanecem. Soundboard mistura efeitos e voz: não há mute independente dos efeitos recebidos, nem ACL de servidor. setSinkId de WebAudio depende do runtime. Ver MEDIA_EXPERIENCE.md.
+MEDIA-001: teste WebRTC local não recebeu candidatos ICE e NÃO passou. Sem confirmação em duas máquinas, hotplug físico, saída real de áudio, Electron picker/loopback, rede externa/TURN ou 3–6 pares. K07 continua (ABR/telemetria de tela globais), K01/K16 permanecem. Soundboard mistura efeitos e voz: não há mute independente dos efeitos recebidos, nem ACL de servidor. setSinkId de WebAudio depende do runtime. Ver MEDIA_EXPERIENCE.
 
 ## VISUAL-002 — 05/11/2026 — Codex/OpenAI
 
@@ -86,7 +80,7 @@ Pendências: validação visual fina contra as capturas, acessibilidade completa
 
 ## STABILIZE-001 — 05/11/2026
 
-K01 corrigido nesta revisão: emissão CJS única e startup/reload verificados em Electron e pacote Linux. K15 parcialmente mitigado por sandbox, navegação e IPC; CSP/permissões completas e dependências vulneráveis continuam pendentes. npm audit: 19 (1 crítica/13 altas/5 moderadas). K07/telemetria de tela global e trust de contas/histórico P2P permanecem. Sem arquivos/pastas/GIFs compartilhados; sem teste real entre duas máquinas. Não anunciar 2.0.0 estável. Lista e evidências em STABILIZATION.md.
+K01 corrigido nesta revisão: emissão CJS única e startup/reload verificados em Electron e pacote Linux. K15 parcialmente mitigado por sandbox, navegação e IPC; CSP/permissões completas e dependências vulneráveis continuam pendentes. npm audit: 19 (1 crítica/13 altas/5 moderadas). K07/telemetria de tela global e trust de contas/histórico P2P permanecem. Sem arquivos/pastas/GIFs compartilhados; sem teste real entre duas máquinas. Não anunciar 2.0.0 estável. Lista e evidências em STABILIZATION.
 
 
 ## SECURITY-002 — 05/11/2026
@@ -96,7 +90,7 @@ As 19 vulnerabilidades conhecidas anteriores foram eliminadas nesta árvore (npm
 
 ## BRAND-001 — 05/11/2026 — Codex/OpenAI
 
-Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px titlebar, 60/56px sala, ~32px chamada); subtítulo removido e estado de maximização sincronizado com Electron. Build e testes compact-bars/window-controls/desktop-security/electron-smoke/redesign-smoke/media-smoke passaram localmente. Arraste e aparência real maximizada/restaurada exigem desktop gráfico. Logo/PNG/ICO ainda pendentes do arquivo original solicitado: tentativa generativa alterou arte e não foi integrada. Ler COMPACT_BARS.md para arquivos, evidências e retomada. Trabalho das barras pronto para revisão; não declarar integração da logo concluída. Reserva da identidade permanece aguardando entrada, sem mudanças de motores/backend. Sem push/merge.
+Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px titlebar, 60/56px sala, ~32px chamada); subtítulo removido e estado de maximização sincronizado com Electron. Build e testes compact-bars/window-controls/desktop-security/electron-smoke/redesign-smoke/media-smoke passaram localmente. Arraste e aparência real maximizada/restaurada exigem desktop gráfico. Logo/PNG/ICO ainda pendentes do arquivo original solicitado: tentativa generativa alterou arte e não foi integrada. Ler COMPACT_BARS para arquivos, evidências e retomada. Trabalho das barras pronto para revisão; não declarar integração da logo concluída. Reserva da identidade permanece aguardando entrada, sem mudanças de motores/backend. Sem push/merge.
 
 
 ## WORKSPACE-3 — 05/11/2026 — estado atual
@@ -107,14 +101,14 @@ Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px
 - Atalho PTT global não implementado; funciona apenas com foco e fora de campos de edição. Sem benchmarks de CPU/memória, matriz física ou verificação Windows/macOS.
 - Favoritos e remoção/restauração de recentes são locais. Unread da sidebar só representa a sala ativa; não simula múltiplas salas conectadas em segundo plano.
 - Diagnóstico é memória limitada e não sobrevive a restart; deve ser copiado antes de fechar o app. Logs de console antigos do motor não são o relatório sanitizado; não compartilhá-los como se tivessem a mesma política de campos.
-- Permanecem ABR/stats de tela por par, avisos Vite/bundle, suspensão real e testes prolongados. Ver WORKSPACE_3_STATUS.md para dependências e evidências.
+- Permanecem ABR/stats de tela por par, avisos Vite/bundle, suspensão real e testes prolongados. Ver WORKSPACE_3_STATUS para dependências e evidências.
 
 
 ## DESKTOP-004 — 05/11/2026
 
 Corrigidos: espera de Peer.open/reconstrução travada, identidade local antes do ID remoto, cards fixos, editores encadeados, nome que sobrevivia ao Cancelar, defaults fictícios FPS/RTT e atribuição errada de snapshot de tela/foco. Telemetria de recepção acompanha foco e ignora resultados antigos; ABR por todos os pares ainda não foi implementado.
 
-BLOCKED permanece media-transport sem ICE; sem validação física de reconexão, áudio/vídeo/suspensão ou Windows/Tray. Headless usa minimizar como fallback de bandeja e não comprova clique nativo. Backend/ACL/DM/anexos/sync global e notificações de mensagens do SO continuam ausentes. Corte de waveform refere-se a arquivos importados; sintetizadores mantêm metadados e reprodução. Não há benchmark físico CPU/GPU/memória. Persistem avisos do bundler e limitações anteriores de armazenamento/EXIF/plataformas. Relatório detalhado em DESKTOP_REFINEMENT.md.
+BLOCKED permanece media-transport sem ICE; sem validação física de reconexão, áudio/vídeo/suspensão ou Windows/Tray. Headless usa minimizar como fallback de bandeja e não comprova clique nativo. Backend/ACL/DM/anexos/sync global e notificações de mensagens do SO continuam ausentes. Corte de waveform refere-se a arquivos importados; sintetizadores mantêm metadados e reprodução. Não há benchmark físico CPU/GPU/memória. Persistem avisos do bundler e limitações anteriores de armazenamento/EXIF/plataformas. Relatório detalhado em DESKTOP_REFINEMENT.
 
 ## HOTFIX-005 — limites atuais — 06/11/2026 UTC
 
@@ -122,10 +116,10 @@ Caminhos de recuperação prematura/beacon obsoleto corrigidos no código e cobe
 
 Windows: ícone/menu da bandeja, aviso inicial, captura em segundo plano e ciclo X/restaurar/encerrar exigem teste físico. Linux headless usa fallback minimizar; teste de processo não é teste da bandeja Windows. Contraste/leitor de tela, primeira pintura e dispositivos físicos permanecem na matriz manual. Bundle principal >500 kB e avisos customResolver/freeze persistem; boot-theme.js clássico é intencionalmente copiado de public, sem bundling, para rodar antes do renderer. Sem dependências novas.
 
-Arquitetura continua sem servidor autenticado/ACL global; backend próprio é proposta. Notificações do SO, DM/anexos/pastas/GIFs e garantia de durabilidade quando IndexedDB indisponível permanecem fora deste hotfix. Cards extremadamente pequenos conservam identificadores acessíveis/title, mas reduzem texto/controles visuais. Detalhes/evidências em HOTFIX_STABILITY.md.
+Arquitetura continua sem servidor autenticado/ACL global; backend próprio é proposta. Notificações do SO, DM/anexos/pastas/GIFs e garantia de durabilidade quando IndexedDB indisponível permanecem fora deste hotfix. Cards extremadamente pequenos conservam identificadores acessíveis/title, mas reduzem texto/controles visuais. Detalhes/evidências em HOTFIX_STABILITY.
 
 ## HOTFIX-006 — limites confirmados — 06/11/2026 UTC
-Cards locais sem indicador, identidade das mensagens ausente, miniaturas fixas/sem espaço mobile e pausa compartilhada curta foram corrigidos e testados. Mantêm-se os gates físicos do HOTFIX-005. Chromium tem política administrada WebRtcIPHandling=disable_non_proxied_udp; não contornar para forçar passe ICE. Contraste de nomes é validado contra cor sólida das mensagens, não certifica legibilidade sobre qualquer wallpaper/hover; fallback semântico e opção de desativar cores disponíveis. Nenhum ping independente da internet de cada usuário é alegado. Detalhes e testes em HOTFIX_ACCEPTANCE.md.
+Cards locais sem indicador, identidade das mensagens ausente, miniaturas fixas/sem espaço mobile e pausa compartilhada curta foram corrigidos e testados. Mantêm-se os gates físicos do HOTFIX-005. Chromium tem política administrada WebRtcIPHandling=disable_non_proxied_udp; não contornar para forçar passe ICE. Contraste de nomes é validado contra cor sólida das mensagens, não certifica legibilidade sobre qualquer wallpaper/hover; fallback semântico e opção de desativar cores disponíveis. Nenhum ping independente da internet de cada usuário é alegado. Detalhes e testes em HOTFIX_ACCEPTANCE.
 
 
 ## Gates DESKTOP-007 — 06/11/2026
