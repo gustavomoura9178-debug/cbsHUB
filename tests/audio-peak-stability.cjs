@@ -186,40 +186,99 @@ const assert = require("node:assert/strict");
           e.roomGeneration === initialGeneration,
       ),
     );
-    // Rapid repeat is bounded and shows an error instead of closing the call.
+    // Rapid repeat: stays in the call, shows a notice and reconnects by itself
+    // (short waits here; production backs off 0/1/2.5/5/10/20 s).
     await page.evaluate(() => {
+      e.micRecoveryDelaysMs = [0, 150, 150, 150, 150, 150];
       window.recovered = e.rawMicStream;
       recovered.getAudioTracks()[0].stop();
       recovered.getAudioTracks()[0].dispatchEvent(new Event("ended"));
     });
+    await page.waitForFunction(
+      () =>
+        m.getState().error &&
+        (m.getState().error.includes("Reconectando") ||
+          m.getState().error.includes("A chamada continua")),
+    );
+    await page.waitForFunction(
+      () => !m.getState().microphoneBusy && e.rawMicStream !== recovered,
+    );
     assert(
       await page.evaluate(
         () =>
-          e.rawMicStream === recovered &&
+          e.rawMicStream.active &&
           s.getState().inVoiceCall &&
           callCloseCount === 0 &&
-          m.getState().error.includes("A chamada continua"),
+          replacements.length === 2,
       ),
     );
-    // Capture permission/device failure also leaves the room and remote call intact.
+    // Track muted by the OS/driver without "ended": watchdog reconnects the capture.
+    await page.evaluate(() => {
+      e.micMuteWatchdogMs = 100;
+      window.mutedCapture = e.rawMicStream;
+      const t = mutedCapture.getAudioTracks()[0];
+      Object.defineProperty(t, "muted", { configurable: true, get: () => true });
+      t.dispatchEvent(new Event("mute"));
+    });
+    await page.waitForFunction(
+      () => !m.getState().microphoneBusy && e.rawMicStream !== mutedCapture,
+    );
+    assert(
+      await page.evaluate(
+        () =>
+          e.rawMicStream.active &&
+          s.getState().inVoiceCall &&
+          callCloseCount === 0 &&
+          replacements.length === 3,
+      ),
+    );
+    // A short mute that unmutes by itself must not replace the capture.
+    await page.evaluate(async () => {
+      e.micMuteWatchdogMs = 300;
+      window.briefMute = e.rawMicStream;
+      const t = briefMute.getAudioTracks()[0];
+      Object.defineProperty(t, "muted", { configurable: true, get: () => true });
+      t.dispatchEvent(new Event("mute"));
+      await new Promise((r) => setTimeout(r, 50));
+      t.dispatchEvent(new Event("unmute"));
+      await new Promise((r) => setTimeout(r, 450));
+    });
+    assert(
+      await page.evaluate(
+        () => e.rawMicStream === briefMute && replacements.length === 3,
+      ),
+    );
+    // Capture permission/device failure: bounded automatic retries, call and room intact.
     await page.evaluate(() => {
       window.originalCapture = navigator.mediaDevices.getUserMedia.bind(
         navigator.mediaDevices,
       );
+      window.captureAttempts = 0;
       navigator.mediaDevices.getUserMedia = async () => {
+        captureAttempts++;
         throw Error("device interrupted");
       };
-      e.lastMicRecoveryAt = -Infinity;
-      recovered.getAudioTracks()[0].dispatchEvent(new Event("ended"));
+      e.micRecoveryDelaysMs = [0, 50, 50];
+      e.micRecoveryAttempt = 0;
+      e.lastMicRecoveredAt = -Infinity;
+      window.stuck = e.rawMicStream;
+      stuck.getAudioTracks()[0].stop();
+      stuck.getAudioTracks()[0].dispatchEvent(new Event("ended"));
     });
-    await page.waitForFunction(() => !m.getState().microphoneBusy);
+    await page.waitForFunction(
+      () =>
+        captureAttempts === 3 &&
+        !m.getState().microphoneBusy &&
+        m.getState().error.includes("parou de responder"),
+    );
+    await page.waitForTimeout(400);
     assert(
       await page.evaluate(
         () =>
+          captureAttempts === 3 &&
           s.getState().inVoiceCall &&
           session.voiceCall === call &&
           callCloseCount === 0 &&
-          m.getState().error.includes("device interrupted") &&
           !d.getState().events.some((x) => x.event === "call_ended"),
       ),
     );
@@ -246,7 +305,7 @@ const assert = require("node:assert/strict");
     );
     await page.evaluate(() => e.leaveRoom());
     console.log(
-      "PASS high-frequency overdrive/PCM bounded without call loss; gate failure bypass; capture restart replaces track without closing peer; repeated/failed recovery bounded; leave cancels late capture. Synthetic audio and mocked RTP sender; no physical two-device test.",
+      "PASS high-frequency overdrive/PCM bounded without call loss; gate failure bypass; capture restart replaces track without closing peer; repeated/failed recovery retried with bounded backoff; muted-track watchdog reconnects while brief mutes are ignored; leave cancels late capture. Synthetic audio and mocked RTP sender; no physical two-device test.",
     );
   } finally {
     await browser.close();

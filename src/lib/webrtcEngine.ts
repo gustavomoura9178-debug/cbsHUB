@@ -105,7 +105,14 @@ class WebRTCEngine {
   private chatClock = 0;
   private roomGeneration = 0;
   private micGeneration = 0;
-  private lastMicRecoveryAt = -Infinity;
+  /* Recuperação do microfone: tentativas com espera crescente, limitadas e
+     canceladas ao sair da voz/sala ou quando o usuário troca o microfone. */
+  private micRecoveryDelaysMs = [0, 1000, 2500, 5000, 10000, 20000];
+  private micRecoveryAttempt = 0;
+  private micRecoveryTimer: number | null = null;
+  private lastMicRecoveredAt = -Infinity;
+  private micMuteWatchdog: number | null = null;
+  private micMuteWatchdogMs = 2500;
   private cameraGeneration = 0;
   private screenGeneration = 0;
   private joiningVoice = false;
@@ -2234,7 +2241,7 @@ class WebRTCEngine {
     if (state.inVoiceCall || this.joiningVoice) return;
     const generation = this.roomGeneration;
     this.joiningVoice = true;
-    this.lastMicRecoveryAt = -Infinity;
+    this.clearMicRecovery();
     try {
       await this.setupLocalMicrophone();
     } catch {
@@ -2277,6 +2284,7 @@ class WebRTCEngine {
     this.pushToTalkHeld = false;
     const state = useHubStore.getState();
     this.micGeneration++;
+    this.clearMicRecovery();
     this.joiningVoice = false;
     this.cameraGeneration++;
     this.screenGeneration++;
@@ -2760,7 +2768,9 @@ class WebRTCEngine {
   /* MICROFONE LOCAL & PIPELINE DE ÁUDIO                                       */
   /* ========================================================================= */
 
-  public async setupLocalMicrophone(): Promise<void> {
+  public async setupLocalMicrophone(
+    options: { allowDefaultFallback?: boolean } = {},
+  ): Promise<void> {
     const generation = ++this.micGeneration;
     let stream: MediaStream | null = null;
     let pipeline: VoiceAudioPipeline | null = null;
@@ -2768,21 +2778,39 @@ class WebRTCEngine {
     try {
       const audioConfig = useHubStore.getState().audioConfig;
       const useSuppression = Boolean(audioConfig.neuralNoiseGate);
-      const constraints: MediaStreamConstraints = {
-        audio: {
-          deviceId:
-            audioConfig.inputDeviceId !== "default"
-              ? { exact: audioConfig.inputDeviceId }
-              : undefined,
-          echoCancellation: audioConfig.echoCancellation,
-          autoGainControl: audioConfig.autoGainControl,
-          noiseSuppression: useSuppression,
-          sampleRate: 48000,
-          channelCount: 1,
-        },
+      const audioConstraints: MediaTrackConstraints = {
+        deviceId:
+          audioConfig.inputDeviceId !== "default"
+            ? { exact: audioConfig.inputDeviceId }
+            : undefined,
+        echoCancellation: audioConfig.echoCancellation,
+        autoGainControl: audioConfig.autoGainControl,
+        noiseSuppression: useSuppression,
+        sampleRate: 48000,
+        channelCount: 1,
       };
 
-      stream = await navigator.mediaDevices.getUserMedia(constraints);
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: audioConstraints,
+        });
+      } catch (error) {
+        // Só na recuperação automática: se o dispositivo escolhido sumiu ou mudou
+        // de id (ex.: headset trocando de perfil), usa o microfone padrão sem
+        // alterar a escolha salva do usuário.
+        const name = (error as { name?: string } | null)?.name;
+        if (
+          options.allowDefaultFallback &&
+          audioConfig.inputDeviceId !== "default" &&
+          (name === "OverconstrainedError" || name === "NotFoundError")
+        ) {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { ...audioConstraints, deviceId: undefined },
+          });
+        } else {
+          throw error;
+        }
+      }
       if (generation !== this.micGeneration) {
         stream.getTracks().forEach((t) => t.stop());
         return;
@@ -2855,29 +2883,7 @@ class WebRTCEngine {
       pipeline.setMicMuted(this.microphoneGated());
       this.audioPipeline = pipeline;
       this.rawMicStream = stream;
-      stream.getAudioTracks()[0].onended = () => {
-        if (
-          this.rawMicStream !== stream ||
-          useMediaState.getState().microphoneBusy ||
-          !useHubStore.getState().inVoiceCall
-        )
-          return;
-        callEvent("microphone_interrupted", { reason: "microphone_ended" });
-        // Capture/driver failure must not remove the user, stop remote playback,
-        // or close healthy peer connections. Try one reacquisition per 10 s.
-        if (Date.now() - this.lastMicRecoveryAt < 10000) {
-          mediaError(
-            "Microfone interrompido",
-            "A chamada continua. Selecione o microfone novamente.",
-          );
-          return;
-        }
-        this.lastMicRecoveryAt = Date.now();
-        callEvent("microphone_recovery");
-        void this.setupLocalMicrophone().catch(() => {
-          // setupLocalMicrophone reports the capture error and preserves the session.
-        });
-      };
+      this.watchMicrophone(stream, pipeline);
       callEvent("microphone_ready");
       useHubStore.getState().setLocalVoiceStream(processed);
       soundboardEngine.registerPipelineHooks(
@@ -2894,6 +2900,98 @@ class WebRTCEngine {
       if (generation === this.micGeneration)
         useMediaState.setState({ microphoneBusy: false });
     }
+  }
+
+  /* Detecta captura interrompida de três formas: faixa encerrada, faixa muda
+     (driver/SO silenciou sem encerrar) e AudioContext parado. */
+  private watchMicrophone(
+    stream: MediaStream,
+    pipeline: VoiceAudioPipeline,
+  ): void {
+    this.clearMicMuteWatchdog();
+    const track = stream.getAudioTracks()[0];
+    if (!track) return;
+    track.onended = () => this.handleMicInterruption(stream, "microphone_ended");
+    track.onmute = () => {
+      this.clearMicMuteWatchdog();
+      this.micMuteWatchdog = window.setTimeout(() => {
+        this.micMuteWatchdog = null;
+        if (track.muted) this.handleMicInterruption(stream, "microphone_muted");
+      }, this.micMuteWatchdogMs);
+    };
+    track.onunmute = () => this.clearMicMuteWatchdog();
+    pipeline.setInterruptionHandler(() =>
+      this.handleMicInterruption(stream, "audio_context_suspended"),
+    );
+  }
+
+  private handleMicInterruption(
+    stream: MediaStream,
+    reason: "microphone_ended" | "microphone_muted" | "audio_context_suspended",
+  ): void {
+    if (
+      this.rawMicStream !== stream ||
+      useMediaState.getState().microphoneBusy ||
+      !useHubStore.getState().inVoiceCall
+    )
+      return;
+    callEvent("microphone_interrupted", { reason });
+    // Captura interrompida não tira o usuário da sala nem fecha pares saudáveis.
+    if (Date.now() - this.lastMicRecoveredAt > 30000)
+      this.micRecoveryAttempt = 0;
+    if (this.micRecoveryAttempt > 0)
+      mediaError(
+        "Microfone interrompido",
+        "A chamada continua. Reconectando o microfone…",
+      );
+    this.scheduleMicRecovery();
+  }
+
+  private scheduleMicRecovery(): void {
+    if (this.micRecoveryTimer !== null) return;
+    if (this.micRecoveryAttempt >= this.micRecoveryDelaysMs.length) {
+      mediaError(
+        "Microfone sem sinal",
+        "A chamada continua, mas o microfone parou de responder. Selecione o microfone novamente.",
+      );
+      return;
+    }
+    const delay = this.micRecoveryDelaysMs[this.micRecoveryAttempt++];
+    const generation = this.micGeneration;
+    this.micRecoveryTimer = window.setTimeout(() => {
+      this.micRecoveryTimer = null;
+      if (
+        generation !== this.micGeneration ||
+        !useHubStore.getState().inVoiceCall
+      )
+        return;
+      callEvent("microphone_recovery", {
+        attempt: this.micRecoveryAttempt,
+        delayMs: delay,
+      });
+      void this.setupLocalMicrophone({ allowDefaultFallback: true })
+        .then(() => {
+          if (this.rawMicStream?.active) this.lastMicRecoveredAt = Date.now();
+        })
+        .catch(() => {
+          // A falha já foi informada por setupLocalMicrophone. Tenta de novo só se
+          // nada mais mexeu no microfone (saída, troca manual) nesse meio tempo.
+          if (this.micGeneration === generation + 1) this.scheduleMicRecovery();
+        });
+    }, delay);
+  }
+
+  private clearMicMuteWatchdog(): void {
+    if (this.micMuteWatchdog !== null) clearTimeout(this.micMuteWatchdog);
+    this.micMuteWatchdog = null;
+  }
+
+  private clearMicRecovery(): void {
+    if (this.micRecoveryTimer !== null) clearTimeout(this.micRecoveryTimer);
+    this.micRecoveryTimer = null;
+    this.clearMicMuteWatchdog();
+    this.micRecoveryAttempt = 0;
+    this.lastMicRecoveredAt = -Infinity;
   }
 
   public async selectMicrophone(deviceId: string): Promise<void> {
@@ -3497,6 +3595,7 @@ class WebRTCEngine {
     this.recoveryAttempts = 0;
     this.roomGeneration++;
     this.micGeneration++;
+    this.clearMicRecovery();
     this.cameraGeneration++;
     this.screenGeneration++;
     this.currentRoomSlug = "";

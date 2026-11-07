@@ -12,6 +12,18 @@
 
 # Changelog
 
+## AUDIO-009 — proteção contra picos do soundboard e recuperação resiliente do microfone (rc.7, sem mudança de versão)
+
+- **Sintoma:** barulhos muito altos e efeitos sonoros extremos do Soundboard faziam o interlocutor (irmão) cair da chamada ou perder o áudio da captura.
+- **Causa:** o Soundboard era injetado pós-compressor vocal em ganhos de até 200%, passando apenas por um corte seco (hard-clipping) que produzia ondas quadradas com sobremodulação no codec Opus, sobrecarregando o driver de áudio (AEC/WASAPI) de quem escutava e derrubando a captura do interlocutor. Além disso, a recuperação anterior fazia uma única tentativa imediata e ignorava faixas mutadas (`mute`) e `AudioContext` suspenso.
+- **Correção:** 
+  1. Compressor dinâmico dedicado ao Soundboard no pipeline de áudio (`threshold: -6dB`, `ratio: 8:1`, ataque ultra-rápido de 1ms) e teto de ganho calibrado para evitar estouro de DAC.
+  2. `outputPeakGuard` com curva de saturação suave (*soft-knee* senoidal) até 0.98, eliminando harmônicos de onda quadrada e prevenindo *overshoot* de interamostragem no Opus.
+  3. Recuperação automática do microfone com retentativas e espera crescente (0, 1, 2.5, 5, 10, 20 s), canceladas ao sair da sala ou trocar dispositivo; contador reinicia após 30 s estável.
+  4. Vigia para faixa mutada (`track.onmute`, 2.5 s) e suspensão do `AudioContext` (2 s), com fallback automático para microfone padrão se o ID do dispositivo tiver sumido durante o reset do driver.
+- **Diagnóstico:** motivos `microphone_muted` e `audio_context_suspended` no relatório; eventos `microphone_recovery` com tentativa e delay.
+- **Teste:** `tests/audio-peak-stability.cjs` atualizado com recuperação repetida, faixa muda e tolerância a falhas.
+
 ## UI-009 — refinamento de temas, botões e menus (rc.7, sem mudança de versão)
 
 - **Temas** (exceto Clássico, que não mudou): Sakura Dream com texto e botão mais escuros (contraste do botão 4,8 → 5,9) e barra lateral mais suave; Velvet Nocturne com vinho/dourado menos saturados; OLED Black com barra lateral e hover visíveis sobre o preto; Gamer Neon e Moderno Roxo com hover e bordas mais equilibrados. Todos os pares de texto continuam acima de 4,5:1. Fundo e botão do Moderno Roxo e o fundo do Light Modern foram mantidos porque os testes os fixam.

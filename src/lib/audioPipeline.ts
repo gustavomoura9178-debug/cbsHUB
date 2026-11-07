@@ -99,6 +99,9 @@ export class VoiceAudioPipeline {
   private onSpeakingChange: SpeakingCallback | null = null;
   private isDestroyed = false;
   private isMicMuted = false;
+  private onInterrupted: (() => void) | null = null;
+  private suspendTimer: number | null = null;
+  private soundboardCompressorNode: DynamicsCompressorNode | null = null;
 
   constructor(
     stream: MediaStream,
@@ -125,6 +128,25 @@ export class VoiceAudioPipeline {
     if (this.audioCtx.state === "suspended") {
       await this.audioCtx.resume();
     }
+
+    // Um AudioContext suspenso (troca de dispositivo, driver, política do
+    // navegador) deixa a trilha enviada em silêncio sem disparar "ended".
+    // Tenta retomar e só avisa o motor se continuar parado.
+    this.audioCtx.onstatechange = () => {
+      const ctx = this.audioCtx;
+      if (this.isDestroyed || !ctx || ctx.state === "closed") return;
+      if (ctx.state === "running") {
+        this.clearSuspendTimer();
+        return;
+      }
+      ctx.resume().catch(() => {});
+      if (this.suspendTimer !== null) return;
+      this.suspendTimer = window.setTimeout(() => {
+        this.suspendTimer = null;
+        if (this.isDestroyed || !this.audioCtx) return;
+        if (this.audioCtx.state !== "running") this.onInterrupted?.();
+      }, 2000);
+    };
 
     this.sourceNode = this.audioCtx.createMediaStreamSource(this.rawStream);
 
@@ -208,13 +230,22 @@ export class VoiceAudioPipeline {
     this.outputPeakGuard = createAudioPeakGuard(this.audioCtx);
     this.outputPeakGuard.connect(this.destinationNode);
 
-    // Entrada dos efeitos pós-filtros/gate, mas antes da proteção final de picos.
+    // Compressor dinâmico rápido dedicado aos efeitos sonoros para prevenir estouro/clipagem de DAC
+    this.soundboardCompressorNode = this.audioCtx.createDynamicsCompressor();
+    this.soundboardCompressorNode.threshold.setValueAtTime(-6, this.audioCtx.currentTime);
+    this.soundboardCompressorNode.knee.setValueAtTime(6, this.audioCtx.currentTime);
+    this.soundboardCompressorNode.ratio.setValueAtTime(8, this.audioCtx.currentTime);
+    this.soundboardCompressorNode.attack.setValueAtTime(0.001, this.audioCtx.currentTime);
+    this.soundboardCompressorNode.release.setValueAtTime(0.08, this.audioCtx.currentTime);
+    this.soundboardCompressorNode.connect(this.outputPeakGuard);
+
+    // Entrada dos efeitos pós-filtros/gate, com compressão antes da proteção final de picos.
     this.soundboardInputNode = this.audioCtx.createGain();
     this.soundboardInputNode.gain.setValueAtTime(
       1.0,
       this.audioCtx.currentTime,
     );
-    this.soundboardInputNode.connect(this.outputPeakGuard);
+    this.soundboardInputNode.connect(this.soundboardCompressorNode);
 
     // Encadeamento do Pipeline de Áudio:
     // source -> highPass -> lowPass -> [worklet] -> compressor -> gain -> analyser -> micMuteNode -> outputPeakGuard -> destination
@@ -310,6 +341,17 @@ export class VoiceAudioPipeline {
     }, 45);
   }
 
+  public setInterruptionHandler(handler: (() => void) | null): void {
+    this.onInterrupted = handler;
+  }
+
+  private clearSuspendTimer(): void {
+    if (this.suspendTimer !== null) {
+      clearTimeout(this.suspendTimer);
+      this.suspendTimer = null;
+    }
+  }
+
   public setMicMuted(muted: boolean): void {
     this.isMicMuted = muted;
     if (this.micMuteNode && this.audioCtx) {
@@ -369,6 +411,9 @@ export class VoiceAudioPipeline {
 
   public destroy(): void {
     this.isDestroyed = true;
+    this.onInterrupted = null;
+    this.clearSuspendTimer();
+    if (this.audioCtx) this.audioCtx.onstatechange = null;
 
     if (this.meterInterval !== null) {
       clearInterval(this.meterInterval);
@@ -438,6 +483,14 @@ export class VoiceAudioPipeline {
       } catch {
         /* ignore */
       }
+    }
+    if (this.soundboardCompressorNode) {
+      try {
+        this.soundboardCompressorNode.disconnect();
+      } catch {
+        /* ignore */
+      }
+      this.soundboardCompressorNode = null;
     }
 
     this.outputPeakGuard?.disconnect();

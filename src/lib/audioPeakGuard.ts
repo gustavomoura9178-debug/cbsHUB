@@ -7,7 +7,14 @@ export function createAudioPeakGuard(
   const curve = new Float32Array(4097);
   for (let i = 0; i < curve.length; i++) {
     const sample = (i / (curve.length - 1)) * 2 - 1;
-    curve[i] = Math.max(-0.98, Math.min(0.98, sample));
+    const abs = Math.abs(sample);
+    if (abs <= 0.8) {
+      curve[i] = sample;
+    } else {
+      const sign = sample > 0 ? 1 : -1;
+      const t = Math.min(1, (abs - 0.8) / 0.2);
+      curve[i] = sign * (0.8 + 0.18 * Math.sin((t * Math.PI) / 2));
+    }
   }
   node.curve = curve;
   node.oversample = "none";

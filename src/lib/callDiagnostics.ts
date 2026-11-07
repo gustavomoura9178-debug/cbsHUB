@@ -45,6 +45,8 @@ const REASONS = [
   "manual_leave",
   "room_left",
   "microphone_ended",
+  "microphone_muted",
+  "audio_context_suspended",
   "peer_closed",
   "media_failed",
   "media_timeout",

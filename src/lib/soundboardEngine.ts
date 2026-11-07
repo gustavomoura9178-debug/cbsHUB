@@ -259,7 +259,7 @@ class SoundboardEngine {
       const clipVolume = Number.isFinite(clip.volume) ? clip.volume! : 0.85;
       const finalVolume = Math.max(
         0,
-        Math.min(2.0, clipVolume * soundboardMasterVolume),
+        Math.min(1.4, clipVolume * soundboardMasterVolume),
       );
 
       // Nó de ganho mestre para esta instância do clipe
