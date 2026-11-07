@@ -12,6 +12,14 @@
 
 # Changelog
 
+## UI-009 — refinamento de temas, botões e menus (rc.7, sem mudança de versão)
+
+- **Temas** (exceto Clássico, que não mudou): Sakura Dream com texto e botão mais escuros (contraste do botão 4,8 → 5,9) e barra lateral mais suave; Velvet Nocturne com vinho/dourado menos saturados; OLED Black com barra lateral e hover visíveis sobre o preto; Gamer Neon e Moderno Roxo com hover e bordas mais equilibrados. Todos os pares de texto continuam acima de 4,5:1. Fundo e botão do Moderno Roxo e o fundo do Light Modern foram mantidos porque os testes os fixam.
+- **Botões:** transições específicas, estado pressionado, realce interno discreto só nos temas modernos, variante `success`/`destructive` com texto legível (novos tokens `--success-foreground` e ajuste de `--destructive-foreground`; antes era branco sobre fundo claro).
+- **Menus e popovers:** sombra segue o controle de sombra do tema, menus longos rolam em vez de serem cortados, margem de colisão com a borda da janela, estado pressionado nos itens.
+- **Switch, Input, Tabs:** trilho com contorno visível quando desligado, polegar com contraste, hover e foco com borda de destaque.
+- **Não validado aqui:** build e testes Playwright (sem dependências instaladas neste ambiente). Verificados apenas sintaxe TS e contraste dos presets. Revisar visualmente cada tema antes de integrar.
+
 ## Não lançado — 05/11/2026
 
 Responsável: Codex/OpenAI. Branch `audit/cbshub-v2-2026-11-05`.
@@ -162,3 +170,10 @@ EXECUTADO: build/tsc PASSED; suíte 33 scripts, 32 PASSED/1 BLOCKED por ICE (exi
 - Proteção final de picos na soma de microfone/efeitos e no retorno local, validação de ganhos e canais/amostras do gate.
 - Fallback de falha do processador preserva stream/mute; novos eventos de diagnóstico sem registrar áudio.
 - Regressão de áudio forte/agudo, falhas de captura/processador e cancelamento durante saída. Sem novas dependências. Causa física do relato ainda exige validação no dispositivo afetado.
+
+
+## UI-009 — validação posterior do patch — 06/11/2026 — Codex/OpenAI
+
+Patch original aplicado sem conflitos em `7959e31`, mantendo autoria e conteúdo, na branch `feat/ui-theme-refinement-2026-11-06`, base `b3721dd`. Ponto de recuperação `recovery/pre-ui-theme-refinement-2026-11-06`; principal preservada. Esta validação complementa a observação de testes não executados pelo autor do patch.
+
+EXECUTADO: `npm run build` aprovado; nove scripts existentes aprovados (`theme-validation`, `boot-theme`, `studio-smoke`, `redesign-smoke`, `visual-fixes`, `stabilization-a11y`, `media-smoke`, `chat-toolbar`, `compact-bars`, via `node tests/<nome>.cjs`). No navegador, prévia dos nove presets e contraste dos pares de texto avaliados por contrastChecks e dos tokens success/destructive >= 4,5:1. Capturas de Moderno Roxo e Sakura inspecionadas. Sem novos testes permanentes, bibliotecas, alterações de versão ou de motor WebRTC/áudio. Não foi executada a suíte inteira, matriz física entre dispositivos, empacotamento ou validação nativa Windows nesta aplicação de patch. Não equivale a certificação de acessibilidade de todos os estados de interação nem aprovação de produção.
