@@ -1,14 +1,14 @@
-> Atualização atual: **AUDIO-008 · 2.0.0-rc.7 · 06/11/2026 (America/Sao_Paulo)**. Leia [AUDIO_PEAK_STABILITY.md](AUDIO_PEAK_STABILITY.md). Interrupção de microfone deixa de encerrar a chamada; picos de áudio protegidos. Aceite no hardware afetado continua pendente. Registros abaixo são históricos.
+> Atualização atual: **AUDIO-008 · 2.0.0-rc.7 · 06/11/2026 (America/Sao_Paulo)**. Leia AUDIO_PEAK_STABILITY. Interrupção de microfone deixa de encerrar a chamada; picos de áudio protegidos. Aceite no hardware afetado continua pendente. Registros abaixo são históricos.
 
-> Estado atual: **DESKTOP-007 · 2.0.0-rc.6 · 06/11/2026 (America/Sao_Paulo)**. Leia [DESKTOP_NATIVE.md](DESKTOP_NATIVE.md). Build, 35 testes e pacote/smoke Linux aprovados; um teste bloqueado por ICE. Registros abaixo são históricos; validações Windows e duas máquinas continuam pendentes.
+> Estado atual: **DESKTOP-007 · 2.0.0-rc.6 · 06/11/2026 (America/Sao_Paulo)**. Leia DESKTOP_NATIVE. Build, 35 testes e pacote/smoke Linux aprovados; um teste bloqueado por ICE. Registros abaixo são históricos; validações Windows e duas máquinas continuam pendentes.
 
-> Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia [HOTFIX_ACCEPTANCE.md](HOTFIX_ACCEPTANCE.md). Registros anteriores são históricos; testes físicos permanecem pendentes.
+> Estado atual: **HOTFIX-006 · 2.0.0-rc.5 · 06/11/2026 UTC**. Leia HOTFIX_ACCEPTANCE. Registros anteriores são históricos; testes físicos permanecem pendentes.
 
-> Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia [HOTFIX_STABILITY.md](HOTFIX_STABILITY.md). Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
+> Estado atual: **HOTFIX-005 · 2.0.0-rc.4 · 06/11/2026 UTC**. Leia HOTFIX_STABILITY. Registros anteriores são históricos; candidato para revisão, sem aprovação de produção.
 
-> Atualização atual: **2.0.0-rc.2 / SECURITY-002**. Leia [SECURITY_UPDATE.md](SECURITY_UPDATE.md). Estados anteriores são históricos.
+> Atualização atual: **2.0.0-rc.2 / SECURITY-002**. Leia SECURITY_UPDATE. Estados anteriores são históricos.
 
-> Estado atual em 05/11/2026: candidato **2.0.0-rc.1**, estabilização STABILIZE-001. Consulte [STABILIZATION.md](STABILIZATION.md). As seções anteriores abaixo são históricas.
+> Estado atual em 05/11/2026: candidato **2.0.0-rc.1**, estabilização STABILIZE-001. Consulte STABILIZATION. As seções anteriores abaixo são históricas.
 
 # Changelog
 
@@ -34,7 +34,7 @@ Sem alterações de funcionalidade ou visual; sem substituição/atualização d
 
 ## Não lançado — REDESIGN-001 — 05/11/2026
 
-Codex/OpenAI · feat/workspace-redesign-2026-11-05 · a29e4ca. Novo workspace, sidebar ajustável/recolhível, membros opcionais, chat refinado, menus/foco, controle de voz identificado e diagnóstico organizado. Tokens grafite/verde-água e responsividade. Primitivos shadcn/Radix e Tailwind preservados, sem bibliotecas novas. Build e regressões locais passaram; mídia entre máquinas pendente. Detalhes em REDESIGN_REVIEW.md.
+Codex/OpenAI · feat/workspace-redesign-2026-11-05 · a29e4ca. Novo workspace, sidebar ajustável/recolhível, membros opcionais, chat refinado, menus/foco, controle de voz identificado e diagnóstico organizado. Tokens grafite/verde-água e responsividade. Primitivos shadcn/Radix e Tailwind preservados, sem bibliotecas novas. Build e regressões locais passaram; mídia entre máquinas pendente. Detalhes em REDESIGN_REVIEW.
 
 
 ## Atualização — STUDIO-001 — 05/11/2026
@@ -44,17 +44,17 @@ STUDIO-001 · Codex/OpenAI · feat/cbshub-studio-2026-11-05 · 19d316f. Adiciona
 
 ## Atualização — PROFILE-001 — 05/11/2026
 
-PROFILE-001 · Codex/OpenAI · feat/user-profiles-2026-11-05 · 7a88783. Perfis locais completos/editáveis, avatar/banner, status, temas de cartão, privacidade e bloqueios; projeção pública e integração P2P validadas. Sem mudança de autenticação nem dependências. Detalhes/testes/limites em PROFILES.md.
+PROFILE-001 · Codex/OpenAI · feat/user-profiles-2026-11-05 · 7a88783. Perfis locais completos/editáveis, avatar/banner, status, temas de cartão, privacidade e bloqueios; projeção pública e integração P2P validadas. Sem mudança de autenticação nem dependências. Detalhes/testes/limites em PROFILES.
 
 
 ## Atualização — CHAT-002 — 05/11/2026
 
-CHAT-002 · Codex/OpenAI · feat/chat-v2-2026-11-05 · b74272e. Chat com edição/exclusão/resposta/pin, reações idempotentes, Markdown/código/links seguros, drafts, ACK, reconciliação lógica, busca/janela limitada e três modos de eventos Soundboard. Sem dependências novas. Resultados/limites em CHAT_2.md.
+CHAT-002 · Codex/OpenAI · feat/chat-v2-2026-11-05 · b74272e. Chat com edição/exclusão/resposta/pin, reações idempotentes, Markdown/código/links seguros, drafts, ACK, reconciliação lógica, busca/janela limitada e três modos de eventos Soundboard. Sem dependências novas. Resultados/limites em CHAT_2.
 
 
 ## Atualização — MEDIA-001 — 05/11/2026
 
-Controles de mídia com estados/erros e painel expandido; RTT/perda por participante; aquisição sob demanda, encerramento/rollback de capturas, handles separados de câmera/tela e reconexão com backoff. Soundboard com categorias, edição/ordem, favoritos nativos persistentes, preview isolado e preferência de eventos compartilhada com chat. Deafen aplicado às telas e sons ativos. Limite de volume individual corrigido para 100%. Sem dependências novas. Detalhes e limites em MEDIA_EXPERIENCE.md.
+Controles de mídia com estados/erros e painel expandido; RTT/perda por participante; aquisição sob demanda, encerramento/rollback de capturas, handles separados de câmera/tela e reconexão com backoff. Soundboard com categorias, edição/ordem, favoritos nativos persistentes, preview isolado e preferência de eventos compartilhada com chat. Deafen aplicado às telas e sons ativos. Limite de volume individual corrigido para 100%. Sem dependências novas. Detalhes e limites em MEDIA_EXPERIENCE.
 
 ## VISUAL-002 — 05/11/2026 — Codex/OpenAI
 
@@ -76,17 +76,17 @@ Candidato 2.0.0-rc.1: preload CJS único; sandbox/IPC/navegação/captura refor�
 
 ## SECURITY-002 — 05/11/2026
 
-SECURITY-002: Electron 45.2.3, builder 26.18.0, Vite 8.3.6 e plugins compatíveis; esbuild explícito e override restrito de minimatch. CSP de produção, allowlist de capacidades, captura fail-closed e validação de presença. Novo teste de sinalização, Electron smoke ampliado e teste de rascunho desambiguado. Proposta de backend próprio adicionada. Ver SECURITY_UPDATE.md para justificativas e limites.
+SECURITY-002: Electron 45.2.3, builder 26.18.0, Vite 8.3.6 e plugins compatíveis; esbuild explícito e override restrito de minimatch. CSP de produção, allowlist de capacidades, captura fail-closed e validação de presença. Novo teste de sinalização, Electron smoke ampliado e teste de rascunho desambiguado. Proposta de backend próprio adicionada. Ver SECURITY_UPDATE para justificativas e limites.
 
 
 ## BRAND-001 — 05/11/2026 — Codex/OpenAI
 
-Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px titlebar, 60/56px sala, ~32px chamada); subtítulo removido e estado de maximização sincronizado com Electron. Build e testes compact-bars/window-controls/desktop-security/electron-smoke/redesign-smoke/media-smoke passaram localmente. Arraste e aparência real maximizada/restaurada exigem desktop gráfico. Logo/PNG/ICO ainda pendentes do arquivo original solicitado: tentativa generativa alterou arte e não foi integrada. Ler COMPACT_BARS.md para arquivos, evidências e retomada. Trabalho das barras pronto para revisão; não declarar integração da logo concluída. Reserva da identidade permanece aguardando entrada, sem mudanças de motores/backend. Sem push/merge.
+Branch feat/compact-bars-logo-2026-11-05, base cb7b93f. Barras compactadas (32px titlebar, 60/56px sala, ~32px chamada); subtítulo removido e estado de maximização sincronizado com Electron. Build e testes compact-bars/window-controls/desktop-security/electron-smoke/redesign-smoke/media-smoke passaram localmente. Arraste e aparência real maximizada/restaurada exigem desktop gráfico. Logo/PNG/ICO ainda pendentes do arquivo original solicitado: tentativa generativa alterou arte e não foi integrada. Ler COMPACT_BARS para arquivos, evidências e retomada. Trabalho das barras pronto para revisão; não declarar integração da logo concluída. Reserva da identidade permanece aguardando entrada, sem mudanças de motores/backend. Sem push/merge.
 
 
 ## BRAND-002 — 05/11/2026 — Codex/OpenAI
 
-Branch feat/official-logo-2026-11-05, base 9b58863. SVG oficial recebido e preservado byte a byte; fundo já transparente, branco central faz parte da arte. Exportados nove PNGs e ICO multiresolução; integrados à titlebar/rail, BrowserWindow e builder Windows/Linux. Build, official-logo, compact-bars, window-controls, electron-smoke e empacotamento Linux passaram localmente; logo também carregou no executável Linux. Windows/tray/arraste físico não aprovados. Detalhes/arquivos em OFFICIAL_LOGO.md. Pendência de arquivo de BRAND-001 resolvida; reserva liberada ao concluir revisão local. Sem push/merge nesta etapa.
+Branch feat/official-logo-2026-11-05, base 9b58863. SVG oficial recebido e preservado byte a byte; fundo já transparente, branco central faz parte da arte. Exportados nove PNGs e ICO multiresolução; integrados à titlebar/rail, BrowserWindow e builder Windows/Linux. Build, official-logo, compact-bars, window-controls, electron-smoke e empacotamento Linux passaram localmente; logo também carregou no executável Linux. Windows/tray/arraste físico não aprovados. Detalhes/arquivos em OFFICIAL_LOGO. Pendência de arquivo de BRAND-001 resolvida; reserva liberada ao concluir revisão local. Sem push/merge nesta etapa.
 
 ## CHAT-UI-003 — 05/11/2026
 
@@ -104,17 +104,17 @@ Limitações: instalador/ícone do Windows, bandeja e arraste físico não testa
 
 ## WORKSPACE-3 A/B/F — 05/11/2026 — Codex/OpenAI
 
-Branch feat/workspace-3-2026-11-05, base 8cd3dff. Diagnóstico estruturado local e limitado, relatório sem conteúdo/IDs/endereço, recuperação limitada/cancelável e preservação da voz durante perda isolada do DataConnection. Correções baseadas em caminho reproduzível, sem afirmar causa das quedas do usuário. Push-to-talk opcional com foco (F8/F9/F10), teste local de microfone e limpeza de recursos; stack/mixagem/Soundboard preservados. Arquivos/limites e critérios em VOICE_RECOVERY.md. Testes call-recovery, audio-tools, media-engine e build/tsc passaram nas execuções iniciais; suíte final ainda em execução ao registrar esta fase. Hardware/ICE/TURN e atalho global não aprovados. Sem backend ou mudança de versão; commit de conteúdo será registrado no fechamento.
+Branch feat/workspace-3-2026-11-05, base 8cd3dff. Diagnóstico estruturado local e limitado, relatório sem conteúdo/IDs/endereço, recuperação limitada/cancelável e preservação da voz durante perda isolada do DataConnection. Correções baseadas em caminho reproduzível, sem afirmar causa das quedas do usuário. Push-to-talk opcional com foco (F8/F9/F10), teste local de microfone e limpeza de recursos; stack/mixagem/Soundboard preservados. Arquivos/limites e critérios em VOICE_RECOVERY. Testes call-recovery, audio-tools, media-engine e build/tsc passaram nas execuções iniciais; suíte final ainda em execução ao registrar esta fase. Hardware/ICE/TURN e atalho global não aprovados. Sem backend ou mudança de versão; commit de conteúdo será registrado no fechamento.
 
 
 ## WORKSPACE-3 C/D/E — 05/11/2026 — Codex/OpenAI
 
-Branch feat/workspace-3-2026-11-05, sobre ac501cc. Sidebar existente refinada, sem recriar aplicativo: pesquisa, favoritas locais/recentes separados, indicador real de não lidas da sala ativa, painel compacto de voz e rodapé de perfil em uma linha com tooltips/estados reais. Resize/collapse/Sheets, temas e opções detalhadas do dock preservados. useShallow evita subscrição do sidebar a micLevel e outros estados sem uso. Arquivos: LeftSidebar.tsx, index.css e workspace-sidebar.cjs; documentação em WORKSPACE_3_STATUS.md. workspace-sidebar passou localmente, incluindo teclado/mobile/persistência/temas. Sem contadores de outras salas ou DM falsos. Demais dependências externas estão explicitadas no status.
+Branch feat/workspace-3-2026-11-05, sobre ac501cc. Sidebar existente refinada, sem recriar aplicativo: pesquisa, favoritas locais/recentes separados, indicador real de não lidas da sala ativa, painel compacto de voz e rodapé de perfil em uma linha com tooltips/estados reais. Resize/collapse/Sheets, temas e opções detalhadas do dock preservados. useShallow evita subscrição do sidebar a micLevel e outros estados sem uso. Arquivos: LeftSidebar.tsx, index.css e workspace-sidebar.cjs; documentação em WORKSPACE_3_STATUS. workspace-sidebar passou localmente, incluindo teclado/mobile/persistência/temas. Sem contadores de outras salas ou DM falsos. Demais dependências externas estão explicitadas no status.
 
 
 ## WORKSPACE-3 — fechamento local — 05/11/2026 — Codex/OpenAI
 
-Branch feat/workspace-3-2026-11-05. Commits de conteúdo: eb8f1fc (limpeza do chat, sem motor), 8cd3dff (nova logo oficial), ac501cc (diagnóstico/recuperação/áudio), bed3859 (sidebar/painel/rodapé). Fonte, PNGs/ICO, componentes, testes e limites por fase em WORKSPACE_3_STATUS.md e VOICE_RECOVERY.md. main não alterada; nenhum push/merge nesta tarefa. Tags locais de recuperação preservadas. Reservas liberadas para revisão.
+Branch feat/workspace-3-2026-11-05. Commits de conteúdo: eb8f1fc (limpeza do chat, sem motor), 8cd3dff (nova logo oficial), ac501cc (diagnóstico/recuperação/áudio), bed3859 (sidebar/painel/rodapé). Fonte, PNGs/ICO, componentes, testes e limites por fase em WORKSPACE_3_STATUS e VOICE_RECOVERY. main não alterada; nenhum push/merge nesta tarefa. Tags locais de recuperação preservadas. Reservas liberadas para revisão.
 
 Resultado final EXECUTADO: npm run build e tsc passaram; npm test executou 23 scripts, 22 passaram e media-transport ficou BLOCKED por ausência de candidatos ICE locais. O runner terminou exit 1 pelo bloqueio, sem falhas funcionais restantes nessa execução. Logs em build/test-logs e resumo em build/test-results.json são artefatos locais ignorados. A primeira suíte teve uma falha no fixture de call-recovery: a reconstrução esgotada removia sessões antigas como esperado e o cenário seguinte presumiu que havia um canal de chat. Fixture passou a estabelecer novo canal antes de verificar saída independente da voz; teste isolado e suíte completa repetidos com passe. A comparação de tags SVG também foi normalizada/reexecutada conforme BRAND-003. Não omitir essas tentativas na retomada.
 
@@ -122,12 +122,12 @@ Pacote Linux local preparado com electron-builder --linux --dir e Electron45 ins
 
 Pendente/manual: chamadas reais em dois computadores/redes e vários participantes, ICE/STUN/TURN, suspensão/recuperação real, dispositivos físicos, vídeo/tela/Soundboard simultâneos, consumo de CPU/memória sob carga, Windows/ícones/arraste físicos, leitor de tela e revisão fina de contraste. Não declarar que todas as quedas foram corrigidas ou que o aplicativo está pronto para produção. Versão de desenvolvimento permanece 2.0.0-rc.2; selecionar próximo rc conforme VERSIONING.md antes de distribuir novo candidato. Backend próprio continua proposta para revisão; contas, ACL/salas globais, sincronização entre dispositivos, DM, anexos/pastas/GIFs e notificações do SO não implementados nesta entrega. Sem interfaces falsas.
 
-Próximo responsável: revisar os commits separados, coletar relatório Configurações > Diagnóstico durante uma queda real e executar os gates da matriz de WORKSPACE_3_STATUS.md. No PTT usar F8/F9/F10 com foco; não confundir com atalho global. Favoritos/remoção/restauração de salas são locais; dados históricos existentes preservados.
+Próximo responsável: revisar os commits separados, coletar relatório Configurações > Diagnóstico durante uma queda real e executar os gates da matriz de WORKSPACE_3_STATUS. No PTT usar F8/F9/F10 com foco; não confundir com atalho global. Favoritos/remoção/restauração de salas são locais; dados históricos existentes preservados.
 
 
 ## DESKTOP-004 — entrega de revisão — 05/11/2026 — Codex/OpenAI
 
-Branch feat/desktop-refinement-2026-11-05, base 29e60c1 (PR #11 integrado). Candidato **2.0.0-rc.3**, package/lock consistentes; nenhuma dependência nova/substituída. Código até f9c5513, seguido deste fechamento de testes/versão/docs. Escopo/arquivos/limites em DESKTOP_REFINEMENT.md. Commits: cf21349 (abertura real/reconexão), 7a408f6 (Tray/processo), c2264b3 (identidade local antes de open), 4e1c735 (cards), 322c5c0 (configurações/temas), 8274ad9 (logo/loading), 5a749f6 (corte de efeitos), c5994f2 (navegação), 9a5164a (controles/seletores) e f9c5513 (origem de telemetria).
+Branch feat/desktop-refinement-2026-11-05, base 29e60c1 (PR #11 integrado). Candidato **2.0.0-rc.3**, package/lock consistentes; nenhuma dependência nova/substituída. Código até f9c5513, seguido deste fechamento de testes/versão/docs. Escopo/arquivos/limites em DESKTOP_REFINEMENT. Commits: cf21349 (abertura real/reconexão), 7a408f6 (Tray/processo), c2264b3 (identidade local antes de open), 4e1c735 (cards), 322c5c0 (configurações/temas), 8274ad9 (logo/loading), 5a749f6 (corte de efeitos), c5994f2 (navegação), 9a5164a (controles/seletores) e f9c5513 (origem de telemetria).
 
 EXECUTADO: npm run build/tsc passaram; npm test executou **27 scripts: 26 PASSED, 1 BLOCKED (media-transport, ausência de candidatos ICE locais)**. Exit 1 do runner corresponde ao bloqueio, não a um passe de transporte nem a falha funcional restante nessa execução. npm audit executado nesta revisão: zero ocorrências. Empacotamento Linux final e electron-smoke com executável dist-package/linux-unpacked/cbshub passaram (startup/reload, logo, CSP, preload isolado e captura sintética). Build JS ~708,58kB/gzip ~209,73kB; avisos preexistentes de customResolver/freeze/bundle e author/referências do builder permanecem. Logs/resumo/pacote são artefatos locais ignorados, não instalador Windows publicado. npm ci não foi repetido porque a resolução de dependências não mudou. Empacotar depois de parar renderer: HTML gerado em dist-package pode provocar reload do Vite e interferir nos testes.
 
@@ -135,15 +135,15 @@ Regressões cobrem temas/contraste/persistência/cancelar, editores dentro de um
 
 Pendências: ICE/STUN/TURN e áudio/vídeo depois de queda em duas máquinas/redes; suspensão e troca física de dispositivos; bandeja/menu/ícone Windows e janelas físicas; leitor de tela/contraste completo e benchmark de CPU/GPU/memória sob carga. ABR independente por todos os pares continua pendente; origem do HUD/foco e ausência de medição já foram corrigidas. Backend/contas/ACL/salas globais, DM/anexos/arquivos/pastas/GIFs continuam dependentes de revisão/infraestrutura. Notificações de mensagens do SO também permanecem pendentes. Remoção/restauração/favoritos de salas são locais por decisão anterior. Fallback de memória de banco indisponível não é durabilidade após reinício. Não declarar produção pronta.
 
-Para outra IA: ler DESKTOP_REFINEMENT.md antes de editar. Studio.begin e ProfileProvider.edit abrem abas de configurações; não remontar StudioDialog global ou recriar os editores. API preload tem 9 métodos, getter getDesktopState restrito ao renderer principal. X preserva renderer/captura; before-quit libera encerramento. PTT continua com foco e ganho antes da entrada de efeitos. originalAudioBlob é aditivo/local e não deve ser descartado silenciosamente. Telemetria precisa de sourcePeerId/direction/observedLinkPeerId/flags; não reintroduzir FPS/RTT defaults nem publicar resultado de PC antigo. Medidor é isolado; não voltar a assinar micLevel nos editores/header. Preservar logo nova e mensagem numérica legítima. Próximo gate: revisão da branch e matriz física, sem merge automático.
+Para outra IA: ler DESKTOP_REFINEMENT antes de editar. Studio.begin e ProfileProvider.edit abrem abas de configurações; não remontar StudioDialog global ou recriar os editores. API preload tem 9 métodos, getter getDesktopState restrito ao renderer principal. X preserva renderer/captura; before-quit libera encerramento. PTT continua com foco e ganho antes da entrada de efeitos. originalAudioBlob é aditivo/local e não deve ser descartado silenciosamente. Telemetria precisa de sourcePeerId/direction/observedLinkPeerId/flags; não reintroduzir FPS/RTT defaults nem publicar resultado de PC antigo. Medidor é isolado; não voltar a assinar micLevel nos editores/header. Preservar logo nova e mensagem numérica legítima. Próximo gate: revisão da branch e matriz física, sem merge automático.
 
 ## HOTFIX-005 — 2.0.0-rc.4 — não lançado — 06/11/2026 UTC
 
-Codex/OpenAI · hotfix/stability-desktop-2026-11-05 · base b8983d6. Corrigidos confirmação prematura de recuperação, beacon desconectado, consultas sem prazo e mídia sem novos pacotes; rede e UI em commits distintos. Cards passam a caber no palco sem piso fixo; estados/RTT são do enlace observado. Bandeja ganha mostrar/ocultar, estado e aviso inicial persistido. Configurações conservam rascunhos entre abas e confirmam descarte inline; temas ficam em Aparência. Corte conserva intervalo e exige reaplicar antes de salvar. Splash aplica cores validadas antes do React e pausa completa de 364 ms. Nenhuma dependência, banco ou logo substituído. Escopo/arquivos, resultados e limitações: HOTFIX_STABILITY.md. Sem merge/release automática.
+Codex/OpenAI · hotfix/stability-desktop-2026-11-05 · base b8983d6. Corrigidos confirmação prematura de recuperação, beacon desconectado, consultas sem prazo e mídia sem novos pacotes; rede e UI em commits distintos. Cards passam a caber no palco sem piso fixo; estados/RTT são do enlace observado. Bandeja ganha mostrar/ocultar, estado e aviso inicial persistido. Configurações conservam rascunhos entre abas e confirmam descarte inline; temas ficam em Aparência. Corte conserva intervalo e exige reaplicar antes de salvar. Splash aplica cores validadas antes do React e pausa completa de 364 ms. Nenhuma dependência, banco ou logo substituído. Escopo/arquivos, resultados e limitações: HOTFIX_STABILITY. Sem merge/release automática.
 
 ## HOTFIX-006 — 06/11/2026 UTC — Codex/OpenAI
 
-Branch fix/hotfix-acceptance-gaps-2026-11-06, base 16afa14 (PR #13 já integrado). Candidato rc.5; conteúdo b527927 e a544853, seguido do fechamento documental. Corrigidas lacunas reais: identidade das mensagens em Aparência com persistência e contraste, estado de sinalização/presença local no próprio card/sidebar, miniaturas spotlight proporcionais e pausa conjunta de 364 ms da logo. Motor de rede, bancos, IPC, arte e stack preservados. Relatório por requisito/arquivos: HOTFIX_ACCEPTANCE.md.
+Branch fix/hotfix-acceptance-gaps-2026-11-06, base 16afa14 (PR #13 já integrado). Candidato rc.5; conteúdo b527927 e a544853, seguido do fechamento documental. Corrigidas lacunas reais: identidade das mensagens em Aparência com persistência e contraste, estado de sinalização/presença local no próprio card/sidebar, miniaturas spotlight proporcionais e pausa conjunta de 364 ms da logo. Motor de rede, bancos, IPC, arte e stack preservados. Relatório por requisito/arquivos: HOTFIX_ACCEPTANCE.
 
 EXECUTADO: build/tsc PASSED; suíte 33 scripts, 32 PASSED/1 BLOCKED por ICE (exit 1); zero falhas restantes. Teste integrado adicional dos controles compactos PASSED. Pacote e smoke Linux rc.5 PASSED. Evidências em hotfix-006-results.json. Windows, audição bidirecional em dispositivos físicos após queda e revisão assistiva não executados. Sem produção aprovada ou merge automático.
 

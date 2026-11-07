@@ -68,22 +68,22 @@ StudioProvider envolve App; rascunho/salvo separados evitam remontar engines. th
 
 ## Atualização — PROFILE-001 — 05/11/2026
 
-ProfileProvider envolve App; repository local vincula perfil ao clientId e mantém bloqueios. Modelo UserProfile privado e PublicProfile separado. profile_update aditivo sobre DataConnection, associado à sessão e excluído do diretório/state_sync. Gates de mídia/reação/bloqueio ficam no motor. Sem backend ou mudança de autenticação. Ver PROFILES.md.
+ProfileProvider envolve App; repository local vincula perfil ao clientId e mantém bloqueios. Modelo UserProfile privado e PublicProfile separado. profile_update aditivo sobre DataConnection, associado à sessão e excluído do diretório/state_sync. Gates de mídia/reação/bloqueio ficam no motor. Sem backend ou mudança de autenticação. Ver PROFILES.
 
 
 ## Atualização — CHAT-002 — 05/11/2026
 
-ChatPanel/MessageRow/SafeMarkdown substituem somente a camada de chat anterior. ChatLedger serializa operações no banco cbshub_chat_ledger; storageDb continua com mensagens/clips. Protocolo aditivo chat_operation/chat_operations_sync/chat_ack; histórico/mutação filtrados por sala/sessão/autoria local. Janela DOM de 100 e retenção 500. Ver CHAT_2.md.
+ChatPanel/MessageRow/SafeMarkdown substituem somente a camada de chat anterior. ChatLedger serializa operações no banco cbshub_chat_ledger; storageDb continua com mensagens/clips. Protocolo aditivo chat_operation/chat_operations_sync/chat_ack; histórico/mutação filtrados por sala/sessão/autoria local. Janela DOM de 100 e retenção 500. Ver CHAT_2.
 
 
 ## Atualização — MEDIA-001 — 05/11/2026
 
-mediaState guarda apenas estado transitório de captura/erro/reconexão e qualidade por peer. PeerMediaSession separa webcamCall/screenCall recebidos de outgoingWebcam/outgoingScreen enviados; voiceCall permanece bidirecional. Tokens de geração invalidam capturas/salas antigas. PeerJS é reaproveitado no retry; transportes de chat e ledger não foram substituídos. Soundboard mantém retorno local via GainNode por contexto e injeção pós-gate; setSinkId condicionado à capacidade do runtime. SoundboardClip acrescenta category/order opcionais; banco/chaves existentes preservados. soundPreferences compartilha cbshub-chat-sounds entre painéis. Detalhes em MEDIA_EXPERIENCE.md.
+mediaState guarda apenas estado transitório de captura/erro/reconexão e qualidade por peer. PeerMediaSession separa webcamCall/screenCall recebidos de outgoingWebcam/outgoingScreen enviados; voiceCall permanece bidirecional. Tokens de geração invalidam capturas/salas antigas. PeerJS é reaproveitado no retry; transportes de chat e ledger não foram substituídos. Soundboard mantém retorno local via GainNode por contexto e injeção pós-gate; setSinkId condicionado à capacidade do runtime. SoundboardClip acrescenta category/order opcionais; banco/chaves existentes preservados. soundPreferences compartilha cbshub-chat-sounds entre painéis. Detalhes em MEDIA_EXPERIENCE.
 
 
 ## STABILIZE-001 — 05/11/2026
 
-Preload usa build Rollup CJS único com lib:false, mantendo seis métodos da API. Main valida origem/frame/argumentos de IPC, bloqueia navegação externa e usa sandbox de renderer. Captura exige fonte selecionada e não usa fallback automático para a primeira tela. Journal agrupa operações por append linear, sem mudar banco/protocolo. Servidor de testes e runner agora estão versionados em scripts/. Ver STABILIZATION.md.
+Preload usa build Rollup CJS único com lib:false, mantendo seis métodos da API. Main valida origem/frame/argumentos de IPC, bloqueia navegação externa e usa sandbox de renderer. Captura exige fonte selecionada e não usa fallback automático para a primeira tela. Journal agrupa operações por append linear, sem mudar banco/protocolo. Servidor de testes e runner agora estão versionados em scripts/. Ver STABILIZATION.
 
 
 ## SECURITY-002 — 05/11/2026
@@ -93,26 +93,26 @@ SECURITY-002 preserva arquitetura local/P2P. Acrescenta CSP no HTML de produçã
 
 ## WORKSPACE-3 — 05/11/2026
 
-callDiagnostics armazena no máximo 200 eventos sanitizados em memória. CallDiagnosticsPanel exporta somente estatísticas e estados permitidos. Reconexão reutiliza PeerMediaSession ao substituir DataConnection, com guards por conexão/geração e retries limitados; não existe backend novo. voicePreferences guarda somente PTT/tecla em chave local separada; hook de foco controla ganho no pipeline existente. MicrophoneTest tem captura local independente, explícita e com cleanup. Favoritos locais vivem na sidebar; chat/viewState coordena pesquisa/fixadas/atividades por sala e densidade existente. Ver VOICE_RECOVERY.md e WORKSPACE_3_STATUS.md; descrições antigas de Vite/preload/backend são históricas, versões atuais em package.json e correções em SECURITY_UPDATE.md.
+callDiagnostics armazena no máximo 200 eventos sanitizados em memória. CallDiagnosticsPanel exporta somente estatísticas e estados permitidos. Reconexão reutiliza PeerMediaSession ao substituir DataConnection, com guards por conexão/geração e retries limitados; não existe backend novo. voicePreferences guarda somente PTT/tecla em chave local separada; hook de foco controla ganho no pipeline existente. MicrophoneTest tem captura local independente, explícita e com cleanup. Favoritos locais vivem na sidebar; chat/viewState coordena pesquisa/fixadas/atividades por sala e densidade existente. Ver VOICE_RECOVERY e WORKSPACE_3_STATUS; descrições antigas de Vite/preload/backend são históricas, versões atuais em package.json e correções em SECURITY_UPDATE.
 
 
 ## DESKTOP-004 — 05/11/2026
 
-Electron mantém uma instância por userData, Tray/close-to-background e getDesktopState validado no preload; headless minimiza e evita GTK sem display. settingsNavigation coordena abas; Studio/Profile reutilizam conteúdo embutido sem reiniciar motores. MicrophoneLevelMeter isola updates; header/settings usam seletores rasos. callGrid/useElementSize calculam cards pela área. AnimatedLogo/ConnectionScreen usam a identidade oficial e estados reais de inicialização/reconexão. audioTrim gera WAV restrito e preserva originalAudioBlob no mesmo armazenamento local. StreamTelemetry ganhou origem/direção/enlace e flags de medição; observador acompanha foco, gerações descartam respostas antigas e números desconhecidos não são inventados. Modelo de temas/JSON continua v1; stack/dependências/IPC antigos preservados com getter aditivo. Ver DESKTOP_REFINEMENT.md para contratos e limites.
+Electron mantém uma instância por userData, Tray/close-to-background e getDesktopState validado no preload; headless minimiza e evita GTK sem display. settingsNavigation coordena abas; Studio/Profile reutilizam conteúdo embutido sem reiniciar motores. MicrophoneLevelMeter isola updates; header/settings usam seletores rasos. callGrid/useElementSize calculam cards pela área. AnimatedLogo/ConnectionScreen usam a identidade oficial e estados reais de inicialização/reconexão. audioTrim gera WAV restrito e preserva originalAudioBlob no mesmo armazenamento local. StreamTelemetry ganhou origem/direção/enlace e flags de medição; observador acompanha foco, gerações descartam respostas antigas e números desconhecidos não são inventados. Modelo de temas/JSON continua v1; stack/dependências/IPC antigos preservados com getter aditivo. Ver DESKTOP_REFINEMENT para contratos e limites.
 
 ## HOTFIX-005 — recuperação e desktop — 06/11/2026 UTC
 
 A malha PeerJS permanece existente. Recuperação agora distingue sinalização, descoberta com ACK e mídia com avanço de RTP; clientIds estáveis mantêm os participantes esperados mesmo se o peerId for reconstruído. Consultas do beacon têm prazo e guards por geração/identidade. Estatísticas assíncronas antigas são descartadas por epoch da recuperação. UI consome fases/quality.flowing; não infere internet remota de RTT local. A origem de sinalização e qualidade de mídia continuam conceitos separados.
 
-BackgroundNotice isola a confirmação única de execução em segundo plano; main persiste a preferência e valida tray-state. Sem acesso livre do renderer a IPC/arquivos. Configurações usam flags efêmeras de rascunho e editores embutidos preservados entre abas; salvar/cancelar permanece nos providers. Boot-theme.js aceita só HEX e modo do armazenamento já existente. SoundboardClip recebe intervalo aditivo sobre originalAudioBlob; bancos e protocolo de áudio não foram substituídos. Referência: HOTFIX_STABILITY.md.
+BackgroundNotice isola a confirmação única de execução em segundo plano; main persiste a preferência e valida tray-state. Sem acesso livre do renderer a IPC/arquivos. Configurações usam flags efêmeras de rascunho e editores embutidos preservados entre abas; salvar/cancelar permanece nos providers. Boot-theme.js aceita só HEX e modo do armazenamento já existente. SoundboardClip recebe intervalo aditivo sobre originalAudioBlob; bancos e protocolo de áudio não foram substituídos. Referência: HOTFIX_STABILITY.
 
 ## HOTFIX-006 — apresentação — 06/11/2026 UTC
 Preferências locais de identidade em src/chat/viewState.ts usam JSON v1 aditivo com dois booleanos; não mudam banco/protocolo nem identidade do autor. MessageRow aplica avatar opcional no modo confortável e cor HEX com contraste >=4,5 contra fundo de mensagens, com fallback de tema. LocalConnectionBadge consome sinalização/presença locais; quality[peerId] permanece medição remota do enlace. Spotlight reutiliza useElementSize/callGrid; CallControls compact abre o dock existente via Popover. Logo usa keyframes distintos com janela comum totalmente revelada de 46% a 60% em 2,6 s (364 ms). Sem alteração do motor, IPC, backend, formato de temas ou assets.
 
 
 ## Incremento DESKTOP-007 — rc.6
-Notificação renderer → preload notifyNative → IPC cbs:notify com allowedSender/schema → Electron Notification. Ativação retorna apenas ID, consumido uma vez após revalidar sessão/sala/participante. Identificação de voz é por presença na sala; sem novo backend. Efeitos são decodificados em AudioContext separado e enviados pelo mixer existente, com orçamento de cache/concorrência. O transporte e a arquitetura P2P permanecem. Ver DESKTOP_NATIVE.md.
+Notificação renderer → preload notifyNative → IPC cbs:notify com allowedSender/schema → Electron Notification. Ativação retorna apenas ID, consumido uma vez após revalidar sessão/sala/participante. Identificação de voz é por presença na sala; sem novo backend. Efeitos são decodificados em AudioContext separado e enviados pelo mixer existente, com orçamento de cache/concorrência. O transporte e a arquitetura P2P permanecem. Ver DESKTOP_NATIVE.
 
 
 ## AUDIO-008 — captura não determina participação
-Microfone e efeitos somam em proteção de pico antes do MediaStreamDestination. Gate continua exclusivo do microfone; mute não corta efeitos. Interrupção da captura tenta setupLocalMicrophone/replaceTrack dentro da sessão existente, sem leaveVoiceCall. Orçamento de uma recuperação por 10 s e gerações existentes impedem loops/ressurreição após sair. Falha do worklet desconecta somente o gate. Ver AUDIO_PEAK_STABILITY.md.
+Microfone e efeitos somam em proteção de pico antes do MediaStreamDestination. Gate continua exclusivo do microfone; mute não corta efeitos. Interrupção da captura tenta setupLocalMicrophone/replaceTrack dentro da sessão existente, sem leaveVoiceCall. Orçamento de uma recuperação por 10 s e gerações existentes impedem loops/ressurreição após sair. Falha do worklet desconecta somente o gate. Ver AUDIO_PEAK_STABILITY.

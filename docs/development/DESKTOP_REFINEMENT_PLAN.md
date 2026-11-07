@@ -1,9 +1,0 @@
-# Desktop refinement — 05/11/2026
-
-Responsável: Codex/OpenAI. Branch feat/desktop-refinement-2026-11-05, base 29e60c1 (PR #11 integrado), checkout limpo. Recuperação recovery/pre-desktop-refinement-2026-11-05. Sem alterações concorrentes encontradas no remoto/documentação. Preservar logo nova de duas partes confirmada pelo mantenedor, não restaurar arcos da descrição antiga. Números no chat são mensagem legítima, esclarecimento prévio prevalece.
-
-Ordem: (1) auditar estado atual/diagnóstico; (2) corrigir estados de recuperação e associação de qualidade; (3) Tray/single instance/ocultar sem desmontar renderer; (4–6) reaproveitar sidebar/rodapé/toolbar removida/barras compactas, acrescentar somente lacunas; (7) cards proporcionais ao palco; (8) editores existentes embutidos em configurações; (9) Sakura Dream/Velvet Nocturne com tokens e contraste; (10) logo animada em inicialização real e reconexão bloqueante apenas quando apropriado; (11) nomenclatura Efeitos Sonoros e editor de corte seguro; (12) auditar chat/persistência; (13) segurança/lifecycle; (14) build, testes e docs. Commits pequenos por escopo.
-
-Já implementados: logo/assets, barras 32/60/56px, busca sob demanda/pins/menu/atividades/densidade, favoritos/recentes, perfil compacto, painel de voz, diagnóstico limitado, backoff/PTT/teste mic/dispositivos, CRUD/Markdown/rascunhos de chat. Não recriar. Backend é proposta; não implementar DM/ACL/exclusão global falsas.
-
-Critérios: testes controlados e regressão por fase; build e suíte finais; Tray em Electron com adaptação explícita para ambiente sem bandeja; captura sintética não equivale a mídia física. Matriz em duas máquinas/rede/TURN, Windows, suspensão e medição de hardware ficam pendentes quando indisponíveis. Disponibilizar branch para revisão conforme pedido; não publicar release, mesclar ou declarar produção pronta automaticamente.

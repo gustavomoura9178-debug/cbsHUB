@@ -35,7 +35,7 @@ Pessoa A pode assumir R1/motores e Pessoa B R4/documentação após registro exp
 
 ## Atualização de escopo pelo mantenedor
 
-Em 05/11/2026 o mantenedor solicitou explicitamente a implementação do redesign. R4/R5 foram executados com regressões locais nesta branch; R3 continua pendente e é requisito de validação para integração segura, não um resultado já obtido. A etapa seguinte não é personalização. Ver REDESIGN_REVIEW.md.
+Em 05/11/2026 o mantenedor solicitou explicitamente a implementação do redesign. R4/R5 foram executados com regressões locais nesta branch; R3 continua pendente e é requisito de validação para integração segura, não um resultado já obtido. A etapa seguinte não é personalização. Ver REDESIGN_REVIEW.
 
 
 ## Atualização — STUDIO-001 — 05/11/2026
@@ -45,18 +45,18 @@ STUDIO-001 implementado por nova autorização do mantenedor após redesign inte
 
 ## Atualização — PROFILE-001 — 05/11/2026
 
-PROFILE-001 implementado no escopo local/P2P aprovado. Próximos passos: revisão multipar real, identidade/autorização de backend quando definido e reserva global de username. Não anunciar conta autenticada/sync remoto com base em clientId local. Ver PROFILES.md.
+PROFILE-001 implementado no escopo local/P2P aprovado. Próximos passos: revisão multipar real, identidade/autorização de backend quando definido e reserva global de username. Não anunciar conta autenticada/sync remoto com base em clientId local. Ver PROFILES.
 
 
 ## Atualização — CHAT-002 — 05/11/2026
 
-CHAT-002 implementado no escopo local/P2P; próxima revisão deve validar compatibilidade multipar real, ledger/retention e migração para ACL/backend quando existir. Não anunciar histórico offline global ou exclusão de cópias remotas. CHAT_2.md contém requisitos pendentes.
+CHAT-002 implementado no escopo local/P2P; próxima revisão deve validar compatibilidade multipar real, ledger/retention e migração para ACL/backend quando existir. Não anunciar histórico offline global ou exclusão de cópias remotas. CHAT_2 contém requisitos pendentes.
 
 
 ## Atualização — MEDIA-001 — 05/11/2026
 
 1. Revisão de MEDIA-001 sobre 6a72051, com comparação de lifecycle e chamadas bidirecionais; depende desta entrega e dos testes locais registrados.
-2. Executar matriz física de MEDIA_EXPERIENCE.md em dois dispositivos e depois três: depende de dispositivos/permissões e sinalização/ICE acessível; incluir queda/restauração de rede, mídia simultânea e Soundboard. É gate de integração de mídia, não tarefa já concluída.
+2. Executar matriz física de MEDIA_EXPERIENCE em dois dispositivos e depois três: depende de dispositivos/permissões e sinalização/ICE acessível; incluir queda/restauração de rede, mídia simultânea e Soundboard. É gate de integração de mídia, não tarefa já concluída.
 3. Delimitar correção K07 (ABR e stats de tela por par) após baseline físico, mantendo seletores de foco e compatibilidade.
 4. Resolver K01/preload e planejar atualização de dependências K16 antes de distribuição; dependem de revisão e testes Electron/Windows.
 5. Backend/autenticação e permissões administrativas de sala permanecem etapa separada conforme escolha local/P2P. Não introduzir ACL global de Soundboard sem essa base.
@@ -91,13 +91,13 @@ Após SECURITY-002, revisar BACKEND_PROPOSAL antes de implementar contas e infra
 
 ## Próximos gates após HOTFIX-005 — 06/11/2026 UTC
 
-1. Revisar separadamente os commits de rede, Electron e UI do rc.4. Dependência: resultados e arquivos de HOTFIX_STABILITY.md.
+1. Revisar separadamente os commits de rede, Electron e UI do rc.4. Dependência: resultados e arquivos de HOTFIX_STABILITY.
 2. Validar áudio bidirecional físico após queda curta/prolongada, perda ICE e falha de sinalização, cancelamento/saída e bandeja; validar webcam/tela/efeitos simultâneos. Dependência: dois computadores/redes, sinalização e ICE/STUN/TURN disponíveis. Coletar diagnóstico por peerId.
 3. Validar bandeja/ícones/primeiro aviso/encerramento, dispositivos, janelas e acessibilidade no Windows. Dependência: desktop gráfico e artefato de teste Windows; Linux headless não aprova esse gate.
 4. Medir CPU/memória/GPU com vários participantes e revisar contraste/leitor de tela. Dependência: cenários físicos dos itens 2–3.
 5. Só então decidir release estável/assinatura/distribuição com revisão e autorização. Backend/contas/ACL/sincronização exigem aprovação da proposta e infraestrutura; não são dependência oculta deste hotfix nem suporte já entregue.
 
-HOTFIX-006 / rc.5 substitui rc.4 como candidato de revisão. Lacunas de interface descritas em HOTFIX_ACCEPTANCE.md corrigidas e verificadas. Próximo gate permanece a matriz física/Windows e revisão dos commits; backend e novas funcionalidades não foram iniciados. A aprovação da implementação não aprova transporte real nem release estável.
+HOTFIX-006 / rc.5 substitui rc.4 como candidato de revisão. Lacunas de interface descritas em HOTFIX_ACCEPTANCE corrigidas e verificadas. Próximo gate permanece a matriz física/Windows e revisão dos commits; backend e novas funcionalidades não foram iniciados. A aprovação da implementação não aprova transporte real nem release estável.
 
 
 ## Próximos passos após DESKTOP-007
