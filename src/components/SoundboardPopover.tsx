@@ -33,6 +33,7 @@ import { useHubStore } from "../store/useHubStore";
 import { webrtcEngine } from "../lib/webrtcEngine";
 import { soundboardEngine } from "../lib/soundboardEngine";
 import { storageDb } from "../lib/storageDb";
+import { scheduleCloudSettingsSync } from "../lib/cloudSettings";
 import { AddSoundDialog } from "./AddSoundDialog";
 import {
   setSoundMode,
@@ -103,6 +104,7 @@ export const SoundboardPopover: React.FC<Props> = ({
     await storageDb.saveSoundboardClip(clip);
     soundboardEngine.invalidateClip(clip.id);
     await webrtcEngine.loadSoundboardClips();
+    scheduleCloudSettingsSync();
   };
   return (
     <>
@@ -344,11 +346,13 @@ export const SoundboardPopover: React.FC<Props> = ({
           if (!open) setEditing(null);
         }}
       >
-        <DialogContent>
-          <DialogTitle>Personalizar botão de som</DialogTitle>
-          <DialogDescription>
-            Nome, emoji, categoria e volume são salvos neste dispositivo.
-          </DialogDescription>
+        <DialogContent className="max-w-lg max-h-[88dvh] overflow-y-auto space-y-3">
+          <div>
+            <DialogTitle>Personalizar botão de som</DialogTitle>
+            <DialogDescription>
+              Nome, emoji, categoria e volume são salvos neste dispositivo.
+            </DialogDescription>
+          </div>
           {editing && (
             <>
               {error && (
@@ -356,30 +360,34 @@ export const SoundboardPopover: React.FC<Props> = ({
                   {error}
                 </p>
               )}
-              <label className="space-y-1 text-sm">
-                Nome
-                <Input
-                  aria-label="Nome do som"
-                  maxLength={60}
-                  value={editing.name}
-                  onChange={(e) =>
-                    setEditing({ ...editing, name: e.target.value })
-                  }
-                />
-              </label>
-              <label className="space-y-1 text-sm">
-                Emoji
-                <Input
-                  aria-label="Emoji do som"
-                  maxLength={12}
-                  value={editing.emoji}
-                  onChange={(e) =>
-                    setEditing({ ...editing, emoji: e.target.value })
-                  }
-                />
-              </label>
-              <label className="space-y-1 text-sm">
-                Categoria
+              <div className="grid grid-cols-[1fr_5rem] gap-2.5">
+                <label className="space-y-1 text-xs">
+                  <span className="text-muted-foreground block">Nome</span>
+                  <Input
+                    aria-label="Nome do som"
+                    maxLength={60}
+                    value={editing.name}
+                    onChange={(e) =>
+                      setEditing({ ...editing, name: e.target.value })
+                    }
+                    className="h-9"
+                  />
+                </label>
+                <label className="space-y-1 text-xs">
+                  <span className="text-muted-foreground block">Emoji</span>
+                  <Input
+                    aria-label="Emoji do som"
+                    maxLength={12}
+                    value={editing.emoji}
+                    onChange={(e) =>
+                      setEditing({ ...editing, emoji: e.target.value })
+                    }
+                    className="h-9 text-center text-base"
+                  />
+                </label>
+              </div>
+              <label className="space-y-1 text-xs block">
+                <span className="text-muted-foreground block">Categoria</span>
                 <Input
                   aria-label="Categoria do som"
                   maxLength={32}
@@ -388,10 +396,16 @@ export const SoundboardPopover: React.FC<Props> = ({
                   onChange={(e) =>
                     setEditing({ ...editing, category: e.target.value })
                   }
+                  className="h-9"
                 />
               </label>
-              <label className="space-y-2 text-sm">
-                Volume: {Math.round(editing.volume * 100)}%
+              <div className="rounded-lg border border-border/70 bg-background/40 p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Volume</span>
+                  <span className="font-mono font-semibold text-foreground">
+                    {Math.round(editing.volume * 100)}%
+                  </span>
+                </div>
                 <Slider
                   aria-label="Volume deste som"
                   min={0}
@@ -402,7 +416,7 @@ export const SoundboardPopover: React.FC<Props> = ({
                     setEditing({ ...editing, volume: value })
                   }
                 />
-              </label>
+              </div>
               {!editing.isBuiltIn && editing.audioBlob && (
                 <AudioTrimEditor
                   source={editing.originalAudioBlob || editing.audioBlob}

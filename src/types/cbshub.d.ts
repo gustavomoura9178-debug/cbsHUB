@@ -77,14 +77,58 @@ export interface ChatReaction {
   reactorNicknames: Record<string, string>;
 }
 
+export type UserOnlineStatus = "online" | "idle" | "invisible";
+export type FriendPresenceState = "online" | "idle" | "in_call" | "offline";
+
+export interface CloudProfile {
+  id: string;
+  nickname: string;
+  avatar_color: string;
+  online_status: UserOnlineStatus;
+  custom_status: string | null;
+}
+
+export interface FriendItem {
+  friendshipId: string;
+  id: string;
+  nickname: string;
+  avatarColor: string;
+  onlineStatus: UserOnlineStatus;
+  customStatus?: string | null;
+  presence: FriendPresenceState;
+  status: "pending" | "accepted" | "rejected";
+  direction: "incoming" | "outgoing";
+  channelId?: string;
+}
+
+export interface SignalingCallData {
+  id: string;
+  caller_id: string;
+  receiver_id: string;
+  caller_peer_id: string | null;
+  receiver_peer_id: string | null;
+  status: "calling" | "accepted" | "rejected" | "ended";
+  created_at: string;
+  updated_at: string;
+  peerNickname?: string;
+  peerAvatarColor?: string;
+  withVideo?: boolean;
+}
+
+export type ActiveContext =
+  | { type: "dm"; channelId: string; friend: FriendItem }
+  | { type: "room"; roomId: string; slug: string; name: string }
+  | null;
+
 export interface ChatMessage {
   replyTo?: string;
   editedAt?: number;
   deleted?: boolean;
   pinned?: boolean;
   delivery?: "queued" | "sent" | "received" | "error";
-  id: string; // UUID v4 único para deduplicação P2P
+  id: string; // UUID v4 único para deduplicação P2P/Cloud
   roomId: string;
+  channelId?: string;
   type: "user" | "system" | "soundboard";
   authorClientId: string;
   authorNickname: string;
@@ -92,6 +136,14 @@ export interface ChatMessage {
   content: string;
   createdAt: number; // Epoch ms
   reactions: Record<string, ChatReaction>; // chave = emoji
+  fileUrl?: string | null;
+  fileName?: string | null;
+  fileType?: string | null;
+  fileSize?: number | null;
+  uploadProgress?: {
+    percent: number;
+    bytesPerSecond: number;
+  };
   soundMeta?: {
     emoji: string;
     soundName: string;
@@ -139,6 +191,9 @@ export type SignalingPacket =
   | { type: "peer_state_sync"; state: Omit<Participant, "isLocal"> }
   | { type: "speaking"; peerId: string; isSpeaking: boolean }
   | { type: "screen_stopped"; peerId: string }
+  // Heartbeat P2P para detecção precoce de queda de enlace
+  | { type: "ping"; at: number }
+  | { type: "pong"; at: number }
 
   // Chat de Texto & Sincronização P2P (IndexedDB)
   | { type: "chat_message"; message: ChatMessage }
@@ -173,9 +228,34 @@ export type SignalingPacket =
       soundName: string;
     };
 
+export interface RoomInviteNotice {
+  id: string;
+  slug: string;
+  senderId: string;
+  senderNickname: string;
+  createdAt: number;
+}
+
+export type AppUpdateStatus =
+  | "idle"
+  | "checking"
+  | "available"
+  | "not-available"
+  | "downloading"
+  | "downloaded"
+  | "error";
+
+export interface AppUpdateState {
+  status: AppUpdateStatus;
+  version?: string;
+  releaseNotes?: string;
+  percent?: number;
+  message?: string;
+}
+
 export interface NativeNotice {
   id: string;
-  kind: "message" | "call";
+  kind: "message" | "call" | "friend";
   title: string;
   body: string;
 }
@@ -200,6 +280,10 @@ export interface CbsHubElectronAPI {
   maximizeWindow: () => void;
   closeWindow: () => void;
   setAlwaysOnTop: (flag: boolean) => void;
+  checkForUpdates: () => Promise<void>;
+  downloadUpdate: () => Promise<void>;
+  installUpdate: () => void;
+  onUpdateStatus: (listener: (state: AppUpdateState) => void) => () => void;
 }
 
 declare global {

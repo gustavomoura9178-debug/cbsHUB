@@ -8,6 +8,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  envPrefix: ['VITE_', 'SUPABASE_'],
   plugins: [
     {name:"cbshub-production-csp",apply:"build",transformIndexHtml(){return [{tag:"meta",attrs:{"http-equiv":"Content-Security-Policy",content:productionCsp},injectTo:"head-prepend"}];}},
     tailwindcss(),
@@ -19,7 +20,7 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['electron'],
+              external: ['electron', 'electron-updater'],
             },
           },
         },

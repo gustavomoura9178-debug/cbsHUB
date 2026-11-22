@@ -1,6 +1,6 @@
 export interface NoticeRequest {
   id: string;
-  kind: "message" | "call";
+  kind: "message" | "call" | "friend";
   title: string;
   body: string;
 }
@@ -9,7 +9,7 @@ export function validateNotice(value: unknown): NoticeRequest | null {
   const v = value as Record<string, unknown>;
   if (
     Object.keys(v).some((k) => !["id", "kind", "title", "body"].includes(k)) ||
-    !["message", "call"].includes(String(v.kind))
+    !["message", "call", "friend"].includes(String(v.kind))
   )
     return null;
   for (const [key, max] of [

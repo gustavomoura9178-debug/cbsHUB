@@ -1,4 +1,5 @@
 import { createAudioPeakGuard, safeAudioGain } from "./audioPeakGuard";
+import { applySafeSinkId } from "../hooks/useMediaOutput";
 import { decodeEditableAudio } from "./audioTrim";
 import type { SoundboardClip } from "../types/cbshub";
 import { useHubStore } from "../store/useHubStore";
@@ -99,27 +100,32 @@ class SoundboardEngine {
   private pendingDecodes = 0;
   private monitorGains = new Map<AudioContext, GainNode>();
   constructor() {
-    useHubStore.subscribe((state, previous) => {
-      for (const [ctx, gain] of this.monitorGains) {
-        if (ctx.state === "closed") {
-          this.monitorGains.delete(ctx);
-          continue;
+    // Defer subscription to avoid TDZ errors if soundboardEngine initializes before useHubStore.
+    queueMicrotask(() => {
+      useHubStore.subscribe((state, previous) => {
+        for (const [ctx, gain] of this.monitorGains) {
+          if (ctx.state === "closed") {
+            this.monitorGains.delete(ctx);
+            continue;
+          }
+          if (state.isDeafened !== previous.isDeafened)
+            gain.gain.setValueAtTime(state.isDeafened ? 0 : 1, ctx.currentTime);
+          if (
+            state.audioConfig.outputDeviceId !==
+            previous.audioConfig.outputDeviceId
+          )
+            this.setOutput(ctx, state.audioConfig.outputDeviceId);
         }
-        if (state.isDeafened !== previous.isDeafened)
-          gain.gain.setValueAtTime(state.isDeafened ? 0 : 1, ctx.currentTime);
-        if (
-          state.audioConfig.outputDeviceId !==
-          previous.audioConfig.outputDeviceId
-        )
-          this.setOutput(ctx, state.audioConfig.outputDeviceId);
-      }
+      });
     });
   }
   private setOutput(ctx: AudioContext, id: string) {
-    if ("setSinkId" in ctx)
-      (ctx as AudioContext & { setSinkId(id: string): Promise<void> })
-        .setSinkId(id === "default" ? "" : id)
-        .catch((error) => mediaError("Saída do Soundboard", error));
+    if ("setSinkId" in ctx) {
+      void applySafeSinkId(
+        ctx as AudioContext & { setSinkId?: (id: string) => Promise<void> },
+        id,
+      );
+    }
   }
   private localMonitor(ctx: AudioContext): GainNode {
     let gain = this.monitorGains.get(ctx);

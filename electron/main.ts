@@ -23,6 +23,13 @@ import {
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import * as electronUpdater from "electron-updater";
+import type { AppUpdateState } from "../src/types/cbshub";
+
+const autoUpdater =
+  electronUpdater.autoUpdater ||
+  (electronUpdater as unknown as { default?: typeof electronUpdater }).default
+    ?.autoUpdater;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -265,6 +272,16 @@ function createWindow(): void {
 const notices = new Map<string, Notification>();
 const seenNotices = new Set<string>();
 let lastNotice = 0;
+
+function resolveBrandIcon(fileName: string): string | undefined {
+  const iconPath = path.join(
+    app.getAppPath(),
+    process.env.VITE_DEV_SERVER_URL ? "public/brand" : "dist/brand",
+    fileName,
+  );
+  return fs.existsSync(iconPath) ? iconPath : undefined;
+}
+
 ipcMain.handle("cbs:notify", (event, input: unknown) => {
   if (!allowedSender(event)) return false;
   const request = validateNotice(input);
@@ -273,49 +290,164 @@ ipcMain.handle("cbs:notify", (event, input: unknown) => {
   seenNotices.add(request.id);
   if (seenNotices.size > 200)
     seenNotices.delete(seenNotices.values().next().value!);
-  if (
-    request.kind === "message" &&
-    mainWindow?.isFocused() &&
-    mainWindow.isVisible()
-  )
+
+  const isWindowFocusedVisible =
+    Boolean(mainWindow) &&
+    !mainWindow!.isDestroyed() &&
+    mainWindow!.isVisible() &&
+    !mainWindow!.isMinimized() &&
+    mainWindow!.isFocused();
+
+  // Mensagens e pedidos de amizade suprimem apenas se a janela já estiver visível e em foco;
+  // chamadas sempre notificam (mesmo minimizado ou na bandeja).
+  if (request.kind !== "call" && isWindowFocusedVisible) {
     return false;
-  if (Date.now() - lastNotice < 1000) return false;
+  }
+
+  if (Date.now() - lastNotice < 800) return false;
   lastNotice = Date.now();
   while (notices.size >= 10) {
     const key = notices.keys().next().value!;
     notices.get(key)?.close();
     notices.delete(key);
   }
-  const notice = new Notification({
-    title: request.title,
-    body: request.body,
-    ...(request.kind === "call" && process.platform === "win32"
-      ? { toastXml: callToastXml(request.title, request.body) }
-      : {}),
-    ...(request.kind === "call" && process.platform === "darwin"
-      ? { actions: [{ type: "button" as const, text: "Atender" }] }
-      : {}),
-  });
-  notices.set(request.id, notice);
-  let activated = false;
-  const accept = () => {
-    if (activated || !notices.has(request.id)) return;
-    activated = true;
-    restoreWindow();
-    mainWindow?.webContents.send("cbs:notification-activated", request.id);
-    notice.close();
-    notices.delete(request.id);
+
+  const iconPath = resolveBrandIcon("logo-256.png");
+
+  const showNativeNotification = (useToastXml: boolean) => {
+    try {
+      const notice = new Notification({
+        title: request.title,
+        body: request.body,
+        icon: iconPath,
+        ...(useToastXml && request.kind === "call" && process.platform === "win32"
+          ? { toastXml: callToastXml(request.title, request.body) }
+          : {}),
+        ...(request.kind === "call" && process.platform === "darwin"
+          ? { actions: [{ type: "button" as const, text: "Atender" }] }
+          : {}),
+      });
+      notices.set(request.id, notice);
+      let activated = false;
+      const accept = () => {
+        if (activated || !notices.has(request.id)) return;
+        activated = true;
+        restoreWindow();
+        mainWindow?.webContents.send("cbs:notification-activated", request.id);
+        notice.close();
+        notices.delete(request.id);
+      };
+      notice.on("click", accept);
+      notice.on("action", accept);
+      notice.on("close", () => notices.delete(request.id));
+      notice.on("failed", () => {
+        notices.delete(request.id);
+        if (useToastXml) {
+          showNativeNotification(false);
+        }
+      });
+      setTimeout(() => {
+        notice.close();
+        notices.delete(request.id);
+      }, 30000).unref();
+      notice.show();
+    } catch {
+      if (useToastXml) {
+        showNativeNotification(false);
+      }
+    }
   };
-  notice.on("click", accept);
-  notice.on("action", accept);
-  notice.on("close", () => notices.delete(request.id));
-  notice.on("failed", () => notices.delete(request.id));
-  setTimeout(() => {
-    notice.close();
-    notices.delete(request.id);
-  }, 30000).unref();
-  notice.show();
+
+  showNativeNotification(request.kind === "call" && process.platform === "win32");
   return true;
+});
+
+function sendUpdateStatus(state: AppUpdateState): void {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("cbs:update-status", state);
+  }
+}
+
+let updaterInitialized = false;
+function setupAutoUpdater(): void {
+  if (updaterInitialized || !app.isPackaged || !autoUpdater) return;
+  updaterInitialized = true;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("checking-for-update", () => {
+    sendUpdateStatus({ status: "checking" });
+  });
+  autoUpdater.on("update-available", (info) => {
+    sendUpdateStatus({
+      status: "available",
+      version: info.version,
+      releaseNotes:
+        typeof info.releaseNotes === "string" ? info.releaseNotes : undefined,
+    });
+  });
+  autoUpdater.on("update-not-available", (info) => {
+    sendUpdateStatus({ status: "not-available", version: info.version });
+  });
+  autoUpdater.on("download-progress", (progress) => {
+    sendUpdateStatus({
+      status: "downloading",
+      percent: Math.round(progress.percent || 0),
+    });
+  });
+  autoUpdater.on("update-downloaded", (info) => {
+    sendUpdateStatus({ status: "downloaded", version: info.version });
+  });
+  autoUpdater.on("error", (err) => {
+    sendUpdateStatus({
+      status: "error",
+      message:
+        err instanceof Error
+          ? err.message
+          : "Não foi possível verificar atualizações.",
+    });
+  });
+}
+
+ipcMain.handle("cbs:check-updates", async (event) => {
+  if (!allowedSender(event)) return;
+  if (!app.isPackaged || !autoUpdater) {
+    sendUpdateStatus({ status: "not-available" });
+    return;
+  }
+  setupAutoUpdater();
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (err) {
+    sendUpdateStatus({
+      status: "error",
+      message:
+        err instanceof Error ? err.message : "Erro ao verificar atualizações.",
+    });
+  }
+});
+
+ipcMain.handle("cbs:download-update", async (event) => {
+  if (!allowedSender(event)) return;
+  if (!app.isPackaged || !autoUpdater) return;
+  setupAutoUpdater();
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (err) {
+    sendUpdateStatus({
+      status: "error",
+      message:
+        err instanceof Error ? err.message : "Erro ao baixar atualização.",
+    });
+  }
+});
+
+ipcMain.on("cbs:install-update", (event) => {
+  if (!allowedSender(event)) return;
+  if (!app.isPackaged || !autoUpdater) return;
+  quitting = true;
+  autoUpdater.quitAndInstall();
 });
 
 ipcMain.on("cbs:tray-state", (event, state: unknown) => {
@@ -480,6 +612,12 @@ if (primaryInstance)
 
     createWindow();
     createTray();
+    setupAutoUpdater();
+    if (app.isPackaged && autoUpdater) {
+      setTimeout(() => {
+        void autoUpdater.checkForUpdates().catch(() => {});
+      }, 5000).unref();
+    }
     app.on("activate", restoreWindow);
   });
 

@@ -1,5 +1,30 @@
+import type { RealtimeChannel } from "@supabase/supabase-js";
+import Peer, { type MediaConnection, type DataConnection } from "peerjs";
+import {
+  supabase,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  type DbMessageRow,
+  type DbRoomMessageRow,
+  type DbSignalingCallRow,
+  type DbOnlineStatus,
+} from "./supabase";
+import { loadCloudSettings } from "./cloudSettings";
 import { notifyNative } from "./nativeNotifications";
-import type { StreamTelemetry } from "../types/cbshub";
+import { applySafeSinkId } from "../hooks/useMediaOutput";
+import type {
+  StreamTelemetry,
+  VideoQualityConfig,
+  AudioProcessingConfig,
+  Participant,
+  ChatMessage,
+  SoundboardClip,
+  SignalingPacket,
+  FriendItem,
+  FriendPresenceState,
+  SignalingCallData,
+  ActiveContext,
+} from "../types/cbshub";
 import { useVoicePreferences } from "./voicePreferences";
 import {
   callEvent,
@@ -10,31 +35,25 @@ import { peerState } from "./signalingValidation";
 import { soundActivity } from "../chat/activities";
 import { chatLedger } from "../chat/ledger";
 import {
-  validateMessage,
   validateOperation,
   type ChatOperation,
 } from "../chat/model";
 import { publicProfile, validatePublicProfile } from "../profiles/model";
 import { readOwnProfile, isBlocked } from "../profiles/repository";
-import Peer, { type MediaConnection, type DataConnection } from "peerjs";
 import { useHubStore } from "../store/useHubStore";
 import { sounds } from "./sounds";
 import { VoiceAudioPipeline } from "./audioPipeline";
 import { soundboardEngine } from "./soundboardEngine";
 import { storageDb } from "./storageDb";
 import { enhanceOpusSdp, configureVideoSender } from "./sdpMunger";
-import type {
-  VideoQualityConfig,
-  AudioProcessingConfig,
-  Participant,
-  ChatMessage,
-  SoundboardClip,
-  SignalingPacket,
-} from "../types/cbshub";
-
 import { useMediaState, mediaError } from "./mediaState";
 
-const MAX_ROOM_PEERS = 6;
+const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024; // 50 MB estrito
+
+export type ResolvedAttachmentResult =
+  | { status: "ready"; url: string; fromLocal: boolean }
+  | { status: "missing" }
+  | { status: "offline" };
 
 function buildPeerIceServers(): RTCIceServer[] {
   const servers: RTCIceServer[] = [
@@ -101,12 +120,24 @@ interface PeerMediaSession {
   remoteSpeakingInterval: number | null;
 }
 
+interface RoomMeshPresencePayload {
+  userId: string;
+  peerId: string;
+  nickname: string;
+  avatarColor: string;
+  inVoiceCall: boolean;
+  isMuted: boolean;
+  isDeafened: boolean;
+  isVideoEnabled: boolean;
+  isScreenSharing: boolean;
+}
+
 class WebRTCEngine {
   private chatClock = 0;
   private roomGeneration = 0;
   private micGeneration = 0;
   /* Recuperação do microfone: tentativas com espera crescente, limitadas e
-     canceladas ao sair da voz/sala ou quando o usuário troca o microfone. */
+     canceladas ao sair da voz/chamada ou quando o usuário troca o microfone. */
   private micRecoveryDelaysMs = [0, 1000, 2500, 5000, 10000, 20000];
   private micRecoveryAttempt = 0;
   private micRecoveryTimer: number | null = null;
@@ -121,12 +152,39 @@ class WebRTCEngine {
   private recoveryCancelled = false;
 
   private localPeer: Peer | null = null;
-  private beaconPeer: Peer | null = null;
-  private isBeaconOwner = false;
-  private beaconHealTimeout: number | null = null;
   private currentRoomSlug = "";
+  private directRemotePeerId: string | null = null;
+  private directRemoteUserId: string | null = null;
+  private pendingOutgoingVideo = false;
+  private incomingCallTimer: number | null = null;
 
-  // Malha de sessões ativas (chave: peerId)
+  // Canais Supabase Realtime
+  private presenceChannel: RealtimeChannel | null = null;
+  private friendshipsChannel: RealtimeChannel | null = null;
+  private callsChannelIn: RealtimeChannel | null = null;
+  private callsChannelOut: RealtimeChannel | null = null;
+  private dmRealtimeChannel: RealtimeChannel | null = null;
+  private roomMeshChannel: RealtimeChannel | null = null;
+  private roomMessagesChannel: RealtimeChannel | null = null;
+  private activeRoomMeta: { roomId: string; slug: string; name: string } | null = null;
+  private roomSenderProfiles: Map<string, { nickname: string; avatarColor: string }> = new Map();
+  private attachmentResolveLocks: Map<string, Promise<void>> = new Map();
+  private pendingRoomRelayPurges: Map<string, number> = new Map();
+  private presenceStateMap: Record<string, { online_status?: DbOnlineStatus; in_call?: boolean }> = {};
+  private cloudSessionUserId: string | null = null;
+  private seenIncomingRequestIds = new Set<string>();
+  private firstFriendLoadDone = false;
+  private isNetworkOffline = false;
+  private wasInCallContext: {
+    context: ActiveContext;
+    inVoiceCall: boolean;
+    withVideo: boolean;
+  } | null = null;
+
+  // Heartbeat P2P para detecção de queda real em menos de 12 segundos.
+  private heartbeatInterval: number | null = null;
+
+  // Sessões ativas (chave: peerId)
   private sessions: Map<string, PeerMediaSession> = new Map();
 
   // Pipeline e mídia local
@@ -147,74 +205,2174 @@ class WebRTCEngine {
   private prevReceiverBytes = 0;
   private prevReceiverTimestamp = 0;
 
-  // Sanitizador de slug de sala (Seção 5.1 SDD.md)
-  public sanitizeSlug(input: string): string {
-    const slug = input.toLowerCase().replace(/[^a-z0-9-]/g, "");
-    return slug || "cbs-irmandade";
-  }
+  private recoveryEpoch = 0;
+  private recoveryActive = false;
+  private waitingForMedia = new Set<string>();
+  private signalingPendingAt = 0;
 
   private generateShortId(clientId: string): string {
     const clean = clientId.replace(/[^a-z0-9]/gi, "").toLowerCase();
-    return clean.substring(0, 6) || Math.random().toString(36).substring(2, 8);
+    return clean.substring(0, 8) || Math.random().toString(36).substring(2, 10);
   }
 
   /* ========================================================================= */
-  /* CONEXÃO NA SALA (TEXTO + PRESENÇA + BEACON MESH)                          */
+  /* FASE 1 & 2: SESSÃO CLOUD, PRESENÇA E AMIGOS (SUPABASE)                    */
   /* ========================================================================= */
 
-  public async joinRoom(
-    roomInput: string,
-    autoJoinVoice = false,
-  ): Promise<void> {
-    if (
-      this.sanitizeSlug(roomInput) === this.currentRoomSlug &&
-      this.localPeer &&
-      !this.localPeer.destroyed
-    )
-      return;
-    localStorage.removeItem("cbshub-room-removed-active");
-    this.leaveRoom();
-    const generation = this.roomGeneration;
+  public async initializeCloudSession(userId: string): Promise<void> {
+    if (this.cloudSessionUserId === userId) return;
+    this.teardownCloudSubscriptions();
+    this.cloudSessionUserId = userId;
 
-    const slug = this.sanitizeSlug(roomInput);
-    this.currentRoomSlug = slug;
-    useHubStore.getState().setMessages([]);
-    useHubStore.getState().setRoomId(slug);
-    useHubStore.getState().setStatusText("Conectando à sala...");
+    await Promise.allSettled([
+      this.refreshFriends(),
+      loadCloudSettings(userId),
+      soundboardEngine.loadAllClips(),
+    ]);
 
-    // Carrega mensagens salvas localmente no IndexedDB
-    try {
-      const savedMessages = await chatLedger.refresh(slug);
-      if (this.currentRoomSlug !== slug || generation !== this.roomGeneration)
-        return;
-      useHubStore.getState().addMessageBatch(savedMessages);
-    } catch (err) {
-      console.warn("[WebRTC Engine] Erro ao carregar histórico local:", err);
-    }
+    this.subscribePresence(userId);
+    this.subscribeFriendships(userId);
+    this.subscribeSignalingCalls(userId);
 
-    // Carrega efeitos do Soundboard
-    try {
-      await soundboardEngine.loadAllClips();
-    } catch {
-      /* ignore */
-    }
-
-    if (this.currentRoomSlug !== slug || generation !== this.roomGeneration)
-      return;
-    this.openRoomPeer(slug, autoJoinVoice);
-  }
-
-  private openRoomPeer(slug: string, autoJoinVoice: boolean): void {
+    // Reabre o último amigo ativo se ainda estiver na lista de amigos
     const state = useHubStore.getState();
-    const shortId = this.generateShortId(state.clientId);
-    // Sufixo efêmero único garante que recarregamentos rápidos nunca recebam unavailable-id
-    const instanceNonce = Math.random().toString(36).substring(2, 6);
-    const localPeerId = `cbshub-v2-${slug}-p-${shortId}-${instanceNonce}`;
+    if (state.activeFriend) {
+      const stillFriend = useHubStore
+        .getState()
+        .friends.find((f) => f.id === state.activeFriend?.id);
+      if (stillFriend) {
+        await this.openDirectMessage(stillFriend);
+      } else {
+        useHubStore.getState().setActiveFriend(null);
+        useHubStore.getState().setActiveChannelId(null);
+      }
+    }
+  }
 
-    // Registra participante local na store
+  public teardownRoomChannels(): void {
+    this.activeRoomMeta = null;
+    if (this.roomMeshChannel) {
+      void supabase.removeChannel(this.roomMeshChannel);
+      this.roomMeshChannel = null;
+    }
+    if (this.roomMessagesChannel) {
+      void supabase.removeChannel(this.roomMessagesChannel);
+      this.roomMessagesChannel = null;
+    }
+  }
+
+  public teardownCloudSubscriptions(): void {
+    this.cloudSessionUserId = null;
+    this.seenIncomingRequestIds.clear();
+    this.firstFriendLoadDone = false;
+    this.teardownRoomChannels();
+    if (this.presenceChannel) {
+      void supabase.removeChannel(this.presenceChannel);
+      this.presenceChannel = null;
+    }
+    if (this.friendshipsChannel) {
+      void supabase.removeChannel(this.friendshipsChannel);
+      this.friendshipsChannel = null;
+    }
+    if (this.callsChannelIn) {
+      void supabase.removeChannel(this.callsChannelIn);
+      this.callsChannelIn = null;
+    }
+    if (this.callsChannelOut) {
+      void supabase.removeChannel(this.callsChannelOut);
+      this.callsChannelOut = null;
+    }
+    if (this.dmRealtimeChannel) {
+      void supabase.removeChannel(this.dmRealtimeChannel);
+      this.dmRealtimeChannel = null;
+    }
+    this.presenceStateMap = {};
+  }
+
+  private subscribePresence(userId: string): void {
+    if (this.presenceChannel) {
+      void supabase.removeChannel(this.presenceChannel);
+    }
+
+    const channel = supabase.channel("presence:cbshub", {
+      config: { presence: { key: userId } },
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const raw = channel.presenceState<{
+          user_id?: string;
+          online_status?: DbOnlineStatus;
+          in_call?: boolean;
+        }>();
+        const nextMap: Record<string, { online_status?: DbOnlineStatus; in_call?: boolean }> = {};
+        for (const [key, entries] of Object.entries(raw)) {
+          const latest = entries[entries.length - 1];
+          if (latest) {
+            nextMap[key] = {
+              online_status: latest.online_status,
+              in_call: latest.in_call,
+            };
+          }
+        }
+        this.presenceStateMap = nextMap;
+        this.applyPresenceToFriends();
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await this.trackPresence();
+        }
+      });
+
+    this.presenceChannel = channel;
+  }
+
+  public async trackPresence(): Promise<void> {
+    if (!this.presenceChannel || !this.cloudSessionUserId) return;
+    const state = useHubStore.getState();
+    try {
+      await this.presenceChannel.track({
+        user_id: this.cloudSessionUserId,
+        online_status: state.onlineStatus,
+        in_call: state.inVoiceCall,
+      });
+    } catch {
+      /* ignore presence errors during reconnect */
+    }
+  }
+
+  private resolveFriendPresence(
+    friendId: string,
+    fallbackStatus: DbOnlineStatus,
+  ): FriendPresenceState {
+    const tracked = this.presenceStateMap[friendId];
+    if (!tracked) return "offline";
+    if (tracked.online_status === "invisible") return "offline";
+    if (tracked.in_call) return "in_call";
+    if (tracked.online_status === "idle") return "idle";
+    if (fallbackStatus === "invisible") return "offline";
+    return "online";
+  }
+
+  private applyPresenceToFriends(): void {
+    const state = useHubStore.getState();
+    const updated = state.friends.map((f) => ({
+      ...f,
+      presence: this.resolveFriendPresence(f.id, f.onlineStatus),
+    }));
+    state.setFriends(updated);
+
+    if (state.activeFriend) {
+      const refreshedActive = updated.find((f) => f.id === state.activeFriend?.id);
+      if (refreshedActive) {
+        state.setActiveFriend(refreshedActive);
+      }
+    }
+  }
+
+  private subscribeFriendships(userId: string): void {
+    if (this.friendshipsChannel) {
+      void supabase.removeChannel(this.friendshipsChannel);
+    }
+
+    this.friendshipsChannel = supabase
+      .channel(`friendships:${userId}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "friendships" },
+        () => {
+          void this.refreshFriends();
+        },
+      )
+      .subscribe();
+  }
+
+  public async refreshFriends(): Promise<void> {
+    const userId = useHubStore.getState().authUserId;
+    if (!userId) return;
+
+    const { data: rows, error } = await supabase
+      .from("friendships")
+      .select("id, user_id, friend_id, status, created_at, updated_at")
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+
+    if (error || !rows) {
+      console.warn("[Cloud] Erro ao carregar amizades:", error?.message);
+      return;
+    }
+
+    const otherIds = Array.from(
+      new Set(
+        rows
+          .filter((r) => r.status !== "rejected")
+          .map((r) => (r.user_id === userId ? r.friend_id : r.user_id)),
+      ),
+    );
+
+    if (otherIds.length === 0) {
+      this.firstFriendLoadDone = true;
+      useHubStore.getState().setFriends([]);
+      useHubStore.getState().setPendingRequests([]);
+      return;
+    }
+
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, nickname, avatar_color, online_status, custom_status")
+      .in("id", otherIds);
+
+    const profileMap = new Map(
+      (profiles || []).map((p) => [p.id, p]),
+    );
+
+    const accepted: FriendItem[] = [];
+    const pending: FriendItem[] = [];
+
+    for (const row of rows) {
+      if (row.status === "rejected") continue;
+      const otherId = row.user_id === userId ? row.friend_id : row.user_id;
+      const profile = profileMap.get(otherId);
+      if (!profile) continue;
+
+      const isPending =
+        row.status === "pending" ||
+        row.status === "pending_sent" ||
+        row.status === "pending_received";
+
+      const direction: "incoming" | "outgoing" =
+        row.status === "pending_received" && row.user_id === userId
+          ? "incoming"
+          : row.status === "pending_sent" && row.user_id === userId
+            ? "outgoing"
+            : row.user_id === userId
+              ? "outgoing"
+              : "incoming";
+
+      const item: FriendItem = {
+        friendshipId: row.id,
+        id: profile.id,
+        nickname: profile.nickname,
+        avatarColor: profile.avatar_color || "#6eddbd",
+        onlineStatus: (profile.online_status as DbOnlineStatus) || "online",
+        customStatus: profile.custom_status,
+        presence: this.resolveFriendPresence(
+          profile.id,
+          (profile.online_status as DbOnlineStatus) || "online",
+        ),
+        status: row.status === "accepted" ? "accepted" : "pending",
+        direction,
+      };
+
+      if (row.status === "accepted") {
+        if (!accepted.some((f) => f.id === item.id)) {
+          accepted.push(item);
+        }
+      } else if (isPending) {
+        if (!accepted.some((f) => f.id === item.id) && !pending.some((f) => f.id === item.id)) {
+          pending.push(item);
+        }
+        if (item.direction === "incoming") {
+          const alreadySeen = this.seenIncomingRequestIds.has(item.friendshipId);
+          this.seenIncomingRequestIds.add(item.friendshipId);
+          if (this.firstFriendLoadDone && !alreadySeen) {
+            notifyNative({
+              id: `friend-${item.friendshipId}`,
+              kind: "friend",
+              title: "Novo pedido de amizade",
+              body: `${item.nickname} quer adicionar você no cbsHUB.`,
+            });
+          }
+        }
+      }
+    }
+
+    this.firstFriendLoadDone = true;
+    accepted.sort((a, b) => a.nickname.localeCompare(b.nickname));
+    useHubStore.getState().setFriends(accepted);
+    useHubStore.getState().setPendingRequests(pending);
+  }
+
+  public async sendFriendRequestByUserId(
+    targetUserId: string,
+    targetNickname?: string,
+  ): Promise<void> {
+    const userId = useHubStore.getState().authUserId;
+    if (!userId) throw new Error("Faça login para adicionar amigos.");
+    if (!targetUserId) throw new Error("Usuário de destino inválido.");
+    if (targetUserId === userId) throw new Error("Você não pode adicionar a si mesmo.");
+
+    const displayLabel = targetNickname?.trim() || "este usuário";
+
+    const { data: existingRows, error: checkError } = await supabase
+      .from("friendships")
+      .select("id, user_id, friend_id, status")
+      .or(
+        `and(user_id.eq.${userId},friend_id.eq.${targetUserId}),and(user_id.eq.${targetUserId},friend_id.eq.${userId})`,
+      );
+
+    if (checkError) throw new Error(checkError.message);
+
+    const rows = existingRows || [];
+    if (rows.some((r) => r.status === "accepted")) {
+      throw new Error(`${displayLabel} já está na sua lista de amigos.`);
+    }
+    if (
+      rows.some(
+        (r) =>
+          r.status === "pending" ||
+          r.status === "pending_sent" ||
+          r.status === "pending_received",
+      )
+    ) {
+      throw new Error(`Já existe uma solicitação pendente com ${displayLabel}.`);
+    }
+
+    const rejectedRow = rows.find((r) => r.status === "rejected");
+    if (rejectedRow) {
+      const { error: updateError } = await supabase
+        .from("friendships")
+        .update({
+          user_id: userId,
+          friend_id: targetUserId,
+          status: "pending",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", rejectedRow.id);
+      if (updateError) throw new Error(updateError.message);
+    } else {
+      const { error: insertError } = await supabase.from("friendships").insert({
+        user_id: userId,
+        friend_id: targetUserId,
+        status: "pending",
+      });
+      if (insertError) throw new Error(insertError.message);
+    }
+
+    await this.refreshFriends();
+  }
+
+  public async sendFriendRequest(nicknameQuery: string): Promise<void> {
+    const userId = useHubStore.getState().authUserId;
+    if (!userId) throw new Error("Faça login para adicionar amigos.");
+
+    const clean = nicknameQuery.trim();
+    if (!clean) throw new Error("Informe o nickname do amigo.");
+
+    const { data: target, error: findError } = await supabase
+      .from("profiles")
+      .select("id, nickname")
+      .ilike("nickname", clean)
+      .limit(1)
+      .maybeSingle();
+
+    if (findError) throw new Error(findError.message);
+    if (!target) throw new Error(`Usuário "${clean}" não encontrado.`);
+
+    await this.sendFriendRequestByUserId(target.id, target.nickname);
+  }
+
+  public async respondFriendRequest(
+    friendshipId: string,
+    accept: boolean,
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("friendships")
+      .update({ status: accept ? "accepted" : "rejected" })
+      .eq("id", friendshipId);
+    if (error) throw new Error(error.message);
+    await this.refreshFriends();
+  }
+
+  public async updateCloudProfile(partial: {
+    nickname?: string;
+    online_status?: DbOnlineStatus;
+    custom_status?: string | null;
+    avatar_color?: string;
+  }): Promise<void> {
+    const state = useHubStore.getState();
+    const userId = state.authUserId;
+    if (!userId) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        ...partial,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", userId);
+
+    if (error) throw new Error(error.message);
+
+    if (partial.nickname) state.setNickname(partial.nickname);
+    if (partial.avatar_color) state.setAvatarColor(partial.avatar_color);
+    if (partial.online_status) state.setOnlineStatus(partial.online_status);
+    if (partial.custom_status !== undefined) {
+      state.setCustomStatus(partial.custom_status);
+    }
+    await Promise.allSettled([
+      this.trackPresence(),
+      this.trackRoomMeshPresence(),
+    ]);
+  }
+
+  /* ========================================================================= */
+  /* FASE 2 & 3: CANAIS DM, SALAS FULL-MESH, HISTÓRICO & ANEXOS (50MB MAX)     */
+  /* ========================================================================= */
+
+  private resolveMessageSender(
+    senderId: string,
+    friend: FriendItem | null,
+  ): { nickname: string; avatarColor: string } {
+    const state = useHubStore.getState();
+    if (senderId === state.authUserId) {
+      return { nickname: state.nickname, avatarColor: state.avatarColor };
+    }
+    if (friend && friend.id === senderId) {
+      return { nickname: friend.nickname, avatarColor: friend.avatarColor };
+    }
+    const knownFriend = state.friends.find((f) => f.id === senderId);
+    if (knownFriend) {
+      return {
+        nickname: knownFriend.nickname,
+        avatarColor: knownFriend.avatarColor,
+      };
+    }
+    const cachedRoomProfile = this.roomSenderProfiles.get(senderId);
+    if (cachedRoomProfile) {
+      return cachedRoomProfile;
+    }
+    const participant = Object.values(state.participants).find(
+      (p) => p.clientId === senderId,
+    );
+    if (participant) {
+      return {
+        nickname: participant.nickname,
+        avatarColor: participant.avatarColor,
+      };
+    }
+    return {
+      nickname: friend ? "Amigo" : "Participante",
+      avatarColor: "#6eddbd",
+    };
+  }
+
+  private mapDbMessageToChat(
+    row: DbMessageRow | DbRoomMessageRow,
+    friend: FriendItem | null,
+  ): ChatMessage {
+    const targetId = "channel_id" in row ? row.channel_id : row.room_id;
+    const senderProfile = this.resolveMessageSender(row.sender_id, friend);
+
+    return {
+      id: row.id,
+      roomId: targetId,
+      channelId: targetId,
+      type: "user",
+      delivery: "received",
+      authorClientId: row.sender_id,
+      authorNickname: senderProfile.nickname,
+      authorAvatarColor: senderProfile.avatarColor,
+      content: row.content || "",
+      createdAt: new Date(row.created_at).getTime(),
+      reactions: {},
+      fileUrl: row.file_url,
+      fileName: row.file_name,
+      fileType: row.file_type,
+      fileSize: row.file_size,
+    };
+  }
+
+  public async openDirectMessage(friend: FriendItem): Promise<string> {
+    const state = useHubStore.getState();
+    if (!state.authUserId) throw new Error("Usuário não autenticado.");
+
+    if (state.activeContext?.type === "room") {
+      this.leaveRoom();
+    }
+
+    state.setActiveFriend(friend);
+    state.setRemoteNickname(friend.nickname);
+
+    const { data: channelId, error } = await supabase.rpc(
+      "get_or_create_dm_channel",
+      { target_user_id: friend.id },
+    );
+
+    if (error || !channelId) {
+      throw new Error(
+        error?.message || "Não foi possível abrir o canal de DM.",
+      );
+    }
+
+    this.currentRoomSlug = channelId;
+    useHubStore
+      .getState()
+      .setActiveContext({ type: "dm", channelId, friend });
+    useHubStore.getState().setMessages([]);
+    useHubStore
+      .getState()
+      .setStatusText(`Conversando com ${friend.nickname}`);
+
+    await this.loadChannelMessages(channelId, friend);
+    this.subscribeDmChannel(channelId, friend);
+
+    return channelId;
+  }
+
+  public normalizeRoomSlug(input: string): string {
+    return input
+      .trim()
+      .replace(/^convite:\/\/sala\//i, "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48);
+  }
+
+  public async createOrJoinRoom(
+    nameOrSlug: string,
+    autoJoinVoice = false,
+  ): Promise<{ roomId: string; slug: string; name: string }> {
+    const state = useHubStore.getState();
+    const userId = state.authUserId;
+    if (!userId) throw new Error("Faça login para entrar em uma sala.");
+
+    const rawClean = nameOrSlug
+      .trim()
+      .replace(/^convite:\/\/sala\//i, "")
+      .slice(0, 48);
+    const slug = this.normalizeRoomSlug(nameOrSlug);
+    if (!slug) {
+      throw new Error("Informe um nome ou código válido para a sala.");
+    }
+
+    if (
+      this.activeRoomMeta?.slug === slug &&
+      useHubStore.getState().activeContext?.type === "room"
+    ) {
+      if (autoJoinVoice && !useHubStore.getState().inVoiceCall) {
+        await this.joinRoomVoiceCall(false);
+      }
+      return this.activeRoomMeta;
+    }
+
+    // Encerra ligação 1:1 ou sala anterior para evitar conflito de microfone/tela
+    if (state.activeContext?.type === "room") {
+      this.leaveRoom();
+    } else if (state.inVoiceCall || state.outgoingCall) {
+      this.leaveVoiceCall("manual_leave");
+    }
+
+    if (this.dmRealtimeChannel) {
+      void supabase.removeChannel(this.dmRealtimeChannel);
+      this.dmRealtimeChannel = null;
+    }
+    this.teardownRoomChannels();
+
+    let roomId = `room:${slug}`;
+    let roomName = rawClean || slug;
+
+    try {
+      const { data: existingRoom, error: fetchError } = await supabase
+        .from("rooms")
+        .select("id, slug, name")
+        .eq("slug", slug)
+        .maybeSingle();
+
+      if (existingRoom) {
+        roomId = existingRoom.id;
+        roomName = existingRoom.name || roomName;
+      } else if (!fetchError) {
+        const { data: createdRoom, error: insertError } = await supabase
+          .from("rooms")
+          .insert({
+            slug,
+            name: roomName,
+            created_by: userId,
+          })
+          .select("id, slug, name")
+          .single();
+
+        if (createdRoom) {
+          roomId = createdRoom.id;
+          roomName = createdRoom.name || roomName;
+        } else if (insertError) {
+          const { data: retryRoom } = await supabase
+            .from("rooms")
+            .select("id, slug, name")
+            .eq("slug", slug)
+            .maybeSingle();
+          if (retryRoom) {
+            roomId = retryRoom.id;
+            roomName = retryRoom.name || roomName;
+          }
+        }
+      }
+    } catch {
+      /* Fallback determinístico se a tabela public.rooms não existir ainda */
+    }
+
+    this.roomGeneration++;
+    this.activeRoomMeta = { roomId, slug, name: roomName };
+    this.currentRoomSlug = slug;
+
+    const currentStore = useHubStore.getState();
+    currentStore.addRecentRoom(slug);
+    currentStore.setActiveContext({
+      type: "room",
+      roomId,
+      slug,
+      name: roomName,
+    });
+    currentStore.setMessages([]);
+    currentStore.setStatusText(`Na sala #${slug}`);
+    this.roomSenderProfiles.set(userId, {
+      nickname: currentStore.nickname,
+      avatarColor: currentStore.avatarColor,
+    });
+
+    // Inicializa PeerJS local para fechar malha DataConnection/MediaConnection da sala
+    try {
+      await this.ensureLocalPeer(userId);
+    } catch (err) {
+      console.warn("[Room] PeerJS indisponível no momento:", err);
+    }
+
+    await this.loadRoomMessages(roomId);
+    this.subscribeRoomMessages(roomId, slug);
+    this.subscribeRoomMesh(slug, userId);
+
+    if (autoJoinVoice) {
+      await this.joinRoomVoiceCall(false);
+    }
+
+    return { roomId, slug, name: roomName };
+  }
+
+  public async joinRoomVoiceCall(withVideo = false): Promise<void> {
+    const state = useHubStore.getState();
+    const userId = state.authUserId;
+    if (!userId || !this.activeRoomMeta || state.activeContext?.type !== "room") {
+      throw new Error("Entre em uma sala antes de ativar a voz.");
+    }
+    if (state.inVoiceCall || this.joiningVoice) return;
+
+    this.joiningVoice = true;
+    this.clearMicRecovery();
+
+    try {
+      await this.setupLocalMicrophone();
+      const peerId = await this.ensureLocalPeer(userId);
+
+      this.recoveryCancelled = false;
+      beginCallDiagnostics();
+      useHubStore.getState().setInVoiceCall(true);
+      useHubStore.getState().setCallStageMode("grid");
+      useHubStore.getState().updateParticipant(peerId, {
+        inVoiceCall: true,
+        isMuted: useHubStore.getState().isMuted,
+        isDeafened: useHubStore.getState().isDeafened,
+      });
+
+      await Promise.allSettled([
+        this.trackPresence(),
+        this.trackRoomMeshPresence(),
+      ]);
+      this.broadcastLocalState();
+      this.syncRoomMeshState(this.activeRoomMeta.slug);
+      sounds.playJoin();
+
+      if (withVideo && !useHubStore.getState().isWebcamActive) {
+        await this.toggleWebcam();
+      }
+    } catch (err) {
+      mediaError("Voz na sala", err);
+    } finally {
+      this.joiningVoice = false;
+    }
+  }
+
+  public async sendRoomInviteToFriend(
+    friend: FriendItem,
+    slugArg?: string,
+    roomNameArg?: string,
+  ): Promise<void> {
+    const state = useHubStore.getState();
+    const userId = state.authUserId;
+    if (!userId) throw new Error("Usuário não autenticado.");
+
+    const slug =
+      slugArg ||
+      (state.activeContext?.type === "room" ? state.activeContext.slug : "");
+    if (!slug) throw new Error("Nenhuma sala ativa para convidar.");
+
+    const roomName =
+      roomNameArg ||
+      (state.activeContext?.type === "room" ? state.activeContext.name : slug);
+
+    const { data: channelId, error: rpcErr } = await supabase.rpc(
+      "get_or_create_dm_channel",
+      { target_user_id: friend.id },
+    );
+    if (rpcErr || !channelId) {
+      throw new Error(
+        rpcErr?.message || "Não foi possível abrir o canal de DM.",
+      );
+    }
+
+    const content = `Convite para a sala **${roomName}**: convite://sala/${slug}`;
+    const { error: msgErr } = await supabase.from("messages").insert({
+      id: crypto.randomUUID(),
+      channel_id: channelId,
+      sender_id: userId,
+      content,
+    });
+    if (msgErr) throw new Error(msgErr.message);
+  }
+
+  private subscribeRoomMesh(slug: string, userId: string): void {
+    if (this.roomMeshChannel) {
+      void supabase.removeChannel(this.roomMeshChannel);
+      this.roomMeshChannel = null;
+    }
+
+    const channel = supabase.channel(`room-mesh:${slug}`, {
+      config: { presence: { key: userId } },
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        this.syncRoomMeshState(slug);
+      })
+      .on("presence", { event: "join" }, () => {
+        this.syncRoomMeshState(slug);
+      })
+      .on("presence", { event: "leave" }, () => {
+        this.syncRoomMeshState(slug);
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED" && this.activeRoomMeta?.slug === slug) {
+          await this.trackRoomMeshPresence();
+          this.syncRoomMeshState(slug);
+        }
+      });
+
+    this.roomMeshChannel = channel;
+  }
+
+  public async trackRoomMeshPresence(): Promise<void> {
+    if (!this.roomMeshChannel || !this.activeRoomMeta || !this.cloudSessionUserId) {
+      return;
+    }
+    const state = useHubStore.getState();
+    const payload: RoomMeshPresencePayload = {
+      userId: this.cloudSessionUserId,
+      peerId: this.localPeer?.id || "",
+      nickname: state.nickname,
+      avatarColor: state.avatarColor,
+      inVoiceCall: state.inVoiceCall,
+      isMuted: state.isMuted,
+      isDeafened: state.isDeafened,
+      isVideoEnabled: state.isWebcamActive,
+      isScreenSharing: state.isScreenSharing,
+    };
+    try {
+      await this.roomMeshChannel.track(payload);
+    } catch {
+      /* ignore during reconnect */
+    }
+  }
+
+  private syncRoomMeshState(slug: string): void {
+    if (!this.roomMeshChannel || this.activeRoomMeta?.slug !== slug) return;
+    const state = useHubStore.getState();
+    const userId = state.authUserId;
+    if (!userId || state.activeContext?.type !== "room") return;
+
+    const raw =
+      this.roomMeshChannel.presenceState<RoomMeshPresencePayload>();
+    const byUserId = new Map<string, RoomMeshPresencePayload>();
+
+    for (const [key, entries] of Object.entries(raw)) {
+      const latest = entries[entries.length - 1];
+      if (!latest) continue;
+      const uid = latest.userId || key;
+      if (!uid || uid === userId) continue;
+      byUserId.set(uid, { ...latest, userId: uid });
+      this.roomSenderProfiles.set(uid, {
+        nickname: latest.nickname || "Participante",
+        avatarColor: latest.avatarColor || "#6eddbd",
+      });
+    }
+
+    // Remove sessões antigas de quem saiu da sala ou mudou de peerId
+    for (const session of [...this.sessions.values()]) {
+      const remoteEntry = session.clientId
+        ? byUserId.get(session.clientId)
+        : undefined;
+      if (
+        !remoteEntry ||
+        (remoteEntry.peerId && session.peerId !== remoteEntry.peerId)
+      ) {
+        this.finalizePeerDisconnected(session);
+      }
+    }
+
+    // Monta mapa de participantes deduplicado estritamente por userId
+    const nextParticipants: Record<string, Participant> = {};
+    const existingByUser = new Map<string, Participant>();
+    for (const p of Object.values(useHubStore.getState().participants)) {
+      if (p.clientId) existingByUser.set(p.clientId, p);
+    }
+
+    const localKey = this.localPeer?.id || `local:${userId}`;
+    const existingLocal = existingByUser.get(userId);
+    nextParticipants[localKey] = {
+      profile: existingLocal?.profile ?? null,
+      peerId: localKey,
+      clientId: userId,
+      nickname: state.nickname,
+      avatarColor: state.avatarColor,
+      isLocal: true,
+      inVoiceCall: state.inVoiceCall,
+      isMuted: state.isMuted,
+      isDeafened: state.isDeafened,
+      isSpeaking: state.isLocalSpeaking,
+      isWebcamActive: state.isWebcamActive,
+      isScreenSharing: state.isScreenSharing,
+      screenQualityLabel: existingLocal?.screenQualityLabel,
+      activeSoundEffect: existingLocal?.activeSoundEffect ?? null,
+    };
+
+    let remoteJoinedVoice = false;
+    let remoteLeftVoice = false;
+
+    if (state.inVoiceCall) {
+      for (const [uid, prev] of existingByUser.entries()) {
+        if (uid === userId) continue;
+        const next = byUserId.get(uid);
+        if (prev.inVoiceCall && (!next || !next.inVoiceCall)) {
+          remoteLeftVoice = true;
+        }
+      }
+    }
+
+    for (const [uid, entry] of byUserId.entries()) {
+      const participantKey = entry.peerId || `presence:${uid}`;
+      const prev = existingByUser.get(uid);
+      const nextInVoice = Boolean(entry.inVoiceCall);
+      if (state.inVoiceCall && !prev?.inVoiceCall && nextInVoice) {
+        remoteJoinedVoice = true;
+      }
+      nextParticipants[participantKey] = {
+        profile: prev?.profile ?? null,
+        peerId: participantKey,
+        clientId: uid,
+        nickname: entry.nickname || prev?.nickname || "Participante",
+        avatarColor: entry.avatarColor || prev?.avatarColor || "#6eddbd",
+        isLocal: false,
+        inVoiceCall: nextInVoice,
+        isMuted: Boolean(entry.isMuted),
+        isDeafened: Boolean(entry.isDeafened),
+        isSpeaking: prev?.isSpeaking ?? false,
+        isWebcamActive: Boolean(entry.isVideoEnabled),
+        isScreenSharing: Boolean(entry.isScreenSharing),
+        screenQualityLabel: prev?.screenQualityLabel,
+        rttMs: prev?.rttMs,
+        activeSoundEffect: prev?.activeSoundEffect ?? null,
+      };
+    }
+
+    useHubStore.getState().setParticipants(nextParticipants);
+    if (remoteJoinedVoice) sounds.playJoin();
+    if (remoteLeftVoice) sounds.playLeave();
+
+    // Conecta PeerJS em malha completa (Full-Mesh) para dados e mídia ativa
+    if (this.localPeer && !this.localPeer.destroyed && this.localPeer.open) {
+      for (const entry of byUserId.values()) {
+        if (!entry.peerId || entry.peerId === this.localPeer.id) continue;
+        this.connectToPeer(entry.peerId, entry.userId, entry.nickname);
+
+        const session = this.sessions.get(entry.peerId);
+        if (session && state.inVoiceCall && entry.inVoiceCall) {
+          if (!session.voiceCall) {
+            this.initiateVoiceCallWithPeer(session);
+          }
+          if (this.localWebcamStream && !session.outgoingWebcam) {
+            this.initiateWebcamCallWithPeer(session);
+          }
+          if (
+            state.isScreenSharing &&
+            this.localScreenStream &&
+            !session.outgoingScreen
+          ) {
+            this.initiateScreenCallWithPeer(session);
+          }
+        }
+      }
+    }
+  }
+
+  private async loadRoomMessages(roomId: string): Promise<void> {
+    if (roomId.startsWith("room:")) {
+      try {
+        const localSaved = await chatLedger.refresh(roomId);
+        if (useHubStore.getState().activeContext?.type === "room") {
+          useHubStore.getState().setMessages(localSaved);
+        }
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("room_messages")
+      .select(
+        "id, room_id, sender_id, content, file_url, file_name, file_type, file_size, created_at",
+      )
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    if (error) {
+      console.warn("[Room] Erro ao carregar mensagens:", error.message);
+      try {
+        const localSaved = await chatLedger.refresh(roomId);
+        if (this.activeRoomMeta?.roomId === roomId) {
+          useHubStore.getState().setMessages(localSaved);
+        }
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
+    const rows = data || [];
+    const missingSenderIds = Array.from(
+      new Set(
+        rows
+          .map((r) => r.sender_id)
+          .filter(
+            (id) =>
+              id !== useHubStore.getState().authUserId &&
+              !this.roomSenderProfiles.has(id) &&
+              !useHubStore.getState().friends.some((f) => f.id === id),
+          ),
+      ),
+    );
+
+    if (missingSenderIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, nickname, avatar_color")
+        .in("id", missingSenderIds);
+      for (const p of profiles || []) {
+        this.roomSenderProfiles.set(p.id, {
+          nickname: p.nickname,
+          avatarColor: p.avatar_color || "#6eddbd",
+        });
+      }
+    }
+
+    if (this.activeRoomMeta?.roomId !== roomId) return;
+    const mapped = rows.map((row) => this.mapDbMessageToChat(row, null));
+    useHubStore.getState().setMessages(mapped);
+  }
+
+  private processIncomingInviteText(
+    msgId: string,
+    content: string | undefined,
+    senderId: string,
+    senderNickname: string,
+    createdAtMs?: number,
+  ): void {
+    if (!content || senderId === useHubStore.getState().authUserId) return;
+    const match = content.match(/convite:\/\/sala\/([a-z0-9-]{1,48})/i);
+    if (!match?.[1]) return;
+    useHubStore.getState().addRoomInvite({
+      id: `invite-${msgId}`,
+      slug: match[1].toLowerCase(),
+      senderId,
+      senderNickname: senderNickname || "Alguém",
+      createdAt: createdAtMs ?? Date.now(),
+    });
+  }
+
+  private subscribeRoomMessages(roomId: string, slug: string): void {
+    if (this.roomMessagesChannel) {
+      void supabase.removeChannel(this.roomMessagesChannel);
+      this.roomMessagesChannel = null;
+    }
+
+    let channel = supabase.channel(`room-chat:${slug}`);
+
+    if (!roomId.startsWith("room:")) {
+      channel = channel
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "room_messages",
+            filter: `room_id=eq.${roomId}`,
+          },
+          async (payload) => {
+            const row = payload.new as DbRoomMessageRow;
+            if (!row || this.activeRoomMeta?.roomId !== roomId) return;
+            if (
+              row.sender_id !== useHubStore.getState().authUserId &&
+              !this.roomSenderProfiles.has(row.sender_id) &&
+              !useHubStore.getState().friends.some((f) => f.id === row.sender_id)
+            ) {
+              const summary = await this.resolvePeerProfileSummary(
+                row.sender_id,
+              );
+              this.roomSenderProfiles.set(row.sender_id, summary);
+            }
+            if (this.activeRoomMeta?.roomId !== roomId) return;
+            const mapped = this.mapDbMessageToChat(row, null);
+            const state = useHubStore.getState();
+            const alreadyExists = state.messages.some((m) => m.id === mapped.id);
+            state.addMessage(mapped);
+            if (!alreadyExists && row.sender_id !== state.authUserId) {
+              state.setUnreadCount((n) => n + 1);
+              this.processIncomingInviteText(
+                mapped.id,
+                mapped.content,
+                row.sender_id,
+                mapped.authorNickname,
+                Date.parse(row.created_at) || Date.now(),
+              );
+              notifyNative({
+                id: mapped.id,
+                kind: "message",
+                title: `#${slug} · ${mapped.authorNickname}`.slice(0, 100),
+                body: (mapped.content || mapped.fileName || "Novo anexo").slice(0, 240),
+              });
+            }
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "room_messages",
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            const row = payload.new as DbRoomMessageRow;
+            if (!row || this.activeRoomMeta?.roomId !== roomId) return;
+            const mapped = this.mapDbMessageToChat(row, null);
+            useHubStore.setState((s) => ({
+              messages: s.messages.map((m) => (m.id === mapped.id ? mapped : m)),
+            }));
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "room_messages",
+            filter: `room_id=eq.${roomId}`,
+          },
+          (payload) => {
+            const oldRow = payload.old as { id?: string };
+            if (!oldRow?.id || this.activeRoomMeta?.roomId !== roomId) return;
+            useHubStore.setState((s) => ({
+              messages: s.messages.filter((m) => m.id !== oldRow.id),
+            }));
+          },
+        );
+    }
+
+    channel
+      .on("broadcast", { event: "room_chat_message" }, ({ payload }) => {
+        const msg = payload as ChatMessage | undefined;
+        if (
+          !msg?.id ||
+          this.activeRoomMeta?.roomId !== roomId ||
+          msg.authorClientId === useHubStore.getState().authUserId
+        ) {
+          return;
+        }
+        const state = useHubStore.getState();
+        const exists = state.messages.some((m) => m.id === msg.id);
+        state.addMessage({ ...msg, delivery: "received" });
+        if (!exists) {
+          state.setUnreadCount((n) => n + 1);
+          this.processIncomingInviteText(
+            msg.id,
+            msg.content,
+            msg.authorClientId,
+            msg.authorNickname,
+            msg.createdAt || Date.now(),
+          );
+          notifyNative({
+            id: msg.id,
+            kind: "message",
+            title: `#${slug} · ${msg.authorNickname}`.slice(0, 100),
+            body: (msg.content || msg.fileName || "Novo anexo").slice(0, 240),
+          });
+        }
+      })
+      .on("broadcast", { event: "attachment_cached" }, ({ payload }) => {
+        const p = payload as {
+          messageId?: string;
+          storagePath?: string | null;
+          isRoom?: boolean;
+        };
+        if (p?.messageId) {
+          this.handleRemoteAttachmentCached(
+            p.messageId,
+            p.storagePath || null,
+            Boolean(p.isRoom),
+          );
+        }
+      })
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        const p = payload as {
+          clientId?: string;
+          nickname?: string;
+          isTyping?: boolean;
+        };
+        if (!p?.clientId || p.clientId === useHubStore.getState().authUserId)
+          return;
+        useHubStore
+          .getState()
+          .setTypingUser(p.clientId, p.nickname || "Participante", Boolean(p.isTyping));
+      })
+      .subscribe();
+
+    this.roomMessagesChannel = channel;
+  }
+
+  private async loadChannelMessages(
+    channelId: string,
+    friend: FriendItem,
+  ): Promise<void> {
+    const { data, error } = await supabase
+      .from("messages")
+      .select(
+        "id, channel_id, sender_id, content, file_url, file_name, file_type, file_size, created_at, updated_at",
+      )
+      .eq("channel_id", channelId)
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    if (error) {
+      console.warn("[DM] Erro ao carregar mensagens:", error.message);
+      try {
+        const localSaved = await chatLedger.refresh(channelId);
+        if (useHubStore.getState().activeChannelId === channelId) {
+          useHubStore.getState().setMessages(localSaved);
+        }
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
+    if (useHubStore.getState().activeChannelId !== channelId) return;
+    const mapped = (data || []).map((row) => this.mapDbMessageToChat(row, friend));
+    useHubStore.getState().setMessages(mapped);
+  }
+
+  private subscribeDmChannel(channelId: string, friend: FriendItem): void {
+    if (this.dmRealtimeChannel) {
+      void supabase.removeChannel(this.dmRealtimeChannel);
+      this.dmRealtimeChannel = null;
+    }
+
+    const channel = supabase
+      .channel(`dm:${channelId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `channel_id=eq.${channelId}`,
+        },
+        (payload) => {
+          const row = payload.new as DbMessageRow;
+          if (!row || useHubStore.getState().activeChannelId !== channelId) return;
+          const mapped = this.mapDbMessageToChat(row, friend);
+          const state = useHubStore.getState();
+          const alreadyExists = state.messages.some((m) => m.id === mapped.id);
+          state.addMessage(mapped);
+          if (!alreadyExists && row.sender_id !== state.authUserId) {
+            state.setUnreadCount((n) => n + 1);
+            this.processIncomingInviteText(
+              mapped.id,
+              mapped.content,
+              row.sender_id,
+              mapped.authorNickname,
+              Date.parse(row.created_at) || Date.now(),
+            );
+            notifyNative({
+              id: mapped.id,
+              kind: "message",
+              title: mapped.authorNickname.slice(0, 100),
+              body: (mapped.content || mapped.fileName || "Novo anexo").slice(0, 240),
+            });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "messages",
+          filter: `channel_id=eq.${channelId}`,
+        },
+        (payload) => {
+          const row = payload.new as DbMessageRow;
+          if (!row || useHubStore.getState().activeChannelId !== channelId) return;
+          const mapped = this.mapDbMessageToChat(row, friend);
+          useHubStore.setState((s) => ({
+            messages: s.messages.map((m) => (m.id === mapped.id ? mapped : m)),
+          }));
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "messages",
+          filter: `channel_id=eq.${channelId}`,
+        },
+        (payload) => {
+          const oldRow = payload.old as { id?: string };
+          if (!oldRow?.id || useHubStore.getState().activeChannelId !== channelId)
+            return;
+          useHubStore.setState((s) => ({
+            messages: s.messages.filter((m) => m.id !== oldRow.id),
+          }));
+        },
+      )
+      .on("broadcast", { event: "attachment_cached" }, ({ payload }) => {
+        const p = payload as {
+          messageId?: string;
+          storagePath?: string | null;
+          isRoom?: boolean;
+        };
+        if (p?.messageId) {
+          this.handleRemoteAttachmentCached(
+            p.messageId,
+            p.storagePath || null,
+            Boolean(p.isRoom),
+          );
+        }
+      })
+      .on("broadcast", { event: "typing" }, ({ payload }) => {
+        const p = payload as {
+          clientId?: string;
+          nickname?: string;
+          isTyping?: boolean;
+        };
+        if (!p?.clientId || p.clientId === useHubStore.getState().authUserId)
+          return;
+        useHubStore
+          .getState()
+          .setTypingUser(p.clientId, p.nickname || friend.nickname, Boolean(p.isTyping));
+      })
+      .subscribe();
+
+    this.dmRealtimeChannel = channel;
+  }
+
+  private async deliverRoomFallbackMessage(
+    roomId: string,
+    sentMsg: ChatMessage,
+  ): Promise<void> {
+    await chatLedger.mergeMessages(roomId, [sentMsg]).catch(() => {});
+    if (this.roomMessagesChannel) {
+      void this.roomMessagesChannel.send({
+        type: "broadcast",
+        event: "room_chat_message",
+        payload: sentMsg,
+      });
+    }
+    this.broadcast({ type: "chat_message", message: sentMsg });
+  }
+
+  public async sendChatMessage(
+    content: string,
+    _replyTo?: string,
+  ): Promise<ChatMessage | null> {
+    const state = useHubStore.getState();
+    const isRoom = state.activeContext?.type === "room";
+    const targetId =
+      state.activeContext?.type === "room"
+        ? state.activeContext.roomId
+        : state.activeChannelId;
+    const userId = state.authUserId;
+    if (!targetId || !userId) {
+      throw new Error(
+        isRoom
+          ? "Entre em uma sala para enviar mensagens."
+          : "Selecione um amigo para enviar mensagens.",
+      );
+    }
+    const trimmed = content.trim();
+    if (!trimmed) return null;
+    if (trimmed.length > 8000) {
+      throw new Error("Limite de 8000 caracteres por mensagem.");
+    }
+
+    const id = crypto.randomUUID();
+    const optimistic: ChatMessage = {
+      id,
+      roomId: targetId,
+      channelId: targetId,
+      type: "user",
+      delivery: "queued",
+      authorClientId: userId,
+      authorNickname: state.nickname,
+      authorAvatarColor: state.avatarColor,
+      content: trimmed,
+      createdAt: Date.now(),
+      reactions: {},
+    };
+    state.addMessage(optimistic);
+
+    if (isRoom) {
+      if (!targetId.startsWith("room:")) {
+        const { data, error } = await supabase
+          .from("room_messages")
+          .insert({
+            id,
+            room_id: targetId,
+            sender_id: userId,
+            content: trimmed,
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          const saved = this.mapDbMessageToChat(data, null);
+          state.updateMessageUploadProgress(id, undefined, {
+            ...saved,
+            delivery: "sent",
+          });
+          return saved;
+        }
+      }
+
+      // Fallback Realtime Broadcast + Malha P2P se room_messages não existir no DB
+      const sentMsg: ChatMessage = { ...optimistic, delivery: "sent" };
+      state.updateMessageUploadProgress(id, undefined, { delivery: "sent" });
+      await this.deliverRoomFallbackMessage(targetId, sentMsg);
+      return sentMsg;
+    }
+
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({
+        id,
+        channel_id: targetId,
+        sender_id: userId,
+        content: trimmed,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      state.updateMessageUploadProgress(id, undefined, { delivery: "error" });
+      throw new Error(error.message);
+    }
+
+    const saved = this.mapDbMessageToChat(data, state.activeFriend);
+    state.updateMessageUploadProgress(id, undefined, {
+      ...saved,
+      delivery: "sent",
+    });
+    return saved;
+  }
+
+  public async sendFileMessage(
+    file: File,
+    caption = "",
+  ): Promise<ChatMessage | null> {
+    const state = useHubStore.getState();
+    const isRoom = state.activeContext?.type === "room";
+    const targetId =
+      state.activeContext?.type === "room"
+        ? state.activeContext.roomId
+        : state.activeChannelId;
+    const userId = state.authUserId;
+    if (!targetId || !userId) {
+      throw new Error(
+        isRoom
+          ? "Entre em uma sala antes de enviar arquivos."
+          : "Selecione um amigo antes de enviar arquivos.",
+      );
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      throw new Error(
+        `O arquivo "${file.name}" excede o limite estrito de 50 MB (${(file.size / (1024 * 1024)).toFixed(1)} MB).`,
+      );
+    }
+
+    const msgId = crypto.randomUUID();
+    const safeName = file.name.replace(/[^\w.\-()+ ]/g, "_");
+    const folderPrefix = isRoom ? `rooms/${targetId}` : `dm_channels/${targetId}`;
+    const storagePath = `${folderPrefix}/${crypto.randomUUID()}-${safeName}`;
+
+    const optimistic: ChatMessage = {
+      id: msgId,
+      roomId: targetId,
+      channelId: targetId,
+      type: "user",
+      delivery: "queued",
+      authorClientId: userId,
+      authorNickname: state.nickname,
+      authorAvatarColor: state.avatarColor,
+      content: caption.trim() || file.name,
+      createdAt: Date.now(),
+      reactions: {},
+      fileName: file.name,
+      fileType: file.type || "application/octet-stream",
+      fileSize: file.size,
+      uploadProgress: { percent: 0, bytesPerSecond: 0 },
+    };
+    state.addMessage(optimistic);
+
+    // Salva cópia local imediata na memória/IndexedDB do remetente antes de enviar pelo relay
+    await storageDb.saveLocalAttachment({
+      messageId: msgId,
+      roomId: targetId,
+      fileName: file.name,
+      fileType: file.type || "application/octet-stream",
+      fileSize: file.size,
+      blob: file,
+      savedAt: Date.now(),
+    });
+
+    try {
+      await this.uploadAttachmentWithProgress(
+        storagePath,
+        file,
+        (percent, bytesPerSecond) => {
+          useHubStore
+            .getState()
+            .updateMessageUploadProgress(msgId, { percent, bytesPerSecond });
+        },
+      );
+
+      const { data: urlData } = supabase.storage
+        .from("cbs-attachments")
+        .getPublicUrl(storagePath);
+      const fileUrl = urlData.publicUrl;
+
+      if (isRoom) {
+        if (!targetId.startsWith("room:")) {
+          const { data, error } = await supabase
+            .from("room_messages")
+            .insert({
+              id: msgId,
+              room_id: targetId,
+              sender_id: userId,
+              content: caption.trim() || file.name,
+              file_url: fileUrl,
+              file_name: file.name,
+              file_type: file.type || "application/octet-stream",
+              file_size: file.size,
+            })
+            .select()
+            .single();
+
+          if (!error && data) {
+            const saved = this.mapDbMessageToChat(data, null);
+            useHubStore.getState().updateMessageUploadProgress(msgId, undefined, {
+              ...saved,
+              delivery: "sent",
+            });
+            return saved;
+          }
+        }
+
+        const sentMsg: ChatMessage = {
+          ...optimistic,
+          fileUrl,
+          uploadProgress: undefined,
+          delivery: "sent",
+        };
+        useHubStore.getState().updateMessageUploadProgress(msgId, undefined, {
+          fileUrl,
+          delivery: "sent",
+        });
+        await this.deliverRoomFallbackMessage(targetId, sentMsg);
+        return sentMsg;
+      }
+
+      const { data, error } = await supabase
+        .from("messages")
+        .insert({
+          id: msgId,
+          channel_id: targetId,
+          sender_id: userId,
+          content: caption.trim() || file.name,
+          file_url: fileUrl,
+          file_name: file.name,
+          file_type: file.type || "application/octet-stream",
+          file_size: file.size,
+        })
+        .select()
+        .single();
+
+      if (error) throw new Error(error.message);
+
+      const saved = this.mapDbMessageToChat(data, state.activeFriend);
+      useHubStore.getState().updateMessageUploadProgress(msgId, undefined, {
+        ...saved,
+        delivery: "sent",
+      });
+      return saved;
+    } catch (err) {
+      useHubStore
+        .getState()
+        .updateMessageUploadProgress(msgId, undefined, { delivery: "error" });
+      throw err;
+    }
+  }
+
+  private extractStorageObjectPath(fileUrl?: string | null): string | null {
+    if (!fileUrl || fileUrl.startsWith("local://")) return null;
+    try {
+      const url = new URL(fileUrl);
+      const marker = "/storage/v1/object/";
+      const idx = url.pathname.indexOf(marker);
+      if (idx < 0) return null;
+      const rest = url.pathname.slice(idx + marker.length);
+      const bucketMarker = "cbs-attachments/";
+      const bIdx = rest.indexOf(bucketMarker);
+      if (bIdx < 0) return null;
+      return rest
+        .slice(bIdx + bucketMarker.length)
+        .split("/")
+        .map((seg) => decodeURIComponent(seg))
+        .join("/");
+    } catch {
+      return null;
+    }
+  }
+
+  private handleRemoteAttachmentCached(
+    messageId: string,
+    storagePath: string | null,
+    isRoom: boolean,
+  ): void {
+    const state = useHubStore.getState();
+    const msg = state.messages.find((m) => m.id === messageId);
+    const resolvedPath =
+      storagePath || this.extractStorageObjectPath(msg?.fileUrl);
+
+    // Somente o remetente (ou quem originou o upload) confirma a limpeza no relay
+    if (msg && msg.authorClientId !== state.authUserId) {
+      return;
+    }
+
+    if (isRoom) {
+      if (this.pendingRoomRelayPurges.has(messageId)) return;
+      const timer = window.setTimeout(() => {
+        this.pendingRoomRelayPurges.delete(messageId);
+        void this.purgeTransientCloudAttachment(
+          messageId,
+          resolvedPath,
+          true,
+          "stored",
+        );
+      }, 60_000);
+      this.pendingRoomRelayPurges.set(messageId, timer);
+      return;
+    }
+
+    void this.purgeTransientCloudAttachment(
+      messageId,
+      resolvedPath,
+      false,
+      "stored",
+    );
+  }
+
+  private async purgeTransientCloudAttachment(
+    messageId: string,
+    storagePath: string | null,
+    isRoom: boolean,
+    statusTag: "stored" | "purged",
+  ): Promise<void> {
+    if (storagePath) {
+      await supabase.storage
+        .from("cbs-attachments")
+        .remove([storagePath])
+        .catch(() => {});
+    }
+
+    const markerUrl = `local://${statusTag}/${messageId}`;
+    const userId = useHubStore.getState().authUserId;
+    if (!userId) return;
+
+    const table = isRoom ? "room_messages" : "messages";
+    if (!(isRoom && this.activeRoomMeta?.roomId.startsWith("room:"))) {
+      await supabase
+        .from(table)
+        .update({ file_url: markerUrl })
+        .eq("id", messageId)
+        .then(() => {}, () => {});
+    }
+
+    useHubStore.setState((s) => ({
+      messages: s.messages.map((m) =>
+        m.id === messageId ? { ...m, fileUrl: markerUrl } : m,
+      ),
+    }));
+  }
+
+  public async resolveAttachmentBlobUrl(
+    message: ChatMessage,
+  ): Promise<ResolvedAttachmentResult> {
+    if (!message?.id) return { status: "missing" };
+
+    // 1. Verifica memória local (IndexedDB + cache de sessão)
+    const cached = await storageDb.getLocalAttachment(message.id);
+    if (cached && cached.blob && cached.blob.size > 0) {
+      return {
+        status: "ready",
+        url: URL.createObjectURL(cached.blob),
+        fromLocal: true,
+      };
+    }
+
+    // 2. Se o registro já aponta para armazenamento apenas local e não está no dispositivo
+    if (!message.fileUrl || message.fileUrl.startsWith("local://")) {
+      return { status: "missing" };
+    }
+
+    // 3. Deduplica download concorrente (ex: StrictMode double-mount) para evitar corridas
+    let inflight = this.attachmentResolveLocks.get(message.id);
+    if (!inflight) {
+      inflight = (async () => {
+        const storagePath = this.extractStorageObjectPath(message.fileUrl);
+        let downloadedBlob: Blob | null = null;
+
+        for (let attempt = 0; attempt < 2; attempt++) {
+          if (attempt > 0) {
+            await new Promise((r) => window.setTimeout(r, 900));
+          }
+
+          if (storagePath) {
+            const { data, error } = await supabase.storage
+              .from("cbs-attachments")
+              .download(storagePath);
+            if (!error && data && data.size > 0) {
+              downloadedBlob = data;
+              break;
+            }
+          }
+
+          try {
+            const res = await fetch(message.fileUrl!);
+            if (res.status === 404 || res.status === 410) {
+              break;
+            }
+            if (res.ok) {
+              const b = await res.blob();
+              if (b.size > 0) {
+                downloadedBlob = b;
+                break;
+              }
+            }
+          } catch {
+            /* retry transient network error once */
+          }
+        }
+
+        if (downloadedBlob && downloadedBlob.size > 0) {
+          await storageDb.saveLocalAttachment({
+            messageId: message.id,
+            roomId: message.roomId,
+            fileName: message.fileName || "arquivo",
+            fileType: message.fileType || downloadedBlob.type || "application/octet-stream",
+            fileSize: message.fileSize || downloadedBlob.size,
+            blob: downloadedBlob,
+            savedAt: Date.now(),
+          });
+
+          const state = useHubStore.getState();
+          const isRoom = state.activeContext?.type === "room";
+          if (message.authorClientId !== state.authUserId) {
+            const activeCh = isRoom
+              ? this.roomMessagesChannel
+              : this.dmRealtimeChannel;
+            if (activeCh) {
+              void activeCh.send({
+                type: "broadcast",
+                event: "attachment_cached",
+                payload: {
+                  messageId: message.id,
+                  storagePath,
+                  isRoom,
+                },
+              });
+            }
+            if (!isRoom) {
+              void this.purgeTransientCloudAttachment(
+                message.id,
+                storagePath,
+                false,
+                "stored",
+              );
+            }
+          }
+        }
+      })().finally(() => {
+        this.attachmentResolveLocks.delete(message.id);
+      });
+      this.attachmentResolveLocks.set(message.id, inflight);
+    }
+
+    await inflight;
+
+    const storedAfterFetch = await storageDb.getLocalAttachment(message.id);
+    if (storedAfterFetch && storedAfterFetch.blob.size > 0) {
+      return {
+        status: "ready",
+        url: URL.createObjectURL(storedAfterFetch.blob),
+        fromLocal: true,
+      };
+    }
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      return { status: "offline" };
+    }
+    return { status: "missing" };
+  }
+
+  public async readAttachmentText(message: ChatMessage): Promise<string> {
+    let record = await storageDb.getLocalAttachment(message.id);
+    if (!record) {
+      const resolved = await this.resolveAttachmentBlobUrl(message);
+      if (resolved.status === "ready") {
+        URL.revokeObjectURL(resolved.url);
+      }
+      record = await storageDb.getLocalAttachment(message.id);
+    }
+    if (!record) {
+      throw new Error(
+        "Esse item não foi encontrado na memoria, peça para o usuario enviar novamente",
+      );
+    }
+    const text = await record.blob.text();
+    return text.slice(0, 200_000);
+  }
+
+  public async deleteAttachmentFromLocalMemory(
+    message: ChatMessage,
+  ): Promise<void> {
+    await storageDb.deleteLocalAttachment(message.id);
+    const pendingTimer = this.pendingRoomRelayPurges.get(message.id);
+    if (pendingTimer !== undefined) {
+      window.clearTimeout(pendingTimer);
+      this.pendingRoomRelayPurges.delete(message.id);
+    }
+    const storagePath = this.extractStorageObjectPath(message.fileUrl);
+    const isRoom = useHubStore.getState().activeContext?.type === "room";
+    await this.purgeTransientCloudAttachment(
+      message.id,
+      storagePath,
+      isRoom,
+      "purged",
+    );
+  }
+
+  private async uploadAttachmentWithProgress(
+    storagePath: string,
+    file: File,
+    onProgress: (percent: number, bytesPerSecond: number) => void,
+  ): Promise<void> {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+
+    if (!token) {
+      const { error } = await supabase.storage
+        .from("cbs-attachments")
+        .upload(storagePath, file, { upsert: false });
+      if (error) throw new Error(error.message);
+      onProgress(100, file.size);
+      return;
+    }
+
+    const encodedPath = storagePath
+      .split("/")
+      .map((seg) => encodeURIComponent(seg))
+      .join("/");
+    const endpoint = `${SUPABASE_URL}/storage/v1/object/cbs-attachments/${encodedPath}`;
+    const startedAt = performance.now();
+
+    await new Promise<void>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", endpoint, true);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
+      xhr.setRequestHeader("x-upsert", "false");
+      if (file.type) {
+        xhr.setRequestHeader("Content-Type", file.type);
+      }
+
+      xhr.upload.onprogress = (ev) => {
+        if (!ev.lengthComputable) return;
+        const elapsedSec = Math.max(0.05, (performance.now() - startedAt) / 1000);
+        const percent = Math.min(99, Math.round((ev.loaded / ev.total) * 100));
+        const bps = Math.round(ev.loaded / elapsedSec);
+        onProgress(percent, bps);
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const elapsedSec = Math.max(0.05, (performance.now() - startedAt) / 1000);
+          onProgress(100, Math.round(file.size / elapsedSec));
+          resolve();
+        } else {
+          let message = `Erro no upload (${xhr.status})`;
+          try {
+            const parsed = JSON.parse(xhr.responseText);
+            if (parsed?.message || parsed?.error) {
+              message = parsed.message || parsed.error;
+            }
+          } catch {
+            /* ignore */
+          }
+          reject(new Error(message));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error("Falha de rede durante o upload."));
+      xhr.send(file);
+    });
+  }
+
+  public async mutateChat(
+    messageId: string,
+    kind: ChatOperation["kind"],
+    data: { content?: string; emoji?: string; active?: boolean } = {},
+  ): Promise<void> {
+    const state = useHubStore.getState();
+    const isRoom = state.activeContext?.type === "room";
+    const message = state.messages.find((m) => m.id === messageId);
+    if (!message || message.deleted) throw new Error("Mensagem indisponível.");
+
+    if (kind === "edit" && data.content !== undefined) {
+      const trimmed = data.content.trim();
+      if (!trimmed) throw new Error("Mensagem vazia.");
+      if (!(isRoom && this.activeRoomMeta?.roomId.startsWith("room:"))) {
+        const table = isRoom ? "room_messages" : "messages";
+        const { error } = await supabase
+          .from(table)
+          .update({ content: trimmed, updated_at: new Date().toISOString() })
+          .eq("id", messageId)
+          .eq("sender_id", state.authUserId || "");
+        if (error) throw new Error(error.message);
+      }
+      useHubStore.setState((s) => ({
+        messages: s.messages.map((m) =>
+          m.id === messageId
+            ? { ...m, content: trimmed, editedAt: Date.now() }
+            : m,
+        ),
+      }));
+      return;
+    }
+
+    if (kind === "delete") {
+      if (!(isRoom && this.activeRoomMeta?.roomId.startsWith("room:"))) {
+        const table = isRoom ? "room_messages" : "messages";
+        const { error } = await supabase
+          .from(table)
+          .delete()
+          .eq("id", messageId)
+          .eq("sender_id", state.authUserId || "");
+        if (error) throw new Error(error.message);
+      }
+      useHubStore.setState((s) => ({
+        messages: s.messages.filter((m) => m.id !== messageId),
+      }));
+      return;
+    }
+
+    if (kind === "reaction" && data.emoji) {
+      state.updateMessageReaction(
+        messageId,
+        data.emoji,
+        state.clientId,
+        state.nickname,
+      );
+      return;
+    }
+
+    if (kind === "pin") {
+      useHubStore.setState((s) => ({
+        messages: s.messages.map((m) =>
+          m.id === messageId ? { ...m, pinned: data.active } : m,
+        ),
+      }));
+    }
+  }
+
+  public async toggleMessageReaction(
+    messageId: string,
+    emoji: string,
+  ): Promise<void> {
+    const state = useHubStore.getState();
+    const msg = state.messages.find((m) => m.id === messageId);
+    await this.mutateChat(messageId, "reaction", {
+      emoji,
+      active: !msg?.reactions[emoji]?.reactorClientIds.includes(state.clientId),
+    });
+  }
+
+  public sendTypingState(isTyping: boolean): void {
+    const state = useHubStore.getState();
+    const targetChannel =
+      state.activeContext?.type === "room"
+        ? this.roomMessagesChannel
+        : this.dmRealtimeChannel;
+    if (targetChannel && state.authUserId) {
+      void targetChannel.send({
+        type: "broadcast",
+        event: "typing",
+        payload: {
+          clientId: state.authUserId,
+          nickname: state.nickname,
+          isTyping,
+        },
+      });
+    }
+    this.broadcast({
+      type: "chat_typing",
+      clientId: state.clientId,
+      nickname: state.nickname,
+      isTyping,
+    });
+  }
+
+  /* ========================================================================= */
+  /* FASE 4: LIGAÇÃO DIRETA 1:1 (SIGNALLING CALLS + PEERJS DIRETO)             */
+  /* ========================================================================= */
+
+  private subscribeSignalingCalls(userId: string): void {
+    if (this.callsChannelIn) void supabase.removeChannel(this.callsChannelIn);
+    if (this.callsChannelOut) void supabase.removeChannel(this.callsChannelOut);
+
+    this.callsChannelIn = supabase
+      .channel(`calls-in:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "signaling_calls",
+          filter: `receiver_id=eq.${userId}`,
+        },
+        (payload) => {
+          const row = payload.new as DbSignalingCallRow | undefined;
+          if (!row?.id) return;
+          void this.handleIncomingSignalingCallEvent(row);
+        },
+      )
+      .subscribe();
+
+    this.callsChannelOut = supabase
+      .channel(`calls-out:${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "signaling_calls",
+          filter: `caller_id=eq.${userId}`,
+        },
+        (payload) => {
+          const row = payload.new as DbSignalingCallRow | undefined;
+          if (!row?.id) return;
+          void this.handleOutgoingSignalingCallEvent(row);
+        },
+      )
+      .subscribe();
+  }
+
+  private async resolvePeerProfileSummary(
+    peerUserId: string,
+  ): Promise<{ nickname: string; avatarColor: string }> {
+    const cached = useHubStore.getState().friends.find((f) => f.id === peerUserId);
+    if (cached) {
+      return { nickname: cached.nickname, avatarColor: cached.avatarColor };
+    }
+    const { data } = await supabase
+      .from("profiles")
+      .select("nickname, avatar_color")
+      .eq("id", peerUserId)
+      .maybeSingle();
+    return {
+      nickname: data?.nickname || "Amigo",
+      avatarColor: data?.avatar_color || "#6eddbd",
+    };
+  }
+
+  private async handleIncomingSignalingCallEvent(
+    row: DbSignalingCallRow,
+  ): Promise<void> {
+    const state = useHubStore.getState();
+
+    if (row.status === "calling") {
+      // Se já está em ligação ou tocando outra, rejeita por ocupado
+      if (
+        state.inVoiceCall ||
+        state.outgoingCall ||
+        (state.incomingCall && state.incomingCall.id !== row.id)
+      ) {
+        await supabase
+          .from("signaling_calls")
+          .update({ status: "rejected", updated_at: new Date().toISOString() })
+          .eq("id", row.id);
+        return;
+      }
+
+      if (state.incomingCall?.id === row.id) return;
+
+      const summary = await this.resolvePeerProfileSummary(row.caller_id);
+      const callData: SignalingCallData = {
+        ...row,
+        peerNickname: summary.nickname,
+        peerAvatarColor: summary.avatarColor,
+      };
+      useHubStore.getState().setIncomingCall(callData);
+      sounds.startRingtone();
+
+      if (this.incomingCallTimer !== null) {
+        window.clearTimeout(this.incomingCallTimer);
+      }
+      this.incomingCallTimer = window.setTimeout(() => {
+        const current = useHubStore.getState().incomingCall;
+        if (current?.id === row.id) {
+          void this.rejectIncomingCall();
+        }
+      }, 45_000);
+
+      notifyNative(
+        {
+          id: row.id,
+          kind: "call",
+          title: "Chamada recebida no cbsHUB",
+          body: `${summary.nickname.slice(0, 80)} está ligando para você. Clique para atender.`,
+        },
+        () => {
+          if (useHubStore.getState().incomingCall?.id === row.id) {
+            void this.acceptIncomingCall().catch((err) =>
+              mediaError("Atender chamada", err),
+            );
+          }
+        },
+      );
+      return;
+    }
+
+    if (row.status === "ended" || row.status === "rejected") {
+      if (state.incomingCall?.id === row.id) {
+        this.clearIncomingCallTimer();
+        sounds.stopRingtone();
+        useHubStore.getState().setIncomingCall(null);
+      }
+      if (state.activeCallId === row.id) {
+        this.cleanupDirectCallLocalState();
+      }
+    }
+  }
+
+  private async handleOutgoingSignalingCallEvent(
+    row: DbSignalingCallRow,
+  ): Promise<void> {
+    const state = useHubStore.getState();
+
+    if (row.status === "accepted" && row.receiver_peer_id) {
+      if (
+        state.outgoingCall?.id !== row.id &&
+        state.activeCallId !== row.id
+      ) {
+        return;
+      }
+      const wasOutgoing = state.outgoingCall?.id === row.id;
+      sounds.stopRingtone();
+      if (wasOutgoing) sounds.playJoin();
+      const withVideo = state.outgoingCall?.withVideo ?? this.pendingOutgoingVideo;
+      this.pendingOutgoingVideo = false;
+      state.setOutgoingCall(null);
+      state.setActiveCallId(row.id);
+
+      this.directRemotePeerId = row.receiver_peer_id;
+      this.directRemoteUserId = row.receiver_id;
+
+      // Garante que estamos na DM do amigo e estabelece enlace direto 1:1
+      if (this.localPeer && !this.localPeer.destroyed) {
+        this.connectToPeer(row.receiver_peer_id, row.receiver_id);
+        if (withVideo && !useHubStore.getState().isWebcamActive) {
+          void this.toggleWebcam().catch(() => {});
+        }
+      }
+      return;
+    }
+
+    if (row.status === "rejected" || row.status === "ended") {
+      if (state.outgoingCall?.id === row.id) {
+        sounds.stopRingtone();
+        this.pendingOutgoingVideo = false;
+        state.setOutgoingCall(null);
+        state.setStatusText(
+          row.status === "rejected" ? "Chamada recusada" : "Chamada encerrada",
+        );
+        this.cleanupDirectCallLocalState();
+      } else if (state.activeCallId === row.id) {
+        this.cleanupDirectCallLocalState();
+      }
+    }
+  }
+
+  private clearIncomingCallTimer(): void {
+    if (this.incomingCallTimer !== null) {
+      window.clearTimeout(this.incomingCallTimer);
+      this.incomingCallTimer = null;
+    }
+  }
+
+  private async ensureLocalPeer(userId: string): Promise<string> {
+    if (this.localPeer && !this.localPeer.destroyed && this.localPeer.open) {
+      return this.localPeer.id;
+    }
+
+    if (this.localPeer && !this.localPeer.destroyed) {
+      try {
+        this.localPeer.destroy();
+      } catch {
+        /* ignore */
+      }
+      this.localPeer = null;
+    }
+
+    const state = useHubStore.getState();
+    const shortId = this.generateShortId(userId);
+    const nonce = Math.random().toString(36).substring(2, 6);
+    const localPeerId = `cbshub-u-${shortId}-${nonce}`;
+
     const localParticipant: Participant = {
       peerId: localPeerId,
-      clientId: state.clientId,
+      clientId: userId,
       nickname: state.nickname,
       avatarColor: state.avatarColor,
       isLocal: true,
@@ -227,393 +2385,641 @@ class WebRTCEngine {
       activeSoundEffect: null,
     };
 
-    useHubStore.getState().setParticipants({ [localPeerId]: localParticipant });
+    if (state.activeContext?.type === "room") {
+      const nextParticipants: Record<string, Participant> = {
+        [localPeerId]: localParticipant,
+      };
+      for (const [key, p] of Object.entries(state.participants)) {
+        if (!p.isLocal && p.clientId !== userId) {
+          nextParticipants[key] = p;
+        }
+      }
+      state.setParticipants(nextParticipants);
+    } else {
+      state.setParticipants({ [localPeerId]: localParticipant });
+    }
 
-    // Inicializa localPeer
     useMediaState.setState({ signaling: "connecting" });
     this.signalingPendingAt = Date.now();
-    this.localPeer = this.createSignalingPeer(localPeerId);
-
-    const peer = this.localPeer;
-    let firstOpen = true;
+    const peer = new Peer(localPeerId, PEER_CONFIG);
+    this.localPeer = peer;
     this.setupLocalPeerListeners();
-    this.localPeer.on("open", (id) => {
-      if (this.localPeer !== peer) return;
-      callEvent("signaling_open");
-      this.signalingPendingAt = 0;
-      useMediaState.setState({
-        signaling: "online",
+
+    return new Promise<string>((resolve, reject) => {
+      const timeout = window.setTimeout(() => {
+        reject(new Error("Tempo esgotado ao conectar ao servidor PeerJS."));
+      }, 15_000);
+
+      peer.on("open", (id) => {
+        window.clearTimeout(timeout);
+        if (this.localPeer !== peer) return;
+        callEvent("signaling_open");
+        this.signalingPendingAt = 0;
+        useMediaState.setState({ signaling: "online" });
+        useHubStore
+          .getState()
+          .setConnectionStatus(true, true, id, this.directRemotePeerId, "Conectado");
+        if (this.activeRoomMeta) {
+          const slug = this.activeRoomMeta.slug;
+          void this.trackRoomMeshPresence().then(() =>
+            this.syncRoomMeshState(slug),
+          );
+        }
+        resolve(id);
       });
-      useHubStore
-        .getState()
-        .setConnectionStatus(
-          false,
-          true,
-          id,
-          null,
-          "Sinalização aberta; verificando participantes...",
-        );
-      sounds.playJoin();
 
-      // Configura escuta de conexões de dados e chamadas de mídia entrantes
-      // Tenta assumir ou consultar o Beacon da sala
-      this.ensureDiscovery();
-      this.refreshRecoveryState();
-
-      const shouldJoinVoice = autoJoinVoice && firstOpen;
-      firstOpen = false;
-      if (shouldJoinVoice && !useHubStore.getState().inVoiceCall) {
-        this.joinVoiceCall().catch((e) =>
-          console.warn("[WebRTC Engine] Auto-join voice falhou:", e),
-        );
-      }
-    });
-
-    this.localPeer.on("error", (err: { type?: string }) => {
-      if (this.localPeer !== peer) return;
-      callEvent("signaling_error", {
-        reason:
+      peer.on("error", (err: { type?: string }) => {
+        callEvent("signaling_error", {
+          reason:
+            err.type === "network" ||
+            err.type === "socket-error" ||
+            err.type === "server-error"
+              ? err.type
+              : "unknown",
+        });
+        console.warn("[WebRTC Engine] Erro no localPeer:", err);
+        if (
           err.type === "network" ||
           err.type === "socket-error" ||
           err.type === "server-error"
-            ? err.type
-            : "unknown",
+        ) {
+          this.scheduleSilentDirectReconnect();
+        }
       });
-      console.error("[WebRTC Engine] Erro no localPeer:", err);
-      if (
-        err.type === "network" ||
-        err.type === "socket-error" ||
-        err.type === "server-error"
-      )
-        this.scheduleRecovery();
-      useHubStore
-        .getState()
-        .setStatusText(`Aviso de rede: ${err.type || "desconhecido"}`);
-    });
 
-    this.localPeer.on("disconnected", () => {
-      if (this.localPeer === peer) {
+      peer.on("disconnected", () => {
+        if (this.localPeer !== peer) return;
         useMediaState.setState({ signaling: "offline" });
-        useHubStore.setState({ isConnected: false });
-        this.discoveryConfirmed = false;
         callEvent("signaling_disconnected");
-        this.scheduleRecovery();
-      }
-    });
-
-    this.localPeer.on("close", () => {
-      // Fechamento inesperado recupera sinalização; leaveRoom invalida a identidade antes de destroy.
-      if (this.localPeer === peer && this.currentRoomSlug) {
-        useMediaState.setState({ signaling: "offline" });
-        useHubStore.setState({ isConnected: false });
-        callEvent("signaling_closed", { reason: "peer_closed" });
-        this.localPeer = null;
-        this.scheduleRecovery();
-      }
-    });
-  }
-
-  private createSignalingPeer(id: string): Peer {
-    return new Peer(id, PEER_CONFIG);
-  }
-  private recoveryEpoch = 0;
-  private recoveryActive = false;
-  private discoveryConfirmed = false;
-  private beaconPendingAt = 0;
-  private waitingForMedia = new Set<string>();
-  private directoryConn: DataConnection | null = null;
-  private directoryTimer: number | null = null;
-  private beginRecovery() {
-    if (this.recoveryActive) return;
-    this.recoveryActive = true;
-    this.recoveryEpoch++;
-    const state = useHubStore.getState();
-    if (state.inVoiceCall)
-      for (const p of Object.values(state.participants))
-        if (!p.isLocal && p.inVoiceCall) {
-          this.waitingForMedia.add(p.clientId);
-          const session = this.sessions.get(p.peerId);
-          if (session) {
-            session.mediaFlowVerified = false;
-            session.recoveryRxBase = undefined;
-            session.recoveryTxBase = undefined;
-            session.recoveryMediaAt = undefined;
-          }
-          useMediaState.setState((s) => ({
-            quality: {
-              ...s.quality,
-              ...(s.quality[p.peerId]
-                ? { [p.peerId]: { ...s.quality[p.peerId], flowing: false } }
-                : {}),
-            },
-          }));
-        }
-  }
-  private refreshRecoveryState(): boolean {
-    const signaling =
-      !!this.localPeer?.open &&
-      !this.localPeer.destroyed &&
-      !this.localPeer.disconnected &&
-      navigator.onLine;
-    const pendingData = [...this.sessions.values()].some(
-      (s) => !s.dataConn.open,
-    );
-    if (
-      signaling &&
-      this.discoveryConfirmed &&
-      !pendingData &&
-      !this.recoveryCancelled
-    )
-      useHubStore.setState({ isConnected: true });
-    if (!this.recoveryActive || this.recoveryCancelled) return false;
-    const phase = !signaling
-      ? "signaling"
-      : !this.discoveryConfirmed || pendingData
-        ? "discovery"
-        : this.waitingForMedia.size
-          ? "media"
-          : "idle";
-    if (phase === "media")
-      for (const session of this.sessions.values())
-        if (
-          this.waitingForMedia.has(session.clientId) &&
-          session.recoveryMediaAt === undefined
-        )
-          session.recoveryMediaAt = Date.now();
-    if (phase === "idle") {
-      this.recoveryActive = false;
-      this.recoveryAttempts = 0;
-      if (this.recoveryTimer !== null) clearTimeout(this.recoveryTimer);
-      this.recoveryTimer = null;
-      useMediaState.setState({
-        reconnecting: false,
-        recoveryPhase: "idle",
-        recoveryMissingMedia: 0,
-        recoveryAttempt: 0,
-        signaling: "online",
-        error: null,
-      });
-      useHubStore
-        .getState()
-        .setStatusText("Sinalização e sessões recuperadas.");
-      return true;
-    }
-    if (this.recoveryAttempts >= 8) {
-      useMediaState.setState({
-        reconnecting: false,
-        recoveryPhase: "failed",
-        recoveryMissingMedia: this.waitingForMedia.size,
-      });
-      return false;
-    }
-    useMediaState.setState({
-      reconnecting: true,
-      recoveryPhase: phase,
-      recoveryMissingMedia: this.waitingForMedia.size,
-    });
-    return false;
-  }
-  private closeDirectory() {
-    const conn = this.directoryConn;
-    this.directoryConn = null;
-    if (this.directoryTimer !== null) clearTimeout(this.directoryTimer);
-    this.directoryTimer = null;
-    try {
-      conn?.close();
-    } catch {}
-  }
-  private ensureDiscovery() {
-    if (!this.localPeer?.open || this.recoveryCancelled) return;
-    let beacon = this.beaconPeer;
-    if (
-      beacon &&
-      !beacon.open &&
-      this.beaconPendingAt > 0 &&
-      Date.now() - this.beaconPendingAt > 12000
-    ) {
-      this.beaconPeer = null;
-      this.isBeaconOwner = false;
-      try {
-        beacon.destroy();
-      } catch {}
-      beacon = null;
-    }
-    if (beacon && !beacon.destroyed && beacon.disconnected) {
-      this.beaconPendingAt ||= Date.now();
-      try {
-        beacon.reconnect();
-      } catch {
-        this.beaconPeer = null;
-        this.isBeaconOwner = false;
+        // Reconexão silenciosa sem derrubar estado da chamada nem flash de overlay
         try {
-          beacon.destroy();
-        } catch {}
-      }
-    }
-    if (!this.beaconPeer || this.beaconPeer.destroyed)
-      this.attemptClaimBeacon(this.currentRoomSlug);
-    else this.queryBeaconDirectory(`cbshub-v2-${this.currentRoomSlug}-beacon`);
+          peer.reconnect();
+        } catch {
+          this.scheduleSilentDirectReconnect();
+        }
+      });
+
+      peer.on("close", () => {
+        const s = useHubStore.getState();
+        if (
+          this.localPeer === peer &&
+          (s.inVoiceCall || s.activeContext?.type === "room")
+        ) {
+          this.localPeer = null;
+          this.scheduleSilentDirectReconnect();
+        }
+      });
+    });
   }
 
-  private signalingPendingAt = 0;
+  public async startDirectCall(
+    friend: FriendItem,
+    withVideo = false,
+  ): Promise<void> {
+    const initialState = useHubStore.getState();
+    const userId = initialState.authUserId;
+    if (!userId) throw new Error("Usuário não autenticado.");
 
-  private scheduleRecovery(): void {
-    if (
-      !this.currentRoomSlug ||
-      this.recoveryTimer !== null ||
-      this.recoveryCancelled
-    )
-      return;
-    this.beginRecovery();
-    if (this.recoveryAttempts >= 8) {
-      callEvent("retry_exhausted", {
-        attempt: this.recoveryAttempts,
-        reason: "retry_limit",
-      });
-      useMediaState.setState({
-        reconnecting: false,
-        recoveryPhase: "failed",
-        recoveryMissingMedia: this.waitingForMedia.size,
-        signaling: this.localPeer?.open ? "online" : "failed",
-        error: this.waitingForMedia.size
-          ? "Não foi possível confirmar a recuperação de mídia. Verifique a conexão e tente novamente."
-          : "Não foi possível recuperar sinalização e participantes. Tente novamente.",
-      });
+    if (initialState.activeContext?.type === "room") {
+      this.leaveRoom();
+    }
+
+    const state = useHubStore.getState();
+    if (state.inVoiceCall || state.outgoingCall || this.joiningVoice) return;
+
+    this.joiningVoice = true;
+    this.clearMicRecovery();
+    this.pendingOutgoingVideo = withVideo;
+
+    try {
+      await this.openDirectMessage(friend);
+      await this.setupLocalMicrophone();
+      const callerPeerId = await this.ensureLocalPeer(userId);
+
+      this.recoveryCancelled = false;
+      this.directRemoteUserId = friend.id;
+      this.directRemotePeerId = null;
+
+      beginCallDiagnostics();
+      useHubStore.getState().setInVoiceCall(true);
+      await this.trackPresence();
+
+      const { data: callRow, error } = await supabase
+        .from("signaling_calls")
+        .insert({
+          caller_id: userId,
+          receiver_id: friend.id,
+          caller_peer_id: callerPeerId,
+          status: "calling",
+        })
+        .select()
+        .single();
+
+      if (error || !callRow) {
+        throw new Error(error?.message || "Erro ao iniciar sinalização de chamada.");
+      }
+
+      const outgoing: SignalingCallData = {
+        ...callRow,
+        peerNickname: friend.nickname,
+        peerAvatarColor: friend.avatarColor,
+        withVideo,
+      };
+      useHubStore.getState().setOutgoingCall(outgoing);
+      useHubStore.getState().setActiveCallId(callRow.id);
+      sounds.startDialTone();
+    } catch (err) {
+      this.cleanupDirectCallLocalState();
+      mediaError("Chamada direta", err);
+    } finally {
+      this.joiningVoice = false;
+    }
+  }
+
+  public async acceptIncomingCall(): Promise<void> {
+    const initialState = useHubStore.getState();
+    const call = initialState.incomingCall;
+    const userId = initialState.authUserId;
+    if (!call || !userId || this.joiningVoice) return;
+
+    this.clearIncomingCallTimer();
+    sounds.stopRingtone();
+    if (initialState.activeContext?.type === "room") {
+      this.leaveRoom();
+    } else if (initialState.inVoiceCall) {
+      this.leaveVoiceCall("manual_leave");
+    }
+
+    const state = useHubStore.getState();
+    this.joiningVoice = true;
+    this.clearMicRecovery();
+
+    try {
+      useHubStore.getState().setIncomingCall(null);
+      useHubStore.getState().setActiveCallId(call.id);
+
+      const friend = state.friends.find((f) => f.id === call.caller_id);
+      if (friend) {
+        await this.openDirectMessage(friend);
+      }
+
+      await this.setupLocalMicrophone();
+      const receiverPeerId = await this.ensureLocalPeer(userId);
+
+      this.recoveryCancelled = false;
+      this.directRemoteUserId = call.caller_id;
+      this.directRemotePeerId = call.caller_peer_id;
+
+      beginCallDiagnostics();
+      useHubStore.getState().setInVoiceCall(true);
+      await this.trackPresence();
+
+      const { error } = await supabase
+        .from("signaling_calls")
+        .update({
+          status: "accepted",
+          receiver_peer_id: receiverPeerId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", call.id);
+
+      if (error) throw new Error(error.message);
+
+      sounds.playJoin();
+
+      if (call.caller_peer_id) {
+        this.connectToPeer(call.caller_peer_id, call.caller_id);
+      }
+    } catch (err) {
+      this.cleanupDirectCallLocalState();
+      mediaError("Atender chamada", err);
+    } finally {
+      this.joiningVoice = false;
+    }
+  }
+
+  public async rejectIncomingCall(): Promise<void> {
+    const call = useHubStore.getState().incomingCall;
+    this.clearIncomingCallTimer();
+    sounds.stopRingtone();
+    useHubStore.getState().setIncomingCall(null);
+    if (!call) return;
+
+    await supabase
+      .from("signaling_calls")
+      .update({
+        status: "rejected",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", call.id);
+  }
+
+  public async joinVoiceCall(): Promise<void> {
+    const state = useHubStore.getState();
+    if (state.activeContext?.type === "room") {
+      await this.joinRoomVoiceCall(false);
       return;
     }
-    const attempt = ++this.recoveryAttempts;
-    const delayMs = Math.round(
-      Math.min(15000, 1000 * 2 ** Math.min(attempt - 1, 4)) *
-        (0.8 + Math.random() * 0.4),
-    );
-    callEvent("retry_scheduled", { attempt, delayMs });
-    if (this.refreshRecoveryState()) return;
-    useMediaState.setState({ reconnecting: true, recoveryAttempt: attempt });
-    useHubStore
-      .getState()
-      .setStatusText("Reconectando sinalização e participantes...");
-    const generation = this.roomGeneration;
-    this.recoveryTimer = window.setTimeout(() => {
+    const friend = state.activeFriend;
+    if (friend) {
+      await this.startDirectCall(friend, false);
+    } else {
+      mediaError("Ligação", "Selecione um amigo ou entre em uma sala para iniciar uma chamada.");
+    }
+  }
+
+  public leaveVoiceCall(
+    reason: "manual_leave" | "microphone_ended" = "manual_leave",
+  ): void {
+    endCallDiagnostics(reason);
+    const state = useHubStore.getState();
+
+    if (state.activeContext?.type === "room") {
+      this.cleanupRoomVoiceOnly();
+      return;
+    }
+
+    const callId = state.activeCallId || state.outgoingCall?.id;
+
+    sounds.stopRingtone();
+    this.pendingOutgoingVideo = false;
+
+    if (callId) {
+      const nextStatus = state.outgoingCall ? "rejected" : "ended";
+      void supabase
+        .from("signaling_calls")
+        .update({
+          status: nextStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", callId);
+    }
+
+    this.cleanupDirectCallLocalState();
+  }
+
+  private cleanupRoomVoiceOnly(): void {
+    const state = useHubStore.getState();
+    this.micGeneration++;
+    this.clearMicRecovery();
+    this.joiningVoice = false;
+    this.cameraGeneration++;
+    this.screenGeneration++;
+    this.pushToTalkHeld = false;
+    this.waitingForMedia.clear();
+
+    soundboardEngine.stopAll();
+    this.audioPipeline?.destroy();
+    this.audioPipeline = null;
+    this.rawMicStream?.getTracks().forEach((t) => t.stop());
+    this.rawMicStream = null;
+
+    state.setLocalVoiceStream(null);
+    state.setIsLocalSpeaking(false, 0);
+
+    if (state.isScreenSharing) {
+      this.stopScreenShare();
+    }
+    if (state.isWebcamActive && this.localWebcamStream) {
+      this.localWebcamStream.getTracks().forEach((t) => t.stop());
+      this.localWebcamStream = null;
+      state.setLocalWebcamStream(null);
+      state.setWebcamActive(false);
+    }
+
+    const wasInVoice = state.inVoiceCall;
+    state.setInVoiceCall(false);
+    state.setRemoteVoiceStream(null);
+    state.setRemoteScreenStream(null);
+    useMediaState.setState({
+      microphoneBusy: false,
+      cameraBusy: false,
+      screenBusy: false,
+      quality: {},
+    });
+    if (wasInVoice) sounds.playLeave();
+
+    for (const session of this.sessions.values()) {
+      this.closeBlockedMedia(session);
+    }
+
+    if (this.localPeer) {
+      useHubStore.getState().updateParticipant(this.localParticipantId(), {
+        inVoiceCall: false,
+        isWebcamActive: false,
+        isScreenSharing: false,
+        isSpeaking: false,
+      });
+    }
+
+    this.broadcastLocalState();
+    void Promise.allSettled([
+      this.trackPresence(),
+      this.trackRoomMeshPresence(),
+    ]);
+  }
+
+  private cleanupDirectCallLocalState(): void {
+    sounds.stopRingtone();
+    this.clearIncomingCallTimer();
+    this.waitingForMedia.clear();
+    this.pushToTalkHeld = false;
+    const state = useHubStore.getState();
+    this.micGeneration++;
+    this.clearMicRecovery();
+    this.joiningVoice = false;
+    this.cameraGeneration++;
+    this.screenGeneration++;
+    this.directRemotePeerId = null;
+    this.directRemoteUserId = null;
+
+    if (this.recoveryTimer !== null) {
+      clearTimeout(this.recoveryTimer);
       this.recoveryTimer = null;
-      if (
-        generation !== this.roomGeneration ||
-        this.recoveryCancelled ||
-        !this.currentRoomSlug
-      )
-        return;
-      if (navigator.onLine) {
-        const stalled =
-          this.localPeer &&
-          !this.localPeer.open &&
-          !this.localPeer.disconnected &&
-          this.signalingPendingAt > 0 &&
-          Date.now() - this.signalingPendingAt > 12000;
-        if (!this.localPeer || this.localPeer.destroyed || stalled) {
-          const obsolete = this.localPeer;
-          this.localPeer = null;
-          try {
-            obsolete?.destroy();
-          } catch {}
-          const old = [...this.sessions.values()];
-          this.sessions.clear();
-          for (const session of old) {
-            if (session.dataConnectTimer)
-              clearTimeout(session.dataConnectTimer);
-            this.closeBlockedMedia(session);
-            try {
-              session.dataConn.close();
-            } catch {}
-          }
-          this.closeDirectory();
-          this.discoveryConfirmed = false;
-          const beacon = this.beaconPeer;
-          this.beaconPeer = null;
-          this.isBeaconOwner = false;
-          try {
-            beacon?.destroy();
-          } catch {}
-          try {
-            this.openRoomPeer(this.currentRoomSlug, false);
-          } catch {
-            callEvent("signaling_error", { reason: "unknown" });
-          }
-        } else if (this.localPeer.disconnected) {
-          try {
-            this.signalingPendingAt = Date.now();
-            useMediaState.setState({ signaling: "connecting" });
-            this.localPeer.reconnect();
-          } catch {
-            callEvent("signaling_error", { reason: "unknown" });
-          }
-        } else if (this.localPeer.open) {
-          this.signalingPendingAt = 0;
-          this.ensureDiscovery();
-          let pending = false;
-          for (const session of this.sessions.values())
-            if (!session.dataConn.open) {
-              pending = true;
-              this.connectToPeer(session.peerId, session.clientId);
-            }
-          this.broadcastLocalState();
-          if (this.refreshRecoveryState()) return;
-        }
+    }
+
+    useMediaState.setState({
+      microphoneBusy: false,
+      cameraBusy: false,
+      screenBusy: false,
+      reconnecting: false,
+      recoveryPhase: "idle",
+      quality: {},
+    });
+
+    soundboardEngine.stopAll();
+    this.audioPipeline?.destroy();
+    this.audioPipeline = null;
+    this.rawMicStream?.getTracks().forEach((t) => t.stop());
+    this.rawMicStream = null;
+
+    state.setLocalVoiceStream(null);
+    state.setIsLocalSpeaking(false, 0);
+    state.setOutgoingCall(null);
+    state.setActiveCallId(null);
+
+    if (state.isScreenSharing) {
+      this.stopScreenShare();
+    }
+    if (state.isWebcamActive && this.localWebcamStream) {
+      this.localWebcamStream.getTracks().forEach((t) => t.stop());
+      this.localWebcamStream = null;
+      state.setLocalWebcamStream(null);
+      state.setWebcamActive(false);
+    }
+
+    const wasInVoice = state.inVoiceCall;
+    state.setInVoiceCall(false);
+    state.setRemoteVoiceStream(null);
+    state.setRemoteScreenStream(null);
+    if (wasInVoice) sounds.playLeave();
+
+    for (const session of this.sessions.values()) {
+      this.closeBlockedMedia(session);
+      try {
+        session.dataConn.close();
+      } catch {
+        /* ignore */
       }
-      this.scheduleRecovery();
+      this.teardownPeerVoiceAudio(session);
+    }
+    this.sessions.clear();
+    this.stopHeartbeat();
+    this.stopReceiverStats();
+
+    if (this.localPeer) {
+      try {
+        this.localPeer.destroy();
+      } catch {
+        /* ignore */
+      }
+      this.localPeer = null;
+    }
+
+    useHubStore.getState().setParticipants({});
+    void this.trackPresence();
+  }
+
+  /* ========================================================================= */
+  /* RECONEXÃO SILENCIOSA 1:1                                                  */
+  /* ========================================================================= */
+
+  private scheduleSilentDirectReconnect(): void {
+    const state = useHubStore.getState();
+    const isRoom = state.activeContext?.type === "room";
+    if (
+      (!state.inVoiceCall && !isRoom) ||
+      !state.authUserId ||
+      (!isRoom && !this.directRemotePeerId) ||
+      this.recoveryCancelled ||
+      this.recoveryTimer !== null
+    ) {
+      return;
+    }
+
+    const attempt = ++this.recoveryAttempts;
+    if (attempt > 6) {
+      return;
+    }
+
+    const delayMs = Math.round(Math.min(10000, 1000 * 2 ** (attempt - 1)));
+    const userId = state.authUserId;
+    const callId = state.activeCallId;
+
+    this.recoveryTimer = window.setTimeout(async () => {
+      this.recoveryTimer = null;
+      const current = useHubStore.getState();
+      const currentlyInRoom = current.activeContext?.type === "room";
+      if ((!current.inVoiceCall && !currentlyInRoom) || this.recoveryCancelled)
+        return;
+      if (!navigator.onLine) {
+        this.scheduleSilentDirectReconnect();
+        return;
+      }
+
+      try {
+        if (currentlyInRoom && this.activeRoomMeta) {
+          await this.ensureLocalPeer(userId);
+          this.recoveryAttempts = 0;
+          await this.trackRoomMeshPresence();
+          this.syncRoomMeshState(this.activeRoomMeta.slug);
+          return;
+        }
+
+        // Verifica se a chamada 1:1 ainda está ativa no banco
+        let isCaller = false;
+        if (callId) {
+          const { data: latestCall } = await supabase
+            .from("signaling_calls")
+            .select("status, caller_id, receiver_id, caller_peer_id, receiver_peer_id")
+            .eq("id", callId)
+            .maybeSingle();
+
+          if (!latestCall || latestCall.status !== "accepted") {
+            this.cleanupDirectCallLocalState();
+            return;
+          }
+
+          isCaller = latestCall.caller_id === userId;
+          const latestRemotePeer = isCaller
+            ? latestCall.receiver_peer_id
+            : latestCall.caller_peer_id;
+          if (latestRemotePeer) {
+            this.directRemotePeerId = latestRemotePeer;
+          }
+        }
+
+        const peerId = await this.ensureLocalPeer(userId);
+        // Atualiza o peer_id no banco para que o amigo possa nos alcançar também
+        if (callId) {
+          const nowIso = new Date().toISOString();
+          await supabase
+            .from("signaling_calls")
+            .update(
+              isCaller
+                ? { caller_peer_id: peerId, updated_at: nowIso }
+                : { receiver_peer_id: peerId, updated_at: nowIso },
+            )
+            .eq("id", callId);
+        }
+
+        if (this.directRemotePeerId && this.localPeer?.open) {
+          this.recoveryAttempts = 0;
+          this.connectToPeer(
+            this.directRemotePeerId,
+            this.directRemoteUserId || undefined,
+          );
+        }
+      } catch {
+        this.scheduleSilentDirectReconnect();
+      }
     }, delayMs);
   }
 
   public retryConnection(): void {
     this.recoveryCancelled = false;
     this.recoveryAttempts = 0;
-    if (this.recoveryTimer !== null) clearTimeout(this.recoveryTimer);
-    this.recoveryTimer = null;
-    useMediaState.setState({ error: null });
-    for (const session of this.sessions.values()) {
-      session.voiceRetryAttempts = 0;
-      if (useHubStore.getState().inVoiceCall && !session.voiceCall)
-        this.scheduleVoiceRetry(session);
+    if (this.recoveryTimer !== null) {
+      clearTimeout(this.recoveryTimer);
+      this.recoveryTimer = null;
     }
-    this.scheduleRecovery();
+    useMediaState.setState({ error: null });
+    if (useHubStore.getState().inVoiceCall) {
+      this.scheduleSilentDirectReconnect();
+    } else if (this.cloudSessionUserId) {
+      void this.refreshFriends();
+    }
   }
 
   public notifyNetwork(online: boolean): void {
     callEvent(online ? "network_online" : "network_offline");
     if (!online) {
-      this.discoveryConfirmed = false;
-      this.closeDirectory();
-      useHubStore.setState({ isConnected: false });
-      useMediaState.setState({ signaling: "offline" });
+      this.handleNetworkOffline();
+    } else {
+      void this.handleNetworkOnline();
     }
-    if (online && !this.recoveryCancelled) {
-      this.retryConnection();
+  }
+
+  private handleNetworkOffline(): void {
+    if (this.isNetworkOffline) return;
+    this.isNetworkOffline = true;
+    const state = useHubStore.getState();
+    if (!this.wasInCallContext && (state.activeContext || state.inVoiceCall)) {
+      this.wasInCallContext = {
+        context: state.activeContext,
+        inVoiceCall: state.inVoiceCall,
+        withVideo: state.isWebcamActive,
+      };
+    }
+    this.cancelRecovery();
+    if (state.inVoiceCall) {
+      this.leaveVoiceCall("manual_leave");
+    }
+  }
+
+  private async handleNetworkOnline(): Promise<void> {
+    if (!this.isNetworkOffline) {
+      if (useHubStore.getState().inVoiceCall && !this.recoveryCancelled) {
+        this.retryConnection();
+      }
       return;
     }
-    this.scheduleRecovery();
+
+    this.isNetworkOffline = false;
+    const saved = this.wasInCallContext;
+    this.wasInCallContext = null;
+
+    try {
+      const { data } = await supabase.auth.getSession();
+      const user = data?.session?.user;
+      if (!user) return;
+
+      this.teardownCloudSubscriptions();
+      await this.initializeCloudSession(user.id);
+
+      if (saved?.context?.type === "room") {
+        await this.createOrJoinRoom(saved.context.slug, saved.inVoiceCall);
+        if (
+          saved.inVoiceCall &&
+          saved.withVideo &&
+          !useHubStore.getState().isWebcamActive
+        ) {
+          await this.toggleWebcam().catch(() => {});
+        }
+      } else if (saved?.context?.type === "dm") {
+        const dmFriend = saved.context.friend;
+        const storeFriend =
+          useHubStore
+            .getState()
+            .friends.find((f) => f.id === dmFriend.id) ?? dmFriend;
+        await this.openDirectMessage(storeFriend);
+        if (saved.inVoiceCall) {
+          await this.startDirectCall(storeFriend, saved.withVideo);
+        }
+      }
+    } catch (err) {
+      console.warn("[Network] Falha ao reconectar sessão:", err);
+    }
   }
 
   public cancelRecovery(): void {
     this.recoveryCancelled = true;
     this.recoveryActive = false;
     this.waitingForMedia.clear();
-    this.closeDirectory();
-    useMediaState.setState({ recoveryPhase: "idle", recoveryMissingMedia: 0 });
+    this.stopHeartbeat();
+    useMediaState.setState({
+      recoveryPhase: "idle",
+      recoveryMissingMedia: 0,
+      reconnecting: false,
+      error: null,
+    });
     if (this.recoveryTimer !== null) clearTimeout(this.recoveryTimer);
     this.recoveryTimer = null;
     for (const session of this.sessions.values()) {
       if (session.voiceRetryTimer) clearTimeout(session.voiceRetryTimer);
       session.voiceRetryTimer = undefined;
     }
-    useMediaState.setState({
-      reconnecting: false,
-      error: "Reconexão automática cancelada. Você pode tentar novamente.",
-    });
-    callEvent("retry_cancelled", { reason: "manual_leave" });
+  }
+
+  private scheduleRecovery(): void {
+    if (useHubStore.getState().inVoiceCall) {
+      this.scheduleSilentDirectReconnect();
+    }
+  }
+
+  private refreshRecoveryState(): boolean {
+    const hasOpenData = [...this.sessions.values()].some((s) => s.dataConn.open);
+    if (hasOpenData && !this.recoveryCancelled) {
+      this.startHeartbeat();
+    } else {
+      this.stopHeartbeat();
+    }
+    return true;
   }
 
   private scheduleVoiceRetry(session: PeerMediaSession): void {
     if (
       this.recoveryCancelled ||
-      (this.recoveryActive && this.recoveryAttempts >= 8) ||
       session.voiceRetryTimer ||
       this.sessions.get(session.peerId) !== session ||
       !this.canCallSession(session)
@@ -627,16 +3033,12 @@ class WebRTCEngine {
         { attempt: 6, reason: "retry_limit" },
         session.peerId,
       );
-      useMediaState.setState({
-        error:
-          "Não foi possível recuperar uma conexão de voz. Use Tentar novamente.",
-      });
       return;
     }
     session.voiceRetryAttempts = attempt;
-    const base = (this.localPeer?.id || "") < session.peerId ? 500 : 1500;
+    const base = (this.localPeer?.id || "") < session.peerId ? 500 : 1200;
     const delayMs = Math.round(
-      Math.min(15000, base * 2 ** (attempt - 1)) * (0.8 + Math.random() * 0.4),
+      Math.min(10000, base * 2 ** (attempt - 1)) * (0.8 + Math.random() * 0.4),
     );
     callEvent("retry_scheduled", { attempt, delayMs }, session.peerId);
     const generation = this.roomGeneration;
@@ -653,240 +3055,54 @@ class WebRTCEngine {
     }, delayMs);
   }
 
+  private startHeartbeat(): void {
+    if (this.heartbeatInterval !== null || this.recoveryCancelled) return;
+    this.heartbeatInterval = window.setInterval(() => {
+      this.sendHeartbeat();
+    }, 10_000);
+    this.sendHeartbeat();
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatInterval !== null) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
+  private sendHeartbeat(): void {
+    const now = Date.now();
+    for (const session of this.sessions.values()) {
+      if (!session.dataConn.open) continue;
+      try {
+        session.dataConn.send({ type: "ping", at: now } as SignalingPacket);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  /* ========================================================================= */
+  /* GESTÃO DE SESSÕES P2P DIRETAS (DATACONNECTION & MEDIACONNECTION)          */
+  /* ========================================================================= */
+
   private setupLocalPeerListeners(): void {
     if (!this.localPeer) return;
 
-    // Conexões de dados entrantes (Chat, Presença, Sincronização)
     this.localPeer.on("connection", (conn) => {
       this.handleIncomingDataConnection(conn);
     });
 
-    // Chamadas de mídia entrantes (Voz, Webcam, Compartilhamento de Tela)
     this.localPeer.on("call", (call) => {
       this.handleIncomingMediaCall(call);
     });
   }
 
-  /* ========================================================================= */
-  /* BEACON DE DESCOBERTA E AUTO-HEAL ANTI-QUEDA                               */
-  /* ========================================================================= */
-
-  private attemptClaimBeacon(slug: string): void {
-    if (!slug || this.recoveryCancelled || !this.localPeer?.open) return;
-    if (this.beaconPeer && !this.beaconPeer.destroyed) return;
-    const generation = this.roomGeneration,
-      beaconId = `cbshub-v2-${slug}-beacon`;
-    try {
-      const peer = this.createSignalingPeer(beaconId);
-      this.beaconPeer = peer;
-      this.beaconPendingAt = Date.now();
-      const current = () =>
-        generation === this.roomGeneration &&
-        this.beaconPeer === peer &&
-        slug === this.currentRoomSlug;
-      peer.on("connection", (conn) => {
-        if (current()) this.handleBeaconDirectoryConnection(conn);
-        else conn.close();
-      });
-      peer.on("open", () => {
-        if (!current()) return;
-        this.isBeaconOwner = true;
-        this.beaconPendingAt = 0;
-        if (this.recoveryActive) this.queryBeaconDirectory(beaconId);
-        else this.discoveryConfirmed = true;
-        this.refreshRecoveryState();
-      });
-      peer.on("disconnected", () => {
-        if (!current()) return;
-        this.beaconPendingAt = Date.now();
-        this.discoveryConfirmed = false;
-        this.scheduleRecovery();
-      });
-      peer.on("close", () => {
-        if (!current()) return;
-        this.beaconPeer = null;
-        this.isBeaconOwner = false;
-        this.discoveryConfirmed = false;
-        this.scheduleRecovery();
-      });
-      peer.on("error", (error: { type?: string }) => {
-        if (!current()) return;
-        if (error.type === "unavailable-id") {
-          this.beaconPeer = null;
-          this.isBeaconOwner = false;
-          try {
-            peer.destroy();
-          } catch {}
-          this.queryBeaconDirectory(beaconId);
-        } else {
-          this.discoveryConfirmed = false;
-          this.scheduleRecovery();
-        }
-      });
-    } catch {
-      this.discoveryConfirmed = false;
-      this.scheduleRecovery();
-    }
-  }
-
-  /**
-   * Responde a novos membros que conectam ao Beacon para pedir a lista de participantes
-   */
-  private handleBeaconDirectoryConnection(conn: DataConnection): void {
-    const generation = this.roomGeneration;
-    conn.on("data", (data) => {
-      if (generation !== this.roomGeneration) return;
-      const packet = data as SignalingPacket;
-      if (packet && packet.type === "directory_request") {
-        const state = useHubStore.getState();
-        // Coleta participantes conhecidos (limite de 6)
-        const knownPeers: Array<Omit<Participant, "isLocal">> = Object.values(
-          state.participants,
-        )
-          .map((p) => {
-            const { isLocal, profile: _profile, ...rest } = p;
-            return rest;
-          })
-          .slice(0, MAX_ROOM_PEERS);
-
-        // Responde com o diretório completo
-        try {
-          conn.send({
-            type: "directory_response",
-            peers: knownPeers,
-          } as SignalingPacket);
-        } catch (err) {
-          console.warn(
-            "[WebRTC Beacon] Falha ao enviar directory_response:",
-            err,
-          );
-        }
-
-        // O visitante já discará para os membros recebidos na lista; não discamos de volta para evitar colisão
-        // (Glare) no DataChannel
-      }
-    });
-  }
-
-  /**
-   * Consulta o Beacon para obter a lista de irmãos e abrir malha direta (Full Mesh)
-   */
-  private queryBeaconDirectory(beaconId: string): void {
-    if (
-      !this.localPeer?.open ||
-      this.localPeer.destroyed ||
-      this.directoryConn ||
-      this.recoveryCancelled
-    )
-      return;
-    const generation = this.roomGeneration,
-      peer = this.localPeer;
-    let conn: DataConnection;
-    try {
-      conn = peer.connect(beaconId, { reliable: true });
-    } catch {
-      this.scheduleRecovery();
-      return;
-    }
-    this.directoryConn = conn;
-    const current = () =>
-      this.directoryConn === conn &&
-      this.localPeer === peer &&
-      generation === this.roomGeneration &&
-      !this.recoveryCancelled;
-    const failed = () => {
-      if (!current()) return;
-      this.discoveryConfirmed = false;
-      this.closeDirectory();
-      this.scheduleBeaconElection();
-      this.scheduleRecovery();
-    };
-    this.directoryTimer = window.setTimeout(failed, 8000);
-    conn.on("open", () => {
-      if (!current()) return;
-      const state = useHubStore.getState(),
-        local = Object.values(state.participants).find((p) => p.isLocal);
-      if (!local) return;
-      const { isLocal, profile, ...info } = local;
-      try {
-        conn.send({
-          type: "directory_request",
-          peerInfo: info,
-        } as SignalingPacket);
-      } catch {
-        failed();
-      }
-    });
-    conn.on("data", (data) => {
-      if (!current()) return;
-      const packet = data as SignalingPacket;
-      if (packet?.type !== "directory_response" || !Array.isArray(packet.peers))
-        return;
-      const peers = packet.peers
-        .slice(0, MAX_ROOM_PEERS)
-        .filter(
-          (p) =>
-            p &&
-            typeof p.peerId === "string" &&
-            p.peerId.startsWith(`cbshub-v2-${this.currentRoomSlug}-p-`) &&
-            p.peerId.length <= 180 &&
-            typeof p.clientId === "string" &&
-            p.clientId.length <= 128,
-        );
-      this.discoveryConfirmed = true;
-      for (const p of peers)
-        if (p.peerId !== peer.id) this.connectToPeer(p.peerId, p.clientId);
-      this.closeDirectory();
-      this.refreshRecoveryState();
-    });
-    conn.on("error", failed);
-    conn.on("close", () => {
-      if (current()) failed();
-    });
-  }
-
-  /**
-   * Eleição determinística de novo Beacon baseada em ordem alfabética dos clientIds
-   */
-  private scheduleBeaconElection(): void {
-    if (
-      (this.isBeaconOwner &&
-        this.beaconPeer?.open &&
-        !this.beaconPeer.disconnected &&
-        !this.beaconPeer.destroyed) ||
-      this.beaconHealTimeout !== null ||
-      this.recoveryCancelled ||
-      this.recoveryAttempts >= 8
-    )
-      return;
-
-    const state = useHubStore.getState();
-    const allParticipants = Object.values(state.participants);
-    const sortedClientIds = allParticipants.map((p) => p.clientId).sort();
-    const myIndex = sortedClientIds.indexOf(state.clientId);
-
-    if (myIndex === -1) return;
-
-    // Backoff ordenado: 0 * 400ms, 1 * 400ms, etc.
-    const delay = myIndex * 400 + 150;
-
-    this.beaconHealTimeout = window.setTimeout(() => {
-      this.beaconHealTimeout = null;
-      if (this.currentRoomSlug && !this.recoveryCancelled) {
-        if (this.beaconPeer?.disconnected) {
-          try {
-            this.beaconPeer.reconnect();
-          } catch {}
-        } else this.attemptClaimBeacon(this.currentRoomSlug);
-      }
-    }, delay);
-  }
-
-  /* ========================================================================= */
-  /* GESTÃO DE SESSÕES MESH (DATACONNECTION & MEDIACONNECTION)                  */
-  /* ========================================================================= */
-
-  private connectToPeer(remotePeerId: string, clientId?: string): void {
+  private connectToPeer(
+    remotePeerId: string,
+    clientId?: string,
+    nickname?: string,
+  ): void {
     if (
       !this.localPeer ||
       this.localPeer.destroyed ||
@@ -900,12 +3116,11 @@ class WebRTCEngine {
       reliable: true,
       metadata: { initiator: this.localPeer.id },
     });
-    this.setupDataConnection(conn, clientId);
+    this.setupDataConnection(conn, clientId, nickname);
   }
 
   private handleIncomingDataConnection(conn: DataConnection): void {
     if (this.sessions.has(conn.peer)) {
-      // Já existe sessão ativa; fecha duplicada
       const existing = this.sessions.get(conn.peer);
       if (
         existing &&
@@ -922,14 +3137,24 @@ class WebRTCEngine {
   private setupDataConnection(
     conn: DataConnection,
     initialClientId?: string,
+    initialNickname?: string,
   ): void {
     const remotePeerId = conn.peer;
 
     const previous = this.sessions.get(remotePeerId);
+    const knownParticipant = useHubStore.getState().participants[remotePeerId];
     const session: PeerMediaSession = previous || {
       peerId: remotePeerId,
-      clientId: initialClientId || "",
-      nickname: "Irmão Conectando...",
+      clientId:
+        initialClientId ||
+        knownParticipant?.clientId ||
+        this.directRemoteUserId ||
+        "",
+      nickname:
+        initialNickname ||
+        knownParticipant?.nickname ||
+        useHubStore.getState().activeFriend?.nickname ||
+        "Participante",
       dataConn: conn,
       voiceCall: null,
       webcamCall: null,
@@ -948,6 +3173,16 @@ class WebRTCEngine {
     if (session.dataConnectTimer) clearTimeout(session.dataConnectTimer);
     session.dataConn = conn;
     session.dataConnecting = !conn.open;
+
+    if (initialClientId) {
+      for (const [pid, other] of this.sessions.entries()) {
+        if (pid === remotePeerId) continue;
+        if (other.clientId === initialClientId) {
+          this.finalizePeerDisconnected(other);
+        }
+      }
+    }
+
     this.sessions.set(remotePeerId, session);
     if (replaced && replaced !== conn) {
       callEvent("data_replaced", {}, remotePeerId);
@@ -955,6 +3190,7 @@ class WebRTCEngine {
         replaced.close();
       } catch {}
     }
+
     const generation = this.roomGeneration;
     session.dataConnectTimer = window.setTimeout(() => {
       if (
@@ -984,7 +3220,6 @@ class WebRTCEngine {
       const state = useHubStore.getState();
       const localParticipant = state.participants[this.localPeer?.id || ""];
 
-      // Envia nosso estado completo para o irmão
       if (localParticipant) {
         const { isLocal, profile: _profile, ...myState } = localParticipant;
         conn.send({
@@ -994,14 +3229,6 @@ class WebRTCEngine {
       }
 
       this.sendProfileToSession(session);
-
-      // Sincroniza chat recente (IndexedDB)
-      this.requestChatSync(conn);
-
-      // Compatibilidade legada com 1v1
-      if (!useHubStore.getState().remotePeerId) {
-        useHubStore.getState().setRemoteNickname(session.nickname);
-      }
     });
 
     conn.on("data", (data) => {
@@ -1048,21 +3275,7 @@ class WebRTCEngine {
       pc?.connectionState !== "failed" &&
       pc?.connectionState !== "closed"
     ) {
-      this.scheduleRecovery();
-      if (!session.dataGraceTimer)
-        session.dataGraceTimer = window.setTimeout(() => {
-          session.dataGraceTimer = undefined;
-          if (
-            this.sessions.get(session.peerId) !== session ||
-            session.dataConn.open
-          )
-            return;
-          if (
-            session.voiceCall?.peerConnection?.connectionState === "connected"
-          )
-            return;
-          this.finalizePeerDisconnected(session);
-        }, 15000);
+      this.scheduleSilentDirectReconnect();
       return;
     }
     this.finalizePeerDisconnected(session);
@@ -1075,65 +3288,38 @@ class WebRTCEngine {
     session.dataConnectTimer = undefined;
     this.closeBlockedMedia(session);
     this.waitingForMedia.delete(session.clientId);
-    sounds.playLeave();
     this.teardownPeerVoiceAudio(session);
 
-    if (session.voiceCall) {
+    for (const call of [
+      session.voiceCall,
+      session.webcamCall,
+      session.screenCall,
+    ]) {
       try {
-        session.voiceCall.close();
-      } catch {
-        /* ignore */
-      }
-    }
-    if (session.webcamCall) {
-      try {
-        session.webcamCall.close();
-      } catch {
-        /* ignore */
-      }
-    }
-    if (session.screenCall) {
-      try {
-        session.screenCall.close();
+        call?.close();
       } catch {
         /* ignore */
       }
     }
 
-    this.sessions.delete(session.peerId);
-    useHubStore.getState().removeParticipant(session.peerId);
-    useHubStore.getState().removeRemoteStreams(session.peerId);
-    this.scheduleRecovery();
-
-    // Compatibilidade legada
-    if (useHubStore.getState().remotePeerId === session.peerId) {
-      const remainingSessions = Array.from(this.sessions.values());
-      if (remainingSessions.length > 0) {
-        useHubStore.getState().setRemoteNickname(remainingSessions[0].nickname);
-      } else {
-        useHubStore.getState().setRemoteNickname("Aguardando irmão...");
-        useHubStore.getState().setRemoteVoiceStream(null);
-        useHubStore.getState().setRemoteScreenStream(null);
-        this.stopReceiverStats();
+    const state = useHubStore.getState();
+    if (state.activeContext?.type !== "room") {
+      state.removeParticipant(session.peerId);
+      if (state.inVoiceCall) {
+        this.scheduleSilentDirectReconnect();
       }
     }
-
-    // Se o dono do beacon saiu, agenda eleição de novo beacon
-    this.scheduleBeaconElection();
+    state.removeRemoteStreams(session.peerId);
   }
-
-  /* ========================================================================= */
-  /* TRATAMENTO DE PACOTES DE SINALIZAÇÃO P2P                                  */
-  /* ========================================================================= */
 
   private handleIncomingSignalingPacket(
     session: PeerMediaSession,
     packet: SignalingPacket,
   ): void {
     if (!packet || !packet.type) return;
-
     if (packet.type !== "peer_state_sync" && isBlocked(session.clientId))
       return;
+
     switch (packet.type) {
       case "profile_update": {
         if (
@@ -1148,10 +3334,38 @@ class WebRTCEngine {
               : validatePublicProfile(packet.profile);
           useHubStore.getState().updateParticipant(session.peerId, { profile });
         } catch {
-          /* Malformed remote profile is ignored, not merged. */
+          /* ignore */
         }
         break;
       }
+      case "ping": {
+        try {
+          session.dataConn.send({ type: "pong", at: packet.at } as SignalingPacket);
+        } catch {
+          /* ignore */
+        }
+        break;
+      }
+      case "pong":
+        break;
+
+      case "chat_message": {
+        const msg = packet.message;
+        if (!msg?.id || !msg?.roomId) break;
+        const currentCtx = useHubStore.getState().activeContext;
+        if (
+          currentCtx?.type === "room" &&
+          msg.roomId === currentCtx.roomId &&
+          msg.authorClientId !== useHubStore.getState().authUserId
+        ) {
+          useHubStore.getState().addMessage({
+            ...msg,
+            delivery: "received",
+          });
+        }
+        break;
+      }
+
       case "peer_state_sync": {
         const remote = peerState(
           packet.state,
@@ -1159,64 +3373,47 @@ class WebRTCEngine {
           session.clientId,
         );
         if (!remote) return;
-        const beforeParticipant =
-          useHubStore.getState().participants[session.peerId];
         session.clientId = remote.clientId;
         session.nickname = remote.nickname;
 
-        useHubStore.getState().updateParticipant(session.peerId, {
-          ...remote,
-          isLocal: false,
-        });
+        for (const [pid, other] of this.sessions.entries()) {
+          if (pid === session.peerId) continue;
+          if (other.clientId === remote.clientId) {
+            this.finalizePeerDisconnected(other);
+          }
+        }
 
-        // Se o par acabou de ser registrado, insere caso não exista ainda
-        if (!useHubStore.getState().participants[session.peerId]) {
-          useHubStore.getState().setParticipants({
-            ...useHubStore.getState().participants,
-            [session.peerId]: { ...remote, isLocal: false },
-          });
+        // Remove qualquer entrada duplicada ou placeholder presence: com o mesmo userId
+        const currentParticipants = { ...useHubStore.getState().participants };
+        const prevParticipant =
+          currentParticipants[session.peerId] ??
+          Object.values(currentParticipants).find(
+            (p) => p.clientId === remote.clientId,
+          );
+        for (const [key, p] of Object.entries(currentParticipants)) {
+          if (key !== session.peerId && p.clientId === remote.clientId) {
+            delete currentParticipants[key];
+          }
+        }
+        currentParticipants[session.peerId] = { ...remote, isLocal: false };
+        useHubStore.getState().setParticipants(currentParticipants);
+
+        const preState = useHubStore.getState();
+        if (preState.activeContext?.type === "room" && preState.inVoiceCall) {
+          if (!prevParticipant?.inVoiceCall && remote.inVoiceCall) {
+            sounds.playJoin();
+          } else if (prevParticipant?.inVoiceCall && !remote.inVoiceCall) {
+            sounds.playLeave();
+          }
         }
 
         if (isBlocked(remote.clientId)) {
           this.closeBlockedMedia(session);
           return;
         }
-        if (
-          beforeParticipant &&
-          !beforeParticipant.inVoiceCall &&
-          remote.inVoiceCall &&
-          !useHubStore.getState().inVoiceCall
-        ) {
-          const room = this.currentRoomSlug,
-            generation = this.roomGeneration;
-          notifyNative(
-            {
-              id: crypto.randomUUID(),
-              kind: "call",
-              title: "Chamada na sala",
-              body: `${remote.nickname.slice(0, 80)} iniciou uma chamada. Clique para atender.`,
-            },
-            () => {
-              if (
-                this.roomGeneration === generation &&
-                this.currentRoomSlug === room &&
-                this.sessions.get(session.peerId) === session &&
-                useHubStore.getState().participants[session.peerId]
-                  ?.inVoiceCall &&
-                !isBlocked(session.clientId) &&
-                !useHubStore.getState().inVoiceCall
-              )
-                void this.joinVoiceCall().catch((error) =>
-                  mediaError("Atender chamada", error),
-                );
-            },
-          );
-        }
         this.sendProfileToSession(session);
-        // Compatibilidade legada
         useHubStore.getState().setRemoteNickname(remote.nickname);
 
-        // Se ambos estiverem em chamada de voz e a chamada ainda não tiver chegado após 400ms:
         const localState = useHubStore.getState();
         if (
           localState.inVoiceCall &&
@@ -1233,23 +3430,21 @@ class WebRTCEngine {
             ) {
               this.initiateVoiceCallWithPeer(currentSession);
             }
-          }, 400);
+          }, 250);
         }
 
         if (!remote.inVoiceCall) {
           this.waitingForMedia.delete(remote.clientId);
           this.closeBlockedMedia(session);
-          this.refreshRecoveryState();
         }
         if (
           localState.inVoiceCall &&
           remote.inVoiceCall &&
           this.localWebcamStream &&
           !session.outgoingWebcam
-        )
+        ) {
           this.initiateWebcamCallWithPeer(session);
-
-        // Se local estiver compartilhando tela e o irmão estiver em call de voz
+        }
         if (
           localState.isScreenSharing &&
           this.localScreenStream &&
@@ -1289,185 +3484,6 @@ class WebRTCEngine {
         break;
       }
 
-      case "chat_message": {
-        const room = useHubStore.getState().roomId;
-        try {
-          const msg = validateMessage(packet.message, room);
-          if (msg.type === "soundboard") return;
-          if (msg.authorClientId !== session.clientId) return;
-          chatLedger
-            .mergeMessages(room, [msg])
-            .then((merged) => {
-              if (useHubStore.getState().roomId !== room) return;
-              const fresh = !useHubStore
-                .getState()
-                .messages.some((m) => m.id === msg.id);
-              useHubStore.getState().setMessages(merged);
-              if (fresh) useHubStore.getState().setUnreadCount((n) => n + 1);
-              if (fresh && msg.type === "user" && !isBlocked(session.clientId))
-                notifyNative({
-                  id: msg.id,
-                  kind: "message",
-                  title: msg.authorNickname.slice(0, 100),
-                  body: msg.content.slice(0, 240),
-                });
-              session.dataConn.send({
-                type: "chat_ack",
-                roomId: room,
-                messageId: msg.id,
-              } as SignalingPacket);
-            })
-            .catch((error) =>
-              console.warn("[Chat] Falha ao persistir mensagem:", error),
-            );
-        } catch {
-          /* Invalid remote content is not rendered or stored. */
-        }
-        break;
-      }
-      case "chat_ack": {
-        const state = useHubStore.getState();
-        const message = state.messages.find(
-          (m) =>
-            m.id === packet.messageId && m.authorClientId === state.clientId,
-        );
-        if (!message || packet.roomId !== state.roomId) return;
-        chatLedger
-          .acknowledge(packet.roomId, message.id)
-          .then((messages) => {
-            if (useHubStore.getState().roomId === packet.roomId)
-              useHubStore.getState().setMessages(messages);
-          })
-          .catch(() => {});
-        break;
-      }
-      case "chat_operation": {
-        this.receiveChatOperations(session, useHubStore.getState().roomId, [
-          packet.operation,
-        ]);
-        break;
-      }
-      case "chat_operations_sync": {
-        if (
-          packet.roomId !== useHubStore.getState().roomId ||
-          !Array.isArray(packet.operations) ||
-          packet.operations.length > 100
-        )
-          return;
-        this.receiveChatOperations(session, packet.roomId, packet.operations);
-        break;
-      }
-
-      case "chat_reaction_toggle": {
-        if (
-          typeof packet.emoji !== "string" ||
-          packet.emoji.length > 16 ||
-          ["__proto__", "constructor", "prototype"].includes(packet.emoji)
-        )
-          return;
-        const ownerState = useHubStore.getState();
-        const message = ownerState.messages.find(
-          (m) => m.id === packet.messageId,
-        );
-        if (
-          packet.clientId !== session.clientId ||
-          (message?.authorClientId === ownerState.clientId &&
-            !readOwnProfile(ownerState.clientId, ownerState.nickname).privacy
-              .allowReactions)
-        )
-          return;
-        storageDb
-          .toggleReaction(
-            packet.messageId,
-            packet.emoji,
-            packet.clientId,
-            packet.nickname,
-          )
-          .catch(() => {});
-        useHubStore
-          .getState()
-          .updateMessageReaction(
-            packet.messageId,
-            packet.emoji,
-            packet.clientId,
-            packet.nickname,
-          );
-        break;
-      }
-
-      case "chat_typing": {
-        if (
-          packet.clientId !== session.clientId ||
-          typeof packet.nickname !== "string" ||
-          packet.nickname.length > 80 ||
-          typeof packet.isTyping !== "boolean"
-        )
-          return;
-        useHubStore
-          .getState()
-          .setTypingUser(packet.clientId, packet.nickname, packet.isTyping);
-        break;
-      }
-
-      case "chat_sync_request": {
-        const room = useHubStore.getState().roomId;
-        if (
-          packet.roomId !== room ||
-          !Array.isArray(packet.knownIds) ||
-          packet.knownIds.length > 500
-        )
-          return;
-        storageDb
-          .getMessagesByRoom(room)
-          .then((all) => {
-            if (useHubStore.getState().roomId !== room) return;
-            const known = new Set(packet.knownIds);
-            const missing = all.filter(
-              (m) =>
-                !known.has(m.id) &&
-                m.type !== "soundboard" &&
-                !m.deleted &&
-                !isBlocked(m.authorClientId),
-            );
-            // Original author is needed to authenticate a new v2 edit/delete; history remains best-effort P2P.
-            for (let i = 0; i < missing.length; i += 50)
-              session.dataConn.send({
-                type: "chat_sync_response",
-                roomId: room,
-                messages: missing.slice(i, i + 50),
-              } as SignalingPacket);
-          })
-          .catch(() => {});
-        this.sendChatOperations(session.dataConn, room);
-        break;
-      }
-      case "chat_sync_response": {
-        const room = useHubStore.getState().roomId;
-        if (
-          packet.roomId !== room ||
-          !Array.isArray(packet.messages) ||
-          packet.messages.length > 500
-        )
-          return;
-        try {
-          const clean = packet.messages
-            .filter(
-              (m) => m.type !== "soundboard" && !isBlocked(m.authorClientId),
-            )
-            .map((m) => validateMessage(m, room));
-          chatLedger
-            .mergeMessages(room, clean)
-            .then((merged) => {
-              if (useHubStore.getState().roomId === room)
-                useHubStore.getState().setMessages(merged);
-            })
-            .catch(() => {});
-        } catch {
-          /* Ignore invalid history batches. */
-        }
-        break;
-      }
-
       case "soundboard_triggered": {
         if (
           packet.peerId !== session.peerId ||
@@ -1479,13 +3495,12 @@ class WebRTCEngine {
         )
           return;
         soundActivity(
-          useHubStore.getState().roomId,
+          useHubStore.getState().activeChannelId || "dm",
           session.clientId,
           session.nickname,
           packet.emoji,
           packet.soundName,
         );
-        // Exibe animação flutuante no card do participante que tocou o som
         useHubStore.getState().updateParticipant(packet.peerId, {
           activeSoundEffect: {
             emoji: packet.emoji,
@@ -1493,8 +3508,6 @@ class WebRTCEngine {
             expiresAt: Date.now() + 3500,
           },
         });
-
-        // Limpa animação após 3.5 segundos
         window.setTimeout(() => {
           const current = useHubStore.getState().participants[packet.peerId];
           if (current?.activeSoundEffect?.name === packet.soundName) {
@@ -1509,144 +3522,38 @@ class WebRTCEngine {
   }
 
   /* ========================================================================= */
-  /* SINCRONIZAÇÃO DE CHAT P2P (INDEXEDDB)                                     */
-  /* ========================================================================= */
-
-  private requestChatSync(conn: DataConnection): void {
-    const room = this.currentRoomSlug;
-    if (!room) return;
-    storageDb
-      .getMessagesByRoom(room)
-      .then((messages) => {
-        if (this.currentRoomSlug !== room || !conn.open) return;
-        conn.send({
-          type: "chat_sync_request",
-          roomId: room,
-          sinceTimestamp: 0,
-          knownIds: messages.map((m) => m.id),
-        } as SignalingPacket);
-        for (const msg of messages.filter(
-          (m) =>
-            m.authorClientId === useHubStore.getState().clientId && !m.deleted,
-        ))
-          conn.send({ type: "chat_message", message: msg } as SignalingPacket);
-        this.sendChatOperations(conn, room);
-      })
-      .catch(() => {});
-  }
-
-  private sendChatOperations(conn: DataConnection, room: string): void {
-    chatLedger
-      .operations(room)
-      .then((ops) => {
-        if (useHubStore.getState().roomId !== room || !conn.open) return;
-        const own = ops.filter(
-          (o) => o.actorClientId === useHubStore.getState().clientId,
-        );
-        for (let i = 0; i < own.length; i += 100)
-          conn.send({
-            type: "chat_operations_sync",
-            roomId: room,
-            operations: own.slice(i, i + 100),
-          } as SignalingPacket);
-      })
-      .catch(() => {});
-  }
-
-  private receiveChatOperations(
-    session: PeerMediaSession,
-    room: string,
-    incoming: ChatOperation[],
-  ): void {
-    try {
-      const state = useHubStore.getState();
-      const clean = incoming
-        .map((o) => validateOperation(o, room, session.clientId))
-        .filter((o) => {
-          const target = state.messages.find((m) => m.id === o.messageId);
-          if (
-            o.kind === "reaction" &&
-            target?.authorClientId === state.clientId &&
-            !readOwnProfile(state.clientId, state.nickname).privacy
-              .allowReactions
-          )
-            return false;
-          return (
-            o.kind === "reaction" ||
-            !target ||
-            target.authorClientId === session.clientId
-          );
-        });
-      chatLedger
-        .record(room, clean, session.clientId)
-        .then((messages) => {
-          if (useHubStore.getState().roomId !== room) return;
-          useHubStore.getState().setMessages(messages);
-        })
-        .catch((error) => console.warn("[Chat] Operação recusada:", error));
-    } catch {
-      /* Untrusted operations are ignored. */
-    }
-  }
-
-  public async mutateChat(
-    messageId: string,
-    kind: ChatOperation["kind"],
-    data: { content?: string; emoji?: string; active?: boolean } = {},
-  ): Promise<void> {
-    const state = useHubStore.getState();
-    const message = state.messages.find((m) => m.id === messageId);
-    if (!message || message.deleted) throw new Error("Mensagem indisponível.");
-    if (kind !== "reaction" && message.authorClientId !== state.clientId)
-      throw new Error("Você só pode alterar ou fixar suas próprias mensagens.");
-    const author = Object.values(state.participants).find(
-      (p) => p.clientId === message.authorClientId,
-    );
-    if (
-      isBlocked(message.authorClientId) ||
-      (kind === "reaction" && author?.profile?.interactions.reactions === false)
-    )
-      throw new Error("Interação não permitida.");
-    this.chatClock = Math.max(Date.now(), this.chatClock + 1);
-    const op = validateOperation(
-      {
-        id: crypto.randomUUID(),
-        roomId: state.roomId,
-        messageId,
-        actorClientId: state.clientId,
-        nickname: state.nickname,
-        at: this.chatClock,
-        kind,
-        ...data,
-      },
-      state.roomId,
-      state.clientId,
-    );
-    const messages = await chatLedger.record(
-      state.roomId,
-      [op],
-      state.clientId,
-    );
-    if (useHubStore.getState().roomId === state.roomId)
-      useHubStore.getState().setMessages(messages);
-    this.broadcast({ type: "chat_operation", operation: op });
-  }
-
-  /* ========================================================================= */
-  /* CHAMADAS DE MÍDIA ENTRANTES & SAÍDAS (FULL MESH)                          */
+  /* CHAMADAS DE MÍDIA ENTRANTES & SAÍDAS (1:1 DIRETO)                         */
   /* ========================================================================= */
 
   private handleIncomingMediaCall(call: MediaConnection): void {
     const channel = call.metadata?.channel || "voice";
     const remotePeerId = call.peer;
-    const session = this.sessions.get(remotePeerId);
+    let session = this.sessions.get(remotePeerId);
     const ownState = useHubStore.getState();
+
+    if (!session && ownState.inVoiceCall && this.localPeer) {
+      const roomParticipant =
+        ownState.activeContext?.type === "room"
+          ? ownState.participants[remotePeerId]
+          : undefined;
+      if (remotePeerId === this.directRemotePeerId) {
+        this.connectToPeer(remotePeerId, this.directRemoteUserId || undefined);
+        session = this.sessions.get(remotePeerId);
+      } else if (roomParticipant) {
+        this.connectToPeer(
+          remotePeerId,
+          roomParticipant.clientId,
+          roomParticipant.nickname,
+        );
+        session = this.sessions.get(remotePeerId);
+      }
+    }
+
     if (
       !session ||
       !ownState.inVoiceCall ||
       !["voice", "screen", "webcam"].includes(channel) ||
-      isBlocked(session.clientId) ||
-      !readOwnProfile(ownState.clientId, ownState.nickname).privacy.allowCalls
+      isBlocked(session.clientId)
     ) {
       call.close();
       return;
@@ -1660,51 +3567,36 @@ class WebRTCEngine {
         }
         session.voiceCall.close();
       }
-      const state = useHubStore.getState();
-      if (!state.inVoiceCall) {
-        // Se o usuário local NÃO está na call de voz, não envia microfone
-        call.answer();
-      } else {
-        const localVoiceStream =
-          this.audioPipeline?.getProcessedStream() || this.rawMicStream;
-        call.answer(localVoiceStream || undefined);
-      }
-
-      if (session) {
-        session.voiceCall = call;
-      }
+      const localVoiceStream =
+        this.audioPipeline?.getProcessedStream() || this.rawMicStream;
+      call.answer(localVoiceStream || undefined);
+      session.voiceCall = call;
 
       this.patchCallSdp(call, false);
-
       this.monitorVoiceCall(session, call);
+
       call.on("stream", (stream) => {
-        if (session.voiceCall !== call) return;
-        if (session) {
-          this.setupPeerVoiceAudio(session, stream);
-        }
+        if (session!.voiceCall !== call) return;
+        this.setupPeerVoiceAudio(session!, stream);
         useHubStore.getState().setRemoteStream(remotePeerId, "voice", stream);
         useHubStore.getState().setRemoteVoiceStream(stream);
       });
 
       call.on("close", () => {
-        if (session.voiceCall !== call) return;
-        if (session) {
-          this.teardownPeerVoiceAudio(session);
-          session.voiceCall = null;
-        }
+        if (session!.voiceCall !== call) return;
+        this.teardownPeerVoiceAudio(session!);
+        session!.voiceCall = null;
         useHubStore.getState().setRemoteStream(remotePeerId, "voice", null);
       });
     } else if (channel === "screen") {
       session.screenCall?.close();
-      call.answer(); // Atende tela sem enviar vídeo de volta
-      if (session) {
-        session.screenCall = call;
-      }
+      call.answer();
+      session.screenCall = call;
 
       this.patchCallSdp(call, true);
 
       call.on("stream", (stream) => {
-        if (session.screenCall !== call) return;
+        if (session!.screenCall !== call) return;
         sounds.playStreamStart();
         useHubStore.getState().setRemoteStream(remotePeerId, "screen", stream);
         useHubStore.getState().setRemoteScreenStream(stream);
@@ -1715,27 +3607,25 @@ class WebRTCEngine {
       });
 
       call.on("close", () => {
-        if (session.screenCall !== call) return;
-        session.screenCall = null;
+        if (session!.screenCall !== call) return;
+        session!.screenCall = null;
         useHubStore.getState().setRemoteStream(remotePeerId, "screen", null);
         useHubStore.getState().setRemoteScreenStream(null);
         useHubStore
           .getState()
           .updateParticipant(remotePeerId, { isScreenSharing: false });
-        if (useHubStore.getState().telemetry.sourcePeerId === session.peerId)
+        if (useHubStore.getState().telemetry.sourcePeerId === session!.peerId)
           useHubStore.getState().setTelemetry({ active: false });
-        this.stopReceiverStats(session.peerId);
+        this.stopReceiverStats(session!.peerId);
         sounds.playStreamStop();
       });
     } else if (channel === "webcam") {
       session.webcamCall?.close();
       call.answer();
-      if (session) {
-        session.webcamCall = call;
-      }
+      session.webcamCall = call;
 
       call.on("stream", (stream) => {
-        if (session.webcamCall !== call) return;
+        if (session!.webcamCall !== call) return;
         useHubStore.getState().setRemoteStream(remotePeerId, "webcam", stream);
         useHubStore
           .getState()
@@ -1743,8 +3633,8 @@ class WebRTCEngine {
       });
 
       call.on("close", () => {
-        if (session.webcamCall !== call) return;
-        session.webcamCall = null;
+        if (session!.webcamCall !== call) return;
+        session!.webcamCall = null;
         useHubStore.getState().setRemoteStream(remotePeerId, "webcam", null);
         useHubStore
           .getState()
@@ -1784,8 +3674,8 @@ class WebRTCEngine {
 
     session.voiceCall = call;
     this.patchCallSdp(call, false);
-
     this.monitorVoiceCall(session, call);
+
     call.on("stream", (stream) => {
       if (session.voiceCall !== call) return;
       this.setupPeerVoiceAudio(session, stream);
@@ -1819,6 +3709,7 @@ class WebRTCEngine {
       previousLost = 0,
       busy = false,
       disconnectedAt = 0;
+
     session.qualityTimer = window.setInterval(async () => {
       if (
         this.sessions.get(session.peerId) !== session ||
@@ -1867,12 +3758,6 @@ class WebRTCEngine {
       else disconnectedAt = 0;
       if (
         pc.connectionState === "failed" ||
-        (this.recoveryActive &&
-          this.recoveryAttempts < 8 &&
-          this.discoveryConfirmed &&
-          this.waitingForMedia.has(session.clientId) &&
-          session.recoveryMediaAt !== undefined &&
-          Date.now() - session.recoveryMediaAt > 10000) ||
         (disconnectedAt && Date.now() - disconnectedAt > 8000) ||
         (["new", "connecting"].includes(pc.connectionState) &&
           Date.now() - connectingAt > 30000)
@@ -1938,24 +3823,16 @@ class WebRTCEngine {
             sentAudio = report.bytesSent;
         });
         if (
-          this.waitingForMedia.has(session.clientId) &&
-          session.recoveryRxBase === undefined
-        ) {
-          session.recoveryRxBase = receivedAudio;
-          session.recoveryTxBase = sentAudio;
-        } else if (
-          receivedAudio > (session.recoveryRxBase ?? 0) &&
-          sentAudio > (session.recoveryTxBase ?? 0) &&
+          receivedAudio > 0 &&
+          sentAudio > 0 &&
           !!session.voiceAudioEl?.srcObject &&
           pc.connectionState === "connected"
         ) {
           session.mediaFlowVerified = true;
-          this.waitingForMedia.delete(session.clientId);
         }
         const flowing =
           pc.connectionState === "connected" &&
           session.mediaFlowVerified === true;
-        this.refreshRecoveryState();
         useMediaState.setState((s) => ({
           quality: {
             ...s.quality,
@@ -1969,11 +3846,12 @@ class WebRTCEngine {
           },
         }));
       } catch {
-        /* Stats unavailable: never fabricate quality. */
+        /* ignore */
       } finally {
         busy = false;
       }
     }, 2000);
+
     call.on("close", () => {
       if (session.voiceCall && session.voiceCall !== call) return;
       if (session.qualityTimer) clearInterval(session.qualityTimer);
@@ -2058,7 +3936,7 @@ class WebRTCEngine {
   }
 
   /* ========================================================================= */
-  /* ÁUDIO INDIVIDUAL POR IRMÃO (0% A 100%) & SINK ID                          */
+  /* ÁUDIO INDIVIDUAL E SINK ID (useMediaOutput / setSinkId)                   */
   /* ========================================================================= */
 
   private setupPeerVoiceAudio(
@@ -2068,7 +3946,6 @@ class WebRTCEngine {
     this.teardownPeerVoiceAudio(session);
 
     try {
-      // Zera o jitter buffer extra nos receivers de áudio do WebRTC para latência mínima
       const pc = session.voiceCall?.peerConnection;
       if (pc && typeof pc.getReceivers === "function") {
         pc.getReceivers().forEach((receiver) => {
@@ -2083,7 +3960,6 @@ class WebRTCEngine {
         });
       }
 
-      // Reprodução direta na tag <audio> sem intermediário WebAudio (elimina ~250ms de atraso)
       let audioEl = document.getElementById(
         `audio-peer-${session.peerId}`,
       ) as HTMLAudioElement | null;
@@ -2109,11 +3985,10 @@ class WebRTCEngine {
       audioEl.srcObject = stream;
 
       const outputId = state.audioConfig.outputDeviceId;
-      if (outputId && outputId !== "default" && "setSinkId" in audioEl) {
-        (audioEl as unknown as { setSinkId: (id: string) => Promise<void> })
-          .setSinkId(outputId)
-          .catch((e) => mediaError("Saída de áudio indisponível", e));
-      }
+      void applySafeSinkId(
+        audioEl as unknown as { setSinkId?: (id: string) => Promise<void> },
+        outputId,
+      );
 
       audioEl
         .play()
@@ -2232,123 +4107,9 @@ class WebRTCEngine {
     }
   }
 
-  /* ========================================================================= */
-  /* ENTRAR E SAIR DA CHAMADA DE VOZ (INDEPENDENTE DO CHAT)                    */
-  /* ========================================================================= */
-
-  public async joinVoiceCall(): Promise<void> {
-    const state = useHubStore.getState();
-    if (state.inVoiceCall || this.joiningVoice) return;
-    const generation = this.roomGeneration;
-    this.joiningVoice = true;
-    this.clearMicRecovery();
-    try {
-      await this.setupLocalMicrophone();
-    } catch {
-      this.joiningVoice = false;
-      return;
-    }
-    this.joiningVoice = false;
-    if (generation !== this.roomGeneration || !this.rawMicStream?.active)
-      return;
-    this.recoveryCancelled = false;
-    for (const session of this.sessions.values())
-      session.voiceRetryAttempts = 0;
-    beginCallDiagnostics();
-    sounds.playJoin();
-
-    useHubStore.getState().setInVoiceCall(true);
-    if (this.localPeer) {
-      useHubStore
-        .getState()
-        .updateParticipant(this.localParticipantId(), { inVoiceCall: true });
-    }
-
-    // Notifica todos os irmãos da sala via peer_state_sync
-    this.broadcastLocalState();
-
-    // Inicia chamadas de voz com todos os irmãos que já estão em chamada
-    for (const session of this.sessions.values()) {
-      const p = useHubStore.getState().participants[session.peerId];
-      if (p && p.inVoiceCall && !session.voiceCall) {
-        this.initiateVoiceCallWithPeer(session);
-      }
-    }
-  }
-
-  public leaveVoiceCall(
-    reason: "manual_leave" | "microphone_ended" = "manual_leave",
-  ): void {
-    endCallDiagnostics(reason);
-    this.waitingForMedia.clear();
-    this.pushToTalkHeld = false;
-    const state = useHubStore.getState();
-    this.micGeneration++;
-    this.clearMicRecovery();
-    this.joiningVoice = false;
-    this.cameraGeneration++;
-    this.screenGeneration++;
-    useMediaState.setState({
-      microphoneBusy: false,
-      cameraBusy: false,
-      screenBusy: false,
-    });
-    soundboardEngine.stopAll();
-    this.audioPipeline?.destroy();
-    this.audioPipeline = null;
-    this.rawMicStream?.getTracks().forEach((t) => t.stop());
-    this.rawMicStream = null;
-    state.setLocalVoiceStream(null);
-    state.setIsLocalSpeaking(false, 0);
-    if (!state.inVoiceCall) return;
-    state.setInVoiceCall(false);
-    sounds.playLeave();
-
-    if (state.isScreenSharing) {
-      this.stopScreenShare();
-    }
-
-    if (state.isWebcamActive) {
-      this.toggleWebcam().catch(() => {});
-    }
-
-    // Encerra mídia, preservando as DataConnections do chat.
-    for (const session of this.sessions.values()) {
-      this.closeBlockedMedia(session);
-      if (session.voiceCall) {
-        try {
-          session.voiceCall.close();
-        } catch {
-          /* ignore */
-        }
-        session.voiceCall = null;
-      }
-      this.teardownPeerVoiceAudio(session);
-    }
-
-    useHubStore.getState().setInVoiceCall(false);
-    useHubStore.getState().setRemoteVoiceStream(null);
-
-    if (this.localPeer) {
-      useHubStore
-        .getState()
-        .updateParticipant(this.localParticipantId(), { inVoiceCall: false });
-    }
-
-    // Notifica todos os irmãos mantendo o chat ativo!
-    this.broadcastLocalState();
-    this.refreshRecoveryState();
-  }
-
   private canCallSession(session: PeerMediaSession): boolean {
     const state = useHubStore.getState();
-    return (
-      state.inVoiceCall &&
-      state.participants[session.peerId]?.inVoiceCall === true &&
-      !isBlocked(session.clientId) &&
-      readOwnProfile(state.clientId, state.nickname).privacy.allowCalls &&
-      state.participants[session.peerId]?.profile?.interactions.calls !== false
-    );
+    return state.inVoiceCall && !isBlocked(session.clientId);
   }
 
   private closeBlockedMedia(session: PeerMediaSession): void {
@@ -2398,17 +4159,14 @@ class WebRTCEngine {
       });
     this.broadcastLocalState();
     for (const session of this.sessions.values()) {
-      if (isBlocked(session.clientId) || !profile.privacy.allowCalls)
-        this.closeBlockedMedia(session);
-      if (isBlocked(session.clientId)) {
-        useHubStore
-          .getState()
-          .updateParticipant(session.peerId, { profile: null });
-      } else this.sendProfileToSession(session);
+      this.sendProfileToSession(session);
     }
   }
 
   private broadcastLocalState(): void {
+    if (this.activeRoomMeta) {
+      void this.trackRoomMeshPresence();
+    }
     if (!this.localPeer) return;
     const state = useHubStore.getState();
     const local = state.participants[this.localParticipantId()];
@@ -2440,25 +4198,6 @@ class WebRTCEngine {
     }
   }
 
-  // Compatibilidade legada
-  public sendData(msg: { type: string; [key: string]: unknown }): void {
-    if (msg.type === "nickname" && typeof msg.name === "string") {
-      useHubStore.getState().setNickname(msg.name);
-      if (this.localPeer) {
-        useHubStore
-          .getState()
-          .updateParticipant(this.localParticipantId(), { nickname: msg.name });
-      }
-      this.broadcastLocalState();
-    } else if (msg.type === "speaking") {
-      this.broadcast({
-        type: "speaking",
-        peerId: this.localPeer?.id || "",
-        isSpeaking: Boolean(msg.isSpeaking),
-      });
-    }
-  }
-
   /* ========================================================================= */
   /* CONTROLES DE MÍDIA LOCAL (MUTE, DEAFEN, WEBCAM, SCREEN SHARE)             */
   /* ========================================================================= */
@@ -2487,7 +4226,6 @@ class WebRTCEngine {
     const nextMuted = muted !== undefined ? muted : !state.isMuted;
     useHubStore.getState().setMuted(nextMuted);
 
-    // Ajusta o ganho do microfone no pipeline WebAudio (sem cortar o Soundboard!)
     this.audioPipeline?.setMicMuted(this.microphoneGated());
 
     if (nextMuted) {
@@ -2509,7 +4247,6 @@ class WebRTCEngine {
     const nextDeafened = deafened !== undefined ? deafened : !state.isDeafened;
     useHubStore.getState().setDeafened(nextDeafened);
 
-    // Atualiza o elemento de áudio de todas as sessões para silenciar imediatamente se deafened
     for (const session of this.sessions.values()) {
       if (session.voiceAudioEl) {
         const peerVol = state.peerVolumes[session.clientId] ?? 1.0;
@@ -2523,7 +4260,6 @@ class WebRTCEngine {
       }
     }
 
-    // Se ativou Deafen, muta microfone automaticamente (igual ao Discord)
     if (nextDeafened && !state.isMuted) {
       this.toggleMute(true);
     }
@@ -2606,7 +4342,6 @@ class WebRTCEngine {
         }
         this.broadcastLocalState();
 
-        // Envia chamada de webcam para irmãos em call de voz
         for (const session of this.sessions.values()) {
           const p = useHubStore.getState().participants[session.peerId];
           if (
@@ -2702,7 +4437,6 @@ class WebRTCEngine {
       }
       this.broadcastLocalState();
 
-      // Envia stream de tela para todos os irmãos na chamada
       for (const session of this.sessions.values()) {
         const p = useHubStore.getState().participants[session.peerId];
         if (p?.inVoiceCall) {
@@ -2765,7 +4499,7 @@ class WebRTCEngine {
   }
 
   /* ========================================================================= */
-  /* MICROFONE LOCAL & PIPELINE DE ÁUDIO                                       */
+  /* MICROFONE LOCAL, PIPELINE & RECUPERAÇÃO RESILIENTE                        */
   /* ========================================================================= */
 
   public async setupLocalMicrophone(
@@ -2795,9 +4529,6 @@ class WebRTCEngine {
           audio: audioConstraints,
         });
       } catch (error) {
-        // Só na recuperação automática: se o dispositivo escolhido sumiu ou mudou
-        // de id (ex.: headset trocando de perfil), usa o microfone padrão sem
-        // alterar a escolha salva do usuário.
         const name = (error as { name?: string } | null)?.name;
         if (
           options.allowDefaultFallback &&
@@ -2902,8 +4633,6 @@ class WebRTCEngine {
     }
   }
 
-  /* Detecta captura interrompida de três formas: faixa encerrada, faixa muda
-     (driver/SO silenciou sem encerrar) e AudioContext parado. */
   private watchMicrophone(
     stream: MediaStream,
     pipeline: VoiceAudioPipeline,
@@ -2936,7 +4665,6 @@ class WebRTCEngine {
     )
       return;
     callEvent("microphone_interrupted", { reason });
-    // Captura interrompida não tira o usuário da sala nem fecha pares saudáveis.
     if (Date.now() - this.lastMicRecoveredAt > 30000)
       this.micRecoveryAttempt = 0;
     if (this.micRecoveryAttempt > 0)
@@ -2974,8 +4702,6 @@ class WebRTCEngine {
           if (this.rawMicStream?.active) this.lastMicRecoveredAt = Date.now();
         })
         .catch(() => {
-          // A falha já foi informada por setupLocalMicrophone. Tenta de novo só se
-          // nada mais mexeu no microfone (saída, troca manual) nesse meio tempo.
           if (this.micGeneration === generation + 1) this.scheduleMicRecovery();
         });
     }, delay);
@@ -3085,7 +4811,6 @@ class WebRTCEngine {
       this.audioPipeline.updateConfig(partial);
     }
 
-    // Se o usuário ligou/desligou a supressão de ruído, aplica ao vivo na trilha do microfone
     if (typeof partial.neuralNoiseGate === "boolean" && this.rawMicStream) {
       const audioTrack = this.rawMicStream.getAudioTracks()[0];
       if (audioTrack && typeof audioTrack.applyConstraints === "function") {
@@ -3095,7 +4820,6 @@ class WebRTCEngine {
       }
     }
 
-    // Se atualizou remoteStreamVolume ou outputDeviceId, aplica em todas as sessões
     const state = useHubStore.getState();
     for (const session of this.sessions.values()) {
       if (
@@ -3108,18 +4832,13 @@ class WebRTCEngine {
           : Math.max(0, Math.min(1.0, peerVol * partial.remoteStreamVolume));
       }
 
-      if (
-        partial.outputDeviceId &&
-        session.voiceAudioEl &&
-        "setSinkId" in session.voiceAudioEl
-      ) {
-        (
+      if (partial.outputDeviceId && session.voiceAudioEl) {
+        void applySafeSinkId(
           session.voiceAudioEl as unknown as {
-            setSinkId: (id: string) => Promise<void>;
-          }
-        )
-          .setSinkId(partial.outputDeviceId)
-          .catch((error) => mediaError("Saída de áudio indisponível", error));
+            setSinkId?: (id: string) => Promise<void>;
+          },
+          partial.outputDeviceId,
+        );
       }
     }
   }
@@ -3462,82 +5181,14 @@ class WebRTCEngine {
   }
 
   /* ========================================================================= */
-  /* MÉTODOS PÚBLICOS DE CHAT E SOUNDBOARD                                     */
+  /* SOUNDBOARD & ENCERRAMENTO                                                 */
   /* ========================================================================= */
-
-  public async sendChatMessage(
-    content: string,
-    replyTo?: string,
-  ): Promise<ChatMessage | null> {
-    if (!useHubStore.getState().roomId)
-      throw new Error("Entre em uma sala para enviar mensagens.");
-    await storageDb.requirePersistentStorage();
-    const trimmed = content.trim();
-    if (!trimmed) return null;
-    if (trimmed.length > 8000)
-      throw new Error("Limite de 8000 caracteres por mensagem.");
-
-    const state = useHubStore.getState();
-    const id =
-      typeof crypto !== "undefined" && crypto.randomUUID
-        ? crypto.randomUUID()
-        : "msg-" + Date.now();
-
-    const msg: ChatMessage = {
-      id,
-      roomId: state.roomId,
-      type: "user",
-      ...(replyTo ? { replyTo } : {}),
-      delivery: "queued",
-      authorClientId: state.clientId,
-      authorNickname: state.nickname,
-      authorAvatarColor: state.avatarColor,
-      content: trimmed,
-      createdAt: Date.now(),
-      reactions: {},
-    };
-
-    await storageDb.saveMessage(msg);
-    useHubStore.getState().addMessage(msg);
-
-    this.broadcast({
-      type: "chat_message",
-      message: msg,
-    });
-
-    return msg;
-  }
-
-  public async toggleMessageReaction(
-    messageId: string,
-    emoji: string,
-  ): Promise<void> {
-    const state = useHubStore.getState();
-    const msg = state.messages.find((m) => m.id === messageId);
-    await this.mutateChat(messageId, "reaction", {
-      emoji,
-      active: !msg?.reactions[emoji]?.reactorClientIds.includes(state.clientId),
-    });
-  }
-
-  public sendTypingState(isTyping: boolean): void {
-    const state = useHubStore.getState();
-    this.broadcast({
-      type: "chat_typing",
-      clientId: state.clientId,
-      nickname: state.nickname,
-      isTyping,
-    });
-  }
 
   public async triggerSoundboardClip(clip: SoundboardClip): Promise<void> {
     const state = useHubStore.getState();
-
-    // Reproduz localmente e injeta no WebRTC
     await soundboardEngine.playClip(clip);
 
     if (this.localPeer) {
-      // Exibe animação visual flutuante localmente
       useHubStore.getState().updateParticipant(this.localParticipantId(), {
         activeSoundEffect: {
           emoji: clip.emoji,
@@ -3546,7 +5197,6 @@ class WebRTCEngine {
         },
       });
 
-      // Notifica todos os irmãos para exibirem o badge animado
       this.broadcast({
         type: "soundboard_triggered",
         peerId: this.localPeer.id,
@@ -3557,7 +5207,7 @@ class WebRTCEngine {
       });
 
       soundActivity(
-        state.roomId,
+        state.activeChannelId || "dm",
         state.clientId,
         state.nickname,
         clip.emoji,
@@ -3580,125 +5230,21 @@ class WebRTCEngine {
     await soundboardEngine.loadAllClips();
   }
 
-  /* ========================================================================= */
-  /* ENCERRAMENTO COMPLETO DA SALA                                             */
-  /* ========================================================================= */
-
   public leaveRoom(): void {
-    this.recoveryActive = false;
-    this.waitingForMedia.clear();
-    this.discoveryConfirmed = false;
-    this.closeDirectory();
-    endCallDiagnostics("room_left");
-    this.pushToTalkHeld = false;
-    this.recoveryCancelled = false;
-    this.recoveryAttempts = 0;
+    const state = useHubStore.getState();
+    if (
+      (state.inVoiceCall || state.outgoingCall) &&
+      state.activeContext?.type !== "room"
+    ) {
+      this.leaveVoiceCall("manual_leave");
+    }
+    this.teardownRoomChannels();
+    this.cleanupDirectCallLocalState();
     this.roomGeneration++;
-    this.micGeneration++;
-    this.clearMicRecovery();
-    this.cameraGeneration++;
-    this.screenGeneration++;
     this.currentRoomSlug = "";
-    this.joiningVoice = false;
-    if (this.recoveryTimer !== null) clearTimeout(this.recoveryTimer);
-    this.recoveryTimer = null;
-    useMediaState.setState({
-      microphoneBusy: false,
-      cameraBusy: false,
-      screenBusy: false,
-      reconnecting: false,
-      signaling: "idle",
-      recoveryAttempt: 0,
-      recoveryPhase: "idle",
-      recoveryMissingMedia: 0,
-      quality: {},
-    });
-    const leavingPeer = this.localPeer;
-    this.localPeer = null;
-    if (this.beaconHealTimeout !== null) {
-      clearTimeout(this.beaconHealTimeout);
-      this.beaconHealTimeout = null;
-    }
-
-    this.stopScreenShare();
-    this.stopReceiverStats();
-    soundboardEngine.stopAll();
-
-    if (this.localWebcamStream) {
-      this.localWebcamStream.getTracks().forEach((t) => t.stop());
-      this.localWebcamStream = null;
-    }
-
-    if (this.audioPipeline) {
-      this.audioPipeline.destroy();
-      this.audioPipeline = null;
-    }
-
-    if (this.rawMicStream) {
-      this.rawMicStream.getTracks().forEach((t) => t.stop());
-      this.rawMicStream = null;
-    }
-
-    // Encerra todas as sessões mesh ativas
-    const leavingSessions = [...this.sessions.values()];
-    this.sessions.clear();
-    for (const session of leavingSessions) {
-      if (session.dataConnectTimer) clearTimeout(session.dataConnectTimer);
-      session.dataConnectTimer = undefined;
-      this.closeBlockedMedia(session);
-      this.teardownPeerVoiceAudio(session);
-      if (session.voiceCall) {
-        try {
-          session.voiceCall.close();
-        } catch {
-          /* ignore */
-        }
-      }
-      if (session.webcamCall) {
-        try {
-          session.webcamCall.close();
-        } catch {
-          /* ignore */
-        }
-      }
-      if (session.screenCall) {
-        try {
-          session.screenCall.close();
-        } catch {
-          /* ignore */
-        }
-      }
-      if (session.dataConn) {
-        try {
-          session.dataConn.close();
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-    this.sessions.clear();
-
-    if (this.beaconPeer) {
-      try {
-        this.beaconPeer.destroy();
-      } catch {
-        /* ignore */
-      }
-      this.beaconPeer = null;
-      this.isBeaconOwner = false;
-    }
-
-    if (leavingPeer) {
-      try {
-        leavingPeer.destroy();
-      } catch {
-        /* ignore */
-      }
-      this.localPeer = null;
-    }
-
-    sounds.playLeave();
     useHubStore.getState().resetSession();
+    useHubStore.getState().setMessages([]);
+    useHubStore.getState().setActiveContext(null);
   }
 }
 

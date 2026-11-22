@@ -4,6 +4,7 @@
  */
 class SoundSynthesizer {
   private ctx: AudioContext | null = null;
+  private ringInterval: number | null = null;
 
   private getContext(): AudioContext {
     if (!this.ctx || this.ctx.state === 'closed') {
@@ -83,6 +84,48 @@ class SoundSynthesizer {
     const now = ctx.currentTime;
     this.playTone(783.99, 'sine', now, 0.08, 0.14);
     this.playTone(523.25, 'sine', now + 0.07, 0.18, 0.14);
+  }
+
+  public startRingtone(): void {
+    this.stopRingtone();
+    const playRingBurst = () => {
+      try {
+        const ctx = this.getContext();
+        const now = ctx.currentTime;
+        this.playTone(523.25, 'sine', now, 0.14, 0.16);
+        this.playTone(659.25, 'sine', now + 0.12, 0.14, 0.16);
+        this.playTone(783.99, 'sine', now + 0.24, 0.24, 0.18);
+        this.playTone(659.25, 'sine', now + 0.50, 0.14, 0.14);
+        this.playTone(783.99, 'sine', now + 0.64, 0.26, 0.16);
+      } catch {
+        /* ignore */
+      }
+    };
+    playRingBurst();
+    this.ringInterval = window.setInterval(playRingBurst, 2200);
+  }
+
+  public startDialTone(): void {
+    this.stopRingtone();
+    const playDialBurst = () => {
+      try {
+        const ctx = this.getContext();
+        const now = ctx.currentTime;
+        this.playTone(440.0, 'sine', now, 0.28, 0.10);
+        this.playTone(480.0, 'sine', now + 0.02, 0.28, 0.08);
+      } catch {
+        /* ignore */
+      }
+    };
+    playDialBurst();
+    this.ringInterval = window.setInterval(playDialBurst, 2600);
+  }
+
+  public stopRingtone(): void {
+    if (this.ringInterval !== null) {
+      window.clearInterval(this.ringInterval);
+      this.ringInterval = null;
+    }
   }
 }
 

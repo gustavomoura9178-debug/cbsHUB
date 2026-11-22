@@ -19,6 +19,7 @@ import { Slider } from "./ui/slider";
 import { Button } from "./ui/button";
 import { Separator } from "./ui/separator";
 import { ParticipantAvatar } from "./ParticipantAvatar";
+import { useProfiles } from "../profiles/ProfileProvider";
 import type { Participant } from "../types/cbshub";
 
 function getInitials(name: string): string {
@@ -62,6 +63,8 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant }) => {
 
   const soundEffect = participant.activeSoundEffect;
   const isSoundActive = soundEffect && soundEffect.expiresAt > Date.now();
+  const profiles = useProfiles();
+  const profile = isLocal ? profiles.own : participant.profile;
 
   return (
     <div
@@ -72,6 +75,14 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant }) => {
           : "border-border hover:border-primary/40"
       }`}
     >
+      {!hasActiveWebcam && profile?.banner && (
+        <img
+          src={profile.banner}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover opacity-25 pointer-events-none select-none"
+        />
+      )}
       <div className="call-card-quality absolute top-2 left-2 z-10">
         {isLocal ? (
           <LocalConnectionBadge />
@@ -92,9 +103,10 @@ export const UserCallCard: React.FC<UserCallCardProps> = ({ participant }) => {
           className="w-full h-full object-cover"
         />
       ) : (
-        <div className="flex flex-col items-center justify-center gap-2 p-2">
+        <div className="relative z-10 flex flex-col items-center justify-center gap-2 p-2">
           <ParticipantAvatar
             clientId={participant.clientId}
+            isLocal={isLocal}
             name={participant.nickname}
             color={participant.avatarColor}
             speaking={isSpeakingNow}

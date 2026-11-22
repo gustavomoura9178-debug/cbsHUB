@@ -55,14 +55,17 @@ export interface PublicProfile {
 }
 export const PROFILE_KEY = "cbshub-profile-v1";
 export function defaultProfile(ownerId: string, name: string): UserProfile {
+  const slug =
+    ownerId
+      .replace(/[^a-z0-9]/gi, "")
+      .toLowerCase()
+      .slice(0, 12) || "user";
+  const username = `u_${slug.padEnd(3, "0")}`.slice(0, 24);
   return {
     version: 1,
     ownerId,
     displayName: name.slice(0, 40) || "Pessoa",
-    username: `user_${ownerId
-      .replace(/[^a-z0-9]/gi, "")
-      .slice(0, 12)
-      .toLowerCase()}`,
+    username,
     bio: "",
     status: "",
     emoji: "",
@@ -207,6 +210,121 @@ export function validateProfile(value: unknown, ownerId: string): UserProfile {
       allowReactions: bool(privacy.allowReactions),
     },
   };
+}
+
+/** Migrates legacy pre-Supabase profiles onto the current active identity. */
+export function migrateLegacyProfile(
+  value: unknown,
+  ownerId: string,
+  fallbackName = "Usuário",
+): UserProfile {
+  const base = defaultProfile(ownerId, fallbackName);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return base;
+  }
+  const p = value as Record<string, unknown>;
+  const rawDisplay =
+    typeof p.displayName === "string" && p.displayName.trim()
+      ? p.displayName.trim().slice(0, 40)
+      : base.displayName;
+
+  const rawUser =
+    typeof p.username === "string" ? p.username.trim().toLowerCase() : "";
+  const sanitizedUser = /^[a-z][a-z0-9_]{2,23}$/.test(rawUser)
+    ? rawUser
+    : base.username;
+
+  const rawCreatedAt =
+    typeof p.createdAt === "number" &&
+    Number.isSafeInteger(p.createdAt) &&
+    p.createdAt > 0
+      ? Math.min(p.createdAt, Date.now())
+      : base.createdAt;
+
+  let safeAvatar = "";
+  try {
+    safeAvatar = imageData(p.avatar ?? "", 100000);
+  } catch {
+    safeAvatar = "";
+  }
+
+  let safeBanner = "";
+  try {
+    safeBanner = imageData(p.banner ?? "", 240000);
+  } catch {
+    safeBanner = "";
+  }
+
+  let safeLinks: string[] = [];
+  try {
+    safeLinks = links(p.links ?? []);
+  } catch {
+    safeLinks = [];
+  }
+
+  let safeAppearance = base.appearance;
+  try {
+    safeAppearance = appearance(p.appearance);
+  } catch {
+    safeAppearance = base.appearance;
+  }
+
+  const rawPrivacy =
+    p.privacy && typeof p.privacy === "object" && !Array.isArray(p.privacy)
+      ? (p.privacy as Record<string, unknown>)
+      : {};
+
+  const presence = (Object.keys(PRESENCES) as Presence[]).includes(
+    p.presence as Presence,
+  )
+    ? (p.presence as Presence)
+    : base.presence;
+
+  return validateProfile(
+    {
+      version: 1,
+      ownerId,
+      displayName: rawDisplay,
+      username: sanitizedUser,
+      bio: typeof p.bio === "string" ? p.bio.slice(0, 500) : "",
+      status: typeof p.status === "string" ? p.status.slice(0, 100) : "",
+      emoji: typeof p.emoji === "string" ? p.emoji.slice(0, 16) : "",
+      avatar: safeAvatar,
+      banner: safeBanner,
+      links: safeLinks,
+      createdAt: rawCreatedAt,
+      presence,
+      appearance: safeAppearance,
+      privacy: {
+        visibility: rawPrivacy.visibility === "private" ? "private" : "room",
+        showBio:
+          typeof rawPrivacy.showBio === "boolean"
+            ? rawPrivacy.showBio
+            : base.privacy.showBio,
+        showLinks:
+          typeof rawPrivacy.showLinks === "boolean"
+            ? rawPrivacy.showLinks
+            : base.privacy.showLinks,
+        showCreatedAt:
+          typeof rawPrivacy.showCreatedAt === "boolean"
+            ? rawPrivacy.showCreatedAt
+            : base.privacy.showCreatedAt,
+        shareImages:
+          typeof rawPrivacy.shareImages === "boolean"
+            ? rawPrivacy.shareImages
+            : base.privacy.shareImages,
+        allowCalls:
+          typeof rawPrivacy.allowCalls === "boolean"
+            ? rawPrivacy.allowCalls
+            : base.privacy.allowCalls,
+        allowReactions:
+          typeof rawPrivacy.allowReactions === "boolean"
+            ? rawPrivacy.allowReactions
+            : base.privacy.allowReactions,
+      },
+    },
+    ownerId,
+  );
 }
 export function publicProfile(p: UserProfile): PublicProfile | null {
   if (p.privacy.visibility === "private") return null;

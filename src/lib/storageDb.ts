@@ -2,16 +2,28 @@ import { compareMessages } from "../chat/model";
 import type { ChatMessage, SoundboardClip } from '../types/cbshub';
 
 const DB_NAME = 'cbshub_local_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_MESSAGES = 'messages';
 const STORE_CLIPS = 'soundboard_clips';
+const STORE_ATTACHMENTS = 'local_attachments';
 const MAX_MESSAGES_PER_ROOM = 500;
 const MAX_CLIP_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+export interface LocalAttachmentRecord {
+  messageId: string;
+  roomId: string;
+  fileName: string;
+  fileType: string;
+  fileSize: number;
+  blob: Blob;
+  savedAt: number;
+}
 
 class StorageDb {
   private dbPromise: Promise<IDBDatabase | null> | null = null;
   private memoryMessages: Map<string, ChatMessage[]> = new Map();
   private memoryClips: Map<string, SoundboardClip> = new Map();
+  private memoryAttachments: Map<string, LocalAttachmentRecord> = new Map();
 
   private getDb(): Promise<IDBDatabase | null> {
     if (this.dbPromise) return this.dbPromise;
@@ -36,6 +48,10 @@ class StorageDb {
 
           if (!db.objectStoreNames.contains(STORE_CLIPS)) {
             db.createObjectStore(STORE_CLIPS, { keyPath: 'id' });
+          }
+
+          if (!db.objectStoreNames.contains(STORE_ATTACHMENTS)) {
+            db.createObjectStore(STORE_ATTACHMENTS, { keyPath: 'messageId' });
           }
         };
 
@@ -395,6 +411,74 @@ class StorageDb {
         store.delete(id);
         tx.oncomplete = () => resolve();
         tx.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+
+  /* ========================================================================= */
+  /* STORE: LOCAL ATTACHMENTS (MEMÓRIA LOCAL DO DISPOSITIVO)                  */
+  /* ========================================================================= */
+
+  public async saveLocalAttachment(record: LocalAttachmentRecord): Promise<void> {
+    this.memoryAttachments.set(record.messageId, record);
+    const db = await this.getDb();
+    if (!db) return;
+
+    await new Promise<void>((resolve) => {
+      try {
+        const tx = db.transaction(STORE_ATTACHMENTS, 'readwrite');
+        const store = tx.objectStore(STORE_ATTACHMENTS);
+        store.put(record);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+
+  public async getLocalAttachment(
+    messageId: string,
+  ): Promise<LocalAttachmentRecord | null> {
+    const inMemory = this.memoryAttachments.get(messageId);
+    if (inMemory) return inMemory;
+
+    const db = await this.getDb();
+    if (!db) return null;
+
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(STORE_ATTACHMENTS, 'readonly');
+        const store = tx.objectStore(STORE_ATTACHMENTS);
+        const req = store.get(messageId);
+        req.onsuccess = () => {
+          const rec = (req.result as LocalAttachmentRecord | undefined) || null;
+          if (rec) this.memoryAttachments.set(messageId, rec);
+          resolve(rec);
+        };
+        req.onerror = () => resolve(null);
+      } catch {
+        resolve(null);
+      }
+    });
+  }
+
+  public async deleteLocalAttachment(messageId: string): Promise<void> {
+    this.memoryAttachments.delete(messageId);
+    const db = await this.getDb();
+    if (!db) return;
+
+    await new Promise<void>((resolve) => {
+      try {
+        const tx = db.transaction(STORE_ATTACHMENTS, 'readwrite');
+        const store = tx.objectStore(STORE_ATTACHMENTS);
+        store.delete(messageId);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+        tx.onabort = () => resolve();
       } catch {
         resolve();
       }

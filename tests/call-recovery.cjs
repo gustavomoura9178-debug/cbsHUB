@@ -2,7 +2,6 @@ const { chromium } = require("playwright");
 const assert = require("node:assert/strict");
 (async () => {
   const browser = await chromium.launch({
-    executablePath: "/usr/bin/chromium",
     args: [
       "--no-sandbox",
       "--use-fake-device-for-media-stream",

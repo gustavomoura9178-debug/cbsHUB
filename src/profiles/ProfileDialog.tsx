@@ -10,9 +10,12 @@ import {
 } from "react";
 import {
   CalendarDays,
+  Crop,
   ExternalLink,
+  ImagePlus,
   Pencil,
   Shield,
+  Trash2,
   UserRound,
 } from "lucide-react";
 import {
@@ -40,6 +43,7 @@ import {
 import { contrast } from "../studio/theme";
 import { useProfiles } from "./ProfileProvider";
 import { useHubStore } from "../store/useHubStore";
+import { webrtcEngine } from "../lib/webrtcEngine";
 import {
   publicProfile,
   PRESENCES,
@@ -206,13 +210,26 @@ const privacyLabels = {
 export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
   const profiles = useProfiles();
   const participants = useHubStore((s) => s.participants);
+  const friends = useHubStore((s) => s.friends);
+  const pendingRequests = useHubStore((s) => s.pendingRequests);
+  const authUserId = useHubStore((s) => s.authUserId);
   const selected = Object.values(participants).find(
     (p) => p.clientId === profiles.selected,
   );
+  const targetUserId = selected?.clientId || profiles.selected || "";
   const self =
     embedded ||
     profiles.selected === "self" ||
-    profiles.selected === profiles.own.ownerId;
+    profiles.selected === profiles.own.ownerId ||
+    (Boolean(authUserId) && profiles.selected === authUserId);
+  const acceptedFriend = !self
+    ? friends.find((f) => f.id === targetUserId)
+    : undefined;
+  const pendingFriendReq = !self
+    ? pendingRequests.find((r) => r.id === targetUserId)
+    : undefined;
+  const [friendBusy, setFriendBusy] = useState(false);
+  const [friendFeedback, setFriendFeedback] = useState<string | null>(null);
   const [draft, setDraft] = useState<UserProfile>(
       structuredClone(profiles.own),
     ),
@@ -253,26 +270,34 @@ export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
       shareImages: true,
     },
   })!;
-  const [cropFile, setCropFile] = useState<File | null>(null);
+  const [cropTask, setCropTask] = useState<{
+    file?: File | null;
+    sourceDataUrl?: string | null;
+    kind: "avatar" | "banner";
+  } | null>(null);
+  const [bannerSourceFile, setBannerSourceFile] = useState<File | null>(null);
   useEffect(() => {
     if (!embedded) return;
     useSettingsDrafts.setState({
       profile:
-        JSON.stringify(draft) !== JSON.stringify(profiles.own) || !!cropFile,
+        JSON.stringify(draft) !== JSON.stringify(profiles.own) || !!cropTask,
     });
     return () => useSettingsDrafts.setState({ profile: false });
-  }, [embedded, draft, profiles.own, cropFile]);
+  }, [embedded, draft, profiles.own, cropTask]);
+
   async function upload(file: File | undefined, kind: "avatar" | "banner") {
     if (!file) return;
     if (kind === "avatar") {
-      setCropFile(file);
+      setError("");
+      setCropTask({ file, kind: "avatar" });
       return;
     }
+    setBannerSourceFile(file);
     setBusy(true);
     setError("");
     try {
-      const image = await profileImage(file, kind);
-      setDraft((current) => ({ ...current, [kind]: image }));
+      const image = await profileImage(file, "banner");
+      setDraft((current) => ({ ...current, banner: image }));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -402,36 +427,218 @@ export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
                       }
                     />
                   </label>
-                  {(["avatar", "banner"] as const).map((kind) => (
-                    <div className="profile-upload" key={kind}>
-                      <label>
-                        {kind === "avatar"
-                          ? "Avatar (original até 20 MB)"
-                          : "Banner (até 2 MB)"}
-                        <Input
+                  <div className="profile-upload space-y-3">
+                    {/* Editor de Avatar */}
+                    <div className="rounded-xl border border-border bg-background/45 p-3 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-foreground">
+                          Foto de Perfil (Avatar)
+                        </span>
+                        {draft.avatar && (
+                          <span className="text-micro font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                            {Math.max(
+                              1,
+                              Math.round(
+                                ((draft.avatar.split(",")[1]?.length || 0) * 0.75) /
+                                  1024,
+                              ),
+                            )}{" "}
+                            KB · WebP
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="size-14 rounded-full overflow-hidden border border-border bg-secondary flex items-center justify-center shrink-0 text-sm font-bold text-white"
+                          style={{ backgroundColor: draft.appearance.color }}
+                        >
+                          {draft.avatar ? (
+                            <img
+                              src={draft.avatar}
+                              alt="Avatar atual"
+                              className="size-full object-cover"
+                            />
+                          ) : (
+                            draft.displayName.slice(0, 2).toUpperCase() || "?"
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5 flex-1">
+                          <input
+                            id="profile-avatar-upload"
+                            type="file"
+                            className="hidden"
+                            aria-label="Upload de avatar"
+                            accept="image/png,image/jpeg,image/webp"
+                            disabled={busy}
+                            onChange={(e) => {
+                              void upload(e.target.files?.[0], "avatar");
+                              e.target.value = "";
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={busy}
+                            onClick={() =>
+                              document
+                                .getElementById("profile-avatar-upload")
+                                ?.click()
+                            }
+                            className="h-7 px-2.5 text-xs gap-1.5"
+                          >
+                            <ImagePlus className="size-3.5" />
+                            <span>
+                              {draft.avatar ? "Alterar foto" : "Escolher foto"}
+                            </span>
+                          </Button>
+                          {draft.avatar && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                setCropTask({
+                                  sourceDataUrl: draft.avatar,
+                                  kind: "avatar",
+                                })
+                              }
+                              className="h-7 px-2 text-xs gap-1"
+                            >
+                              <Crop className="size-3.5" />
+                              <span>Recortar</span>
+                            </Button>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={!draft.avatar}
+                            onClick={() => patch({ avatar: "" })}
+                            className="h-7 px-2 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          >
+                            <Trash2 className="size-3.5" />
+                            <span>Remover avatar</span>
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Editor de Banner */}
+                    <div className="rounded-xl border border-border bg-background/45 p-3 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-foreground">
+                          Banner de Capa (3:1)
+                        </span>
+                        {draft.banner && (
+                          <span className="text-micro font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                            {Math.max(
+                              1,
+                              Math.round(
+                                ((draft.banner.split(",")[1]?.length || 0) * 0.75) /
+                                  1024,
+                              ),
+                            )}{" "}
+                            KB · WebP
+                          </span>
+                        )}
+                      </div>
+                      <div
+                        className="h-14 w-full rounded-lg overflow-hidden border border-border bg-secondary flex items-center justify-center text-micro text-muted-foreground"
+                        style={{
+                          background: draft.appearance.useGradient
+                            ? `linear-gradient(135deg,${draft.appearance.color},${draft.appearance.gradient})`
+                            : draft.appearance.color,
+                        }}
+                      >
+                        {draft.banner ? (
+                          <img
+                            src={draft.banner}
+                            alt="Banner atual"
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <span className="bg-black/40 text-white/90 px-2 py-0.5 rounded">
+                            Sem imagem de capa
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <input
+                          id="profile-banner-upload"
                           type="file"
-                          aria-label={`Upload de ${kind}`}
+                          className="hidden"
+                          aria-label="Upload de banner"
                           accept="image/png,image/jpeg,image/webp"
                           disabled={busy}
                           onChange={(e) => {
-                            void upload(e.target.files?.[0], kind);
+                            void upload(e.target.files?.[0], "banner");
                             e.target.value = "";
                           }}
                         />
-                      </label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={!draft[kind]}
-                        onClick={() => patch({ [kind]: "" })}
-                      >
-                        Remover {kind}
-                      </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          disabled={busy}
+                          onClick={() =>
+                            document
+                              .getElementById("profile-banner-upload")
+                              ?.click()
+                          }
+                          className="h-7 px-2.5 text-xs gap-1.5"
+                        >
+                          <ImagePlus className="size-3.5" />
+                          <span>
+                            {draft.banner
+                              ? "Alterar banner"
+                              : "Escolher banner"}
+                          </span>
+                        </Button>
+                        {(bannerSourceFile || draft.banner) && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() =>
+                              setCropTask(
+                                bannerSourceFile
+                                  ? { file: bannerSourceFile, kind: "banner" }
+                                  : {
+                                      sourceDataUrl: draft.banner,
+                                      kind: "banner",
+                                    },
+                              )
+                            }
+                            className="h-7 px-2.5 text-xs gap-1"
+                          >
+                            <Crop className="size-3.5" />
+                            <span>Recortar</span>
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          disabled={!draft.banner}
+                          onClick={() => {
+                            setBannerSourceFile(null);
+                            patch({ banner: "" });
+                          }}
+                          className="h-7 px-2 text-xs gap-1 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="size-3.5" />
+                          <span>Remover banner</span>
+                        </Button>
+                      </div>
                     </div>
-                  ))}
+                  </div>
                   <p className="profile-help">
-                    PNG, JPEG ou WebP. Imagens são recortadas e reencodadas
-                    localmente; não há upload para servidor.
+                    PNG, JPEG ou WebP (até 25 MB na entrada). Fotos são
+                    recortadas e comprimidas automaticamente para WebP leve sem
+                    sobrecarregar o banco.
                   </p>
                 </TabsContent>
                 <TabsContent value="style" className="profile-fields">
@@ -617,7 +824,7 @@ export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
                 </TabsContent>
               </Tabs>
             </div>
-            <aside>
+            <aside className="lg:sticky lg:top-0 self-start">
               <h3 className="text-sm font-medium mb-3">Pré-visualização</h3>
               <ProfileCard profile={preview} full />
               <p className="profile-help">
@@ -667,6 +874,15 @@ export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
           <div role="alert" className="profile-error">
             {profiles.error}
           </div>
+          {!self && (friendFeedback || selected) && (
+            <div className="space-y-1 text-center pt-1">
+              {friendFeedback && (
+                <p role="status" className="text-xs text-primary">
+                  {friendFeedback}
+                </p>
+              )}
+            </div>
+          )}
           <footer className="profile-actions">
             {self ? (
               <Button onClick={profiles.edit}>
@@ -675,12 +891,90 @@ export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
               </Button>
             ) : (
               selected && (
-                <Button
-                  variant={blocked ? "secondary" : "destructive"}
-                  onClick={() => profiles.block(selected.clientId, !blocked)}
-                >
-                  {blocked ? "Desbloquear" : "Bloquear usuário"}
-                </Button>
+                <>
+                  {acceptedFriend ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        profiles.close();
+                        void webrtcEngine.openDirectMessage(acceptedFriend);
+                      }}
+                    >
+                      Enviar Mensagem (DM)
+                    </Button>
+                  ) : pendingFriendReq?.direction === "incoming" ? (
+                    <>
+                      <Button
+                        disabled={friendBusy}
+                        onClick={async () => {
+                          setFriendBusy(true);
+                          try {
+                            await webrtcEngine.respondFriendRequest(
+                              pendingFriendReq.friendshipId,
+                              true,
+                            );
+                          } finally {
+                            setFriendBusy(false);
+                          }
+                        }}
+                      >
+                        Aceitar amizade
+                      </Button>
+                      <Button
+                        variant="outline"
+                        disabled={friendBusy}
+                        onClick={async () => {
+                          setFriendBusy(true);
+                          try {
+                            await webrtcEngine.respondFriendRequest(
+                              pendingFriendReq.friendshipId,
+                              false,
+                            );
+                          } finally {
+                            setFriendBusy(false);
+                          }
+                        }}
+                      >
+                        Recusar
+                      </Button>
+                    </>
+                  ) : pendingFriendReq?.direction === "outgoing" ? (
+                    <Button variant="secondary" disabled>
+                      Convite enviado
+                    </Button>
+                  ) : (
+                    <Button
+                      disabled={friendBusy}
+                      onClick={async () => {
+                        setFriendBusy(true);
+                        setFriendFeedback(null);
+                        try {
+                          await webrtcEngine.sendFriendRequestByUserId(
+                            selected.clientId,
+                            selected.nickname,
+                          );
+                          setFriendFeedback("Convite enviado!");
+                        } catch (err) {
+                          setFriendFeedback(
+                            err instanceof Error
+                              ? err.message
+                              : "Erro ao enviar solicitação.",
+                          );
+                        } finally {
+                          setFriendBusy(false);
+                        }
+                      }}
+                    >
+                      Adicionar Amigo
+                    </Button>
+                  )}
+                  <Button
+                    variant={blocked ? "secondary" : "destructive"}
+                    onClick={() => profiles.block(selected.clientId, !blocked)}
+                  >
+                    {blocked ? "Desbloquear" : "Bloquear usuário"}
+                  </Button>
+                </>
               )
             )}
             {!profiles.full && displayed && (
@@ -692,12 +986,15 @@ export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
         </>
       )}
       <AvatarCrop
-        embedded={embedded}
-        file={cropFile}
-        onClose={() => setCropFile(null)}
-        onSave={(image) =>
-          setDraft((current) => ({ ...current, avatar: image }))
-        }
+        file={cropTask?.file ?? null}
+        sourceDataUrl={cropTask?.sourceDataUrl ?? null}
+        kind={cropTask?.kind ?? "avatar"}
+        onClose={() => setCropTask(null)}
+        onSave={(image) => {
+          if (!cropTask) return;
+          const field = cropTask.kind;
+          setDraft((current) => ({ ...current, [field]: image }));
+        }}
       />
     </>
   );

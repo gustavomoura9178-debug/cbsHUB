@@ -1,6 +1,50 @@
 import { compareMessages } from "../chat/model";
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
+
+const CLOUD_SETTINGS_DIRTY_EVENT = "cbshub-cloud-settings-dirty";
+
+/** Dispatch a decoupled DOM event so store mutations never statically import cloudSettings. */
+function notifyCloudSettingsDirty(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(CLOUD_SETTINGS_DIRTY_EVENT));
+  }
+}
+
+const LEGACY_PREFS_KEY = 'cbshub-user-preferences';
+function getScopedPrefsKey(): string {
+  try {
+    const activeUid = localStorage.getItem('cbshub-active-user-id');
+    return activeUid ? `cbshub-prefs-${activeUid}` : LEGACY_PREFS_KEY;
+  } catch {
+    return LEGACY_PREFS_KEY;
+  }
+}
+
+const perUserLocalStorage: StateStorage = {
+  getItem: () => {
+    try {
+      return localStorage.getItem(getScopedPrefsKey());
+    } catch {
+      return null;
+    }
+  },
+  setItem: (_name, value) => {
+    try {
+      localStorage.setItem(getScopedPrefsKey(), value);
+    } catch {
+      /* ignore */
+    }
+  },
+  removeItem: () => {
+    try {
+      localStorage.removeItem(getScopedPrefsKey());
+    } catch {
+      /* ignore */
+    }
+  },
+};
+
 import type {
   ResolutionPreset,
   FpsPreset,
@@ -10,6 +54,12 @@ import type {
   Participant,
   ChatMessage,
   SoundboardClip,
+  UserOnlineStatus,
+  FriendItem,
+  SignalingCallData,
+  ActiveContext,
+  RoomInviteNotice,
+  AppUpdateState,
 } from '../types/cbshub';
 
 export const RESOLUTION_PRESETS: Record<
@@ -64,6 +114,24 @@ function getRandomAvatarColor(): string {
 }
 
 export interface HubState {
+  // -------------------------------------------------------------------------
+  // Autenticação & Cloud (v3.0 Supabase)
+  // -------------------------------------------------------------------------
+  authUserId: string | null;
+  userEmail: string | null;
+  onlineStatus: UserOnlineStatus;
+  customStatus: string | null;
+  friends: FriendItem[];
+  pendingRequests: FriendItem[];
+  activeFriend: FriendItem | null;
+  activeChannelId: string | null;
+  activeContext: ActiveContext;
+  incomingCall: SignalingCallData | null;
+  outgoingCall: SignalingCallData | null;
+  activeCallId: string | null;
+  roomInvites: RoomInviteNotice[];
+  appUpdate: AppUpdateState;
+
   // -------------------------------------------------------------------------
   // Configurações persistentes de usuário e sala (v2.0)
   // -------------------------------------------------------------------------
@@ -142,12 +210,33 @@ export interface HubState {
   remoteScreenStream: MediaStream | null;
 
   // -------------------------------------------------------------------------
+  // Ações Cloud / Amigos / DMs / Chamadas 1:1
+  // -------------------------------------------------------------------------
+  setAuthUser: (userId: string | null, email: string | null) => void;
+  setOnlineStatus: (status: UserOnlineStatus) => void;
+  setCustomStatus: (status: string | null) => void;
+  setFriends: (friends: FriendItem[]) => void;
+  setPendingRequests: (requests: FriendItem[]) => void;
+  setActiveFriend: (friend: FriendItem | null) => void;
+  setActiveChannelId: (channelId: string | null) => void;
+  setActiveContext: (ctx: ActiveContext) => void;
+  setIncomingCall: (call: SignalingCallData | null) => void;
+  setOutgoingCall: (call: SignalingCallData | null) => void;
+  setActiveCallId: (callId: string | null) => void;
+  addRoomInvite: (invite: RoomInviteNotice) => void;
+  removeRoomInvite: (id: string) => void;
+  setAppUpdate: (patch: Partial<AppUpdateState>) => void;
+  updateMessageUploadProgress: (id: string, progress?: { percent: number; bytesPerSecond: number }, patch?: Partial<ChatMessage>) => void;
+  logoutClearState: () => void;
+
+  // -------------------------------------------------------------------------
   // Ações
   // -------------------------------------------------------------------------
   setClientId: (id: string) => void;
   setAvatarColor: (color: string) => void;
   setRoomId: (id: string) => void;
   addRecentRoom: (room: string) => void;
+  removeRecentRoom: (room: string) => void;
   setNickname: (name: string) => void;
   setRemoteNickname: (name: string) => void;
   setConnectionStatus: (connected: boolean, isHost: boolean, localId: string, remoteId: string | null, status: string) => void;
@@ -208,13 +297,29 @@ export interface HubState {
 export const useHubStore = create<HubState>()(
   persist(
     (set, get) => ({
+      // Cloud v3.0
+      authUserId: null,
+      userEmail: null,
+      onlineStatus: 'online',
+      customStatus: null,
+      friends: [],
+      pendingRequests: [],
+      activeFriend: null,
+      activeChannelId: null,
+      activeContext: null,
+      incomingCall: null,
+      outgoingCall: null,
+      activeCallId: null,
+      roomInvites: [],
+      appUpdate: { status: 'idle' },
+
       // Configurações persistentes
       clientId: generateClientId(),
       avatarColor: getRandomAvatarColor(),
-      roomId: 'cbs-irmandade',
-      recentRooms: ['cbs-irmandade'],
-      nickname: 'Irmão Local',
-      remoteNickname: 'Aguardando irmão...',
+      roomId: '',
+      recentRooms: [],
+      nickname: 'Usuário',
+      remoteNickname: 'Aguardando amigo...',
       audioConfig: {
         inputDeviceId: 'default',
         outputDeviceId: 'default',
@@ -293,6 +398,144 @@ export const useHubStore = create<HubState>()(
       remoteVoiceStream: null,
       remoteScreenStream: null,
 
+      // Ações Cloud v3.0
+      setAuthUser: (userId, email) => {
+        if (userId) {
+          try {
+            localStorage.setItem('cbshub-active-user-id', userId);
+          } catch {
+            /* ignore */
+          }
+        }
+        set({
+          authUserId: userId,
+          userEmail: email,
+          ...(userId ? { clientId: userId } : {}),
+        });
+        if (userId) {
+          try {
+            void useHubStore.persist.rehydrate();
+          } catch {
+            /* ignore */
+          }
+        }
+      },
+      setOnlineStatus: (onlineStatus) =>
+        set({
+          onlineStatus:
+            onlineStatus === 'idle' || onlineStatus === 'invisible'
+              ? onlineStatus
+              : 'online',
+        }),
+      setCustomStatus: (customStatus) => set({ customStatus }),
+      setFriends: (friends) => set({ friends }),
+      setPendingRequests: (pendingRequests) => set({ pendingRequests }),
+      setActiveFriend: (activeFriend) => set({ activeFriend }),
+      setActiveChannelId: (activeChannelId) =>
+        set({
+          activeChannelId,
+          roomId: activeChannelId || '',
+        }),
+      setActiveContext: (ctx) => {
+        if (ctx?.type === 'dm') {
+          set({
+            activeContext: ctx,
+            activeFriend: ctx.friend,
+            activeChannelId: ctx.channelId,
+            roomId: ctx.channelId,
+          });
+        } else if (ctx?.type === 'room') {
+          set({
+            activeContext: ctx,
+            activeFriend: null,
+            activeChannelId: ctx.roomId,
+            roomId: ctx.slug,
+          });
+        } else {
+          set({
+            activeContext: null,
+            activeFriend: null,
+            activeChannelId: null,
+            roomId: '',
+          });
+        }
+      },
+      setIncomingCall: (incomingCall) => set({ incomingCall }),
+      setOutgoingCall: (outgoingCall) => set({ outgoingCall }),
+      setActiveCallId: (activeCallId) => set({ activeCallId }),
+      addRoomInvite: (invite) =>
+        set((state) => {
+          const filtered = state.roomInvites.filter(
+            (i) => i.id !== invite.id && i.slug !== invite.slug,
+          );
+          return { roomInvites: [invite, ...filtered].slice(0, 10) };
+        }),
+      removeRoomInvite: (id) =>
+        set((state) => ({
+          roomInvites: state.roomInvites.filter((i) => i.id !== id),
+        })),
+      setAppUpdate: (patch) =>
+        set((state) => ({
+          appUpdate: { ...state.appUpdate, ...patch },
+        })),
+      updateMessageUploadProgress: (id, progress, patch) =>
+        set((state) => ({
+          messages: state.messages.map((m) =>
+            m.id === id
+              ? {
+                  ...m,
+                  ...patch,
+                  uploadProgress: progress,
+                }
+              : m,
+          ),
+        })),
+      logoutClearState: () => {
+        try {
+          localStorage.removeItem('cbshub-active-user-id');
+          localStorage.removeItem('cbshub-profile-v1');
+          localStorage.removeItem('cbshub-blocked-v1');
+          localStorage.removeItem(LEGACY_PREFS_KEY);
+          const toRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('cbshub-chat-draft:')) {
+              toRemove.push(key);
+            }
+          }
+          for (const key of toRemove) {
+            localStorage.removeItem(key);
+          }
+        } catch {
+          /* ignore */
+        }
+        set({
+          authUserId: null,
+          userEmail: null,
+          nickname: 'Usuário',
+          avatarColor: '#6eddbd',
+          onlineStatus: 'online',
+          customStatus: null,
+          friends: [],
+          pendingRequests: [],
+          activeFriend: null,
+          activeChannelId: null,
+          activeContext: null,
+          roomId: '',
+          recentRooms: [],
+          roomInvites: [],
+          messages: [],
+          incomingCall: null,
+          outgoingCall: null,
+          activeCallId: null,
+          isConnected: false,
+          inVoiceCall: false,
+          callStageMode: 'hidden',
+          participants: {},
+          remoteStreams: {},
+        });
+      },
+
       // Ações
       setClientId: (id) => set({ clientId: id }),
       setAvatarColor: (color) => set({ avatarColor: color }),
@@ -308,6 +551,12 @@ export const useHubStore = create<HubState>()(
           const filtered = state.recentRooms.filter((r) => r !== normalized);
           return { recentRooms: [normalized, ...filtered].slice(0, 10) };
         });
+      },
+      removeRecentRoom: (room) => {
+        const normalized = room.toLowerCase().replace(/[^a-z0-9-]/g, '');
+        set((state) => ({
+          recentRooms: state.recentRooms.filter((r) => r !== normalized),
+        }));
       },
       setNickname: (name) => set({ nickname: name }),
       setRemoteNickname: (name) => set({ remoteNickname: name }),
@@ -456,14 +705,18 @@ export const useHubStore = create<HubState>()(
 
       // Soundboard
       setSoundboardClips: (clips) => set({ soundboardClips: clips }),
-      addSoundboardClip: (clip) =>
+      addSoundboardClip: (clip) => {
         set((state) => ({
           soundboardClips: [...state.soundboardClips.filter((c) => c.id !== clip.id), clip],
-        })),
-      removeSoundboardClip: (clipId) =>
+        }));
+        notifyCloudSettingsDirty();
+      },
+      removeSoundboardClip: (clipId) => {
         set((state) => ({
           soundboardClips: state.soundboardClips.filter((c) => c.id !== clipId),
-        })),
+        }));
+        notifyCloudSettingsDirty();
+      },
       setSoundboardVolume: (volume) => set({ soundboardVolume: Math.min(1.5, Math.max(0.0, volume)) }),
 
       // Mídia local
@@ -496,10 +749,12 @@ export const useHubStore = create<HubState>()(
       setIsSettingsOpen: (open) => set({ isSettingsOpen: open }),
       setIsScreenPickerOpen: (open) => set({ isScreenPickerOpen: open }),
 
-      updateAudioConfig: (partial) =>
+      updateAudioConfig: (partial) => {
         set((state) => ({
           audioConfig: { ...state.audioConfig, ...partial },
-        })),
+        }));
+        notifyCloudSettingsDirty();
+      },
 
       updateVideoQuality: (resolution, fps, includeAudio) => {
         const preset = RESOLUTION_PRESETS[resolution];
@@ -515,6 +770,7 @@ export const useHubStore = create<HubState>()(
             includeSystemAudio: includeAudio !== undefined ? includeAudio : state.videoQualityConfig.includeSystemAudio,
           },
         }));
+        notifyCloudSettingsDirty();
       },
 
       setTelemetry: (partial) =>
@@ -565,12 +821,9 @@ export const useHubStore = create<HubState>()(
     }),
     {
       name: 'cbshub-user-preferences',
+      storage: createJSONStorage(() => perUserLocalStorage),
       partialize: (state) => ({
-        clientId: state.clientId,
-        roomId: state.roomId,
         recentRooms: state.recentRooms,
-        nickname: state.nickname,
-        avatarColor: state.avatarColor,
         audioConfig: state.audioConfig,
         videoQualityConfig: state.videoQualityConfig,
         peerVolumes: state.peerVolumes,

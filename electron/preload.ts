@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { DesktopSourceItem, CbsHubElectronAPI } from "../src/types/cbshub";
+import type {
+  DesktopSourceItem,
+  CbsHubElectronAPI,
+  AppUpdateState,
+} from "../src/types/cbshub";
 
 const api: CbsHubElectronAPI = {
   notifyNative: (notice) => ipcRenderer.invoke("cbs:notify", notice),
@@ -49,6 +53,24 @@ const api: CbsHubElectronAPI = {
   },
   setAlwaysOnTop: (flag: boolean): void => {
     ipcRenderer.send("cbs:always-on-top", flag);
+  },
+  checkForUpdates: (): Promise<void> =>
+    ipcRenderer.invoke("cbs:check-updates"),
+  downloadUpdate: (): Promise<void> =>
+    ipcRenderer.invoke("cbs:download-update"),
+  installUpdate: (): void => {
+    ipcRenderer.send("cbs:install-update");
+  },
+  onUpdateStatus: (listener: (state: AppUpdateState) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, state: unknown) => {
+      if (state && typeof state === "object" && "status" in state) {
+        listener(state as AppUpdateState);
+      }
+    };
+    ipcRenderer.on("cbs:update-status", handler);
+    return () => {
+      ipcRenderer.removeListener("cbs:update-status", handler);
+    };
   },
 };
 

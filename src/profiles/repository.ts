@@ -1,19 +1,61 @@
 import {
   defaultProfile,
+  migrateLegacyProfile,
   PROFILE_KEY,
   validateProfile,
   type UserProfile,
 } from "./model";
+export const ACTIVE_AUTH_USER_KEY = "cbshub-active-user-id";
 const BLOCK_KEY = "cbshub-blocked-v1";
+
+export function purgeLegacyAccountStorage(newUserId?: string): void {
+  try {
+    localStorage.removeItem(PROFILE_KEY);
+    localStorage.removeItem(BLOCK_KEY);
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("cbshub-chat-draft:")) {
+        toRemove.push(key);
+      }
+    }
+    for (const key of toRemove) {
+      localStorage.removeItem(key);
+    }
+    if (newUserId) {
+      localStorage.setItem(ACTIVE_AUTH_USER_KEY, newUserId);
+    } else {
+      localStorage.removeItem(ACTIVE_AUTH_USER_KEY);
+    }
+  } catch {
+    /* ignore storage errors */
+  }
+}
+
 export function loadProfile(owner: string, name: string): UserProfile {
   const raw = localStorage.getItem(PROFILE_KEY);
   if (raw) {
     try {
-      return validateProfile(JSON.parse(raw), owner);
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      // Se pertencia a outro usuário autenticado ou formato antigo diferente, descarta sem vazar dados da conta anterior
+      if (
+        typeof parsed?.ownerId === "string" &&
+        parsed.ownerId &&
+        parsed.ownerId !== owner
+      ) {
+        const fresh = defaultProfile(owner, name);
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(fresh));
+        return fresh;
+      }
+      const migrated = migrateLegacyProfile(parsed, owner, name);
+      if (JSON.stringify(parsed) !== JSON.stringify(migrated)) {
+        localStorage.setItem(PROFILE_KEY, JSON.stringify(migrated));
+      }
+      return migrated;
     } catch {
-      throw new Error(
-        "Perfil salvo inválido ou de outra identidade. Seus dados não foram sobrescritos.",
-      );
+      const fresh = defaultProfile(owner, name);
+      localStorage.setItem(PROFILE_KEY, JSON.stringify(fresh));
+      return fresh;
     }
   }
   const p = defaultProfile(owner, name);
@@ -21,13 +63,22 @@ export function loadProfile(owner: string, name: string): UserProfile {
   return p;
 }
 export function saveProfile(profile: UserProfile, owner: string): UserProfile {
-  const validated = validateProfile(profile, owner);
+  let oldCreatedAt: number | null = null;
   const current = localStorage.getItem(PROFILE_KEY);
   if (current) {
-    const old = validateProfile(JSON.parse(current), owner);
-    if (old.createdAt !== validated.createdAt)
-      throw new Error("A data de criação não pode ser alterada.");
+    try {
+      const old = migrateLegacyProfile(JSON.parse(current), owner, profile.displayName);
+      oldCreatedAt = old.createdAt;
+    } catch {
+      oldCreatedAt = null;
+    }
   }
+  const candidate: UserProfile = {
+    ...profile,
+    ownerId: owner,
+    createdAt: oldCreatedAt ?? profile.createdAt,
+  };
+  const validated = validateProfile(candidate, owner);
   localStorage.setItem(PROFILE_KEY, JSON.stringify(validated));
   return validated;
 }
@@ -66,39 +117,74 @@ export function setBlocked(id: string, blocked: boolean, owner: string) {
   localStorage.setItem(BLOCK_KEY, JSON.stringify(list));
   window.dispatchEvent(new Event("cbshub-profile-changed"));
 }
+export function compressCanvasImage(
+  bitmap: ImageBitmap,
+  kind: "avatar" | "banner",
+  crop?: { sx: number; sy: number; sw: number; sh: number },
+): string {
+  const sizes: Array<[number, number]> =
+    kind === "avatar"
+      ? [
+          [192, 192],
+          [160, 160],
+        ]
+      : [
+          [720, 240],
+          [600, 200],
+        ];
+  const qualities =
+    kind === "avatar"
+      ? [0.82, 0.72, 0.62, 0.52, 0.42]
+      : [0.8, 0.7, 0.6, 0.5, 0.42];
+  const targetChars = kind === "avatar" ? 45_000 : 90_000;
+  const hardLimitChars = kind === "avatar" ? 100_000 : 240_000;
+
+  let best = "";
+  for (const [w, h] of sizes) {
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d")!;
+    if (crop) {
+      ctx.drawImage(bitmap, crop.sx, crop.sy, crop.sw, crop.sh, 0, 0, w, h);
+    } else {
+      const scale = Math.max(w / bitmap.width, h / bitmap.height);
+      ctx.drawImage(
+        bitmap,
+        (w - bitmap.width * scale) / 2,
+        (h - bitmap.height * scale) / 2,
+        bitmap.width * scale,
+        bitmap.height * scale,
+      );
+    }
+    for (const q of qualities) {
+      const candidate = canvas.toDataURL("image/webp", q);
+      best = candidate;
+      if (candidate.length <= targetChars) {
+        return candidate;
+      }
+    }
+  }
+  if (best.length > hardLimitChars) {
+    throw new Error("Imagem muito detalhada após compressão; ajuste o recorte.");
+  }
+  return best;
+}
+
 export async function profileImage(
   file: File,
   kind: "avatar" | "banner",
 ): Promise<string> {
-  const limit = kind === "avatar" ? 1024 * 1024 : 2 * 1024 * 1024;
+  const limit = 25 * 1024 * 1024;
   if (file.size > limit)
-    throw new Error(
-      `Arquivo muito grande: limite ${kind === "avatar" ? "1" : "2"} MB.`,
-    );
+    throw new Error("Arquivo muito grande: limite de 25 MB.");
   if (!["image/png", "image/jpeg", "image/webp"].includes(file.type))
     throw new Error("Use PNG, JPEG ou WebP. SVG não é permitido.");
   const bitmap = await createImageBitmap(file);
   try {
-    if (bitmap.width > 8192 || bitmap.height > 8192)
-      throw new Error("Imagem com dimensões excessivas.");
-    const w = kind === "avatar" ? 256 : 960,
-      h = kind === "avatar" ? 256 : 320;
-    const c = document.createElement("canvas");
-    c.width = w;
-    c.height = h;
-    const ctx = c.getContext("2d")!;
-    const scale = Math.max(w / bitmap.width, h / bitmap.height);
-    ctx.drawImage(
-      bitmap,
-      (w - bitmap.width * scale) / 2,
-      (h - bitmap.height * scale) / 2,
-      bitmap.width * scale,
-      bitmap.height * scale,
-    );
-    const data = c.toDataURL("image/webp", 0.75);
-    if (data.length > (kind === "avatar" ? 100000 : 240000))
-      throw new Error("Imagem muito detalhada. Reduza a resolução.");
-    return data;
+    if (bitmap.width > 10000 || bitmap.height > 10000)
+      throw new Error("Imagem com dimensões excessivas (máx. 10000 px).");
+    return compressCanvasImage(bitmap, kind);
   } finally {
     bitmap.close();
   }
