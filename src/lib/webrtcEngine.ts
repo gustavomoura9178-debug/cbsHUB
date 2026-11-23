@@ -143,7 +143,7 @@ class WebRTCEngine {
   private micRecoveryTimer: number | null = null;
   private lastMicRecoveredAt = -Infinity;
   private micMuteWatchdog: number | null = null;
-  private micMuteWatchdogMs = 2500;
+  private micMuteWatchdogMs = 6000;
   private cameraGeneration = 0;
   private screenGeneration = 0;
   private joiningVoice = false;
@@ -1060,9 +1060,20 @@ class WebRTCEngine {
     }
 
     for (const [uid, entry] of byUserId.entries()) {
-      const participantKey = entry.peerId || `presence:${uid}`;
+      const activeSession = [...this.sessions.values()].find(
+        (s) => s.clientId === uid,
+      );
       const prev = existingByUser.get(uid);
-      const nextInVoice = Boolean(entry.inVoiceCall);
+      const participantKey =
+        entry.peerId ||
+        activeSession?.peerId ||
+        (prev?.peerId && !prev.peerId.startsWith("presence:")
+          ? prev.peerId
+          : `presence:${uid}`);
+      const hasActiveVoice = Boolean(
+        activeSession?.voiceCall || state.remoteStreams[participantKey]?.voice,
+      );
+      const nextInVoice = Boolean(entry.inVoiceCall) || hasActiveVoice;
       if (state.inVoiceCall && !prev?.inVoiceCall && nextInVoice) {
         remoteJoinedVoice = true;
       }
@@ -1098,7 +1109,20 @@ class WebRTCEngine {
         const session = this.sessions.get(entry.peerId);
         if (session && state.inVoiceCall && entry.inVoiceCall) {
           if (!session.voiceCall) {
-            this.initiateVoiceCallWithPeer(session);
+            if ((this.localPeer.id || "") < session.peerId) {
+              this.initiateVoiceCallWithPeer(session);
+            } else {
+              const targetSession = session;
+              window.setTimeout(() => {
+                if (
+                  useHubStore.getState().inVoiceCall &&
+                  this.sessions.get(targetSession.peerId) === targetSession &&
+                  !targetSession.voiceCall
+                ) {
+                  this.initiateVoiceCallWithPeer(targetSession);
+                }
+              }, 700);
+            }
           }
           if (this.localWebcamStream && !session.outgoingWebcam) {
             this.initiateWebcamCallWithPeer(session);
@@ -2312,16 +2336,65 @@ class WebRTCEngine {
       sounds.stopRingtone();
       if (wasOutgoing) sounds.playJoin();
       const withVideo = state.outgoingCall?.withVideo ?? this.pendingOutgoingVideo;
+      const friendMatch = state.friends.find((f) => f.id === row.receiver_id);
+      const placeholder = state.participants[`calling:${row.receiver_id}`];
+      const remoteNickname =
+        state.outgoingCall?.peerNickname ||
+        friendMatch?.nickname ||
+        placeholder?.nickname ||
+        "Amigo";
+      const remoteAvatarColor =
+        state.outgoingCall?.peerAvatarColor ||
+        friendMatch?.avatarColor ||
+        placeholder?.avatarColor ||
+        "#6eddbd";
+
       this.pendingOutgoingVideo = false;
       state.setOutgoingCall(null);
       state.setActiveCallId(row.id);
+      state.setCallStageMode("grid");
 
       this.directRemotePeerId = row.receiver_peer_id;
       this.directRemoteUserId = row.receiver_id;
 
+      const nextParticipants = { ...useHubStore.getState().participants };
+      delete nextParticipants[`calling:${row.receiver_id}`];
+      delete nextParticipants[`presence:${row.receiver_id}`];
+      const localPid = this.localParticipantId();
+      if (localPid && nextParticipants[localPid]) {
+        nextParticipants[localPid] = {
+          ...nextParticipants[localPid],
+          inVoiceCall: true,
+          isMuted: useHubStore.getState().isMuted,
+          isDeafened: useHubStore.getState().isDeafened,
+        };
+      }
+      const prevRemote = nextParticipants[row.receiver_peer_id];
+      nextParticipants[row.receiver_peer_id] = {
+        profile: prevRemote?.profile ?? null,
+        peerId: row.receiver_peer_id,
+        clientId: row.receiver_id,
+        nickname: remoteNickname,
+        avatarColor: remoteAvatarColor,
+        isLocal: false,
+        inVoiceCall: true,
+        isMuted: prevRemote?.isMuted ?? false,
+        isDeafened: prevRemote?.isDeafened ?? false,
+        isSpeaking: prevRemote?.isSpeaking ?? false,
+        isWebcamActive: prevRemote?.isWebcamActive ?? false,
+        isScreenSharing: prevRemote?.isScreenSharing ?? false,
+        activeSoundEffect: prevRemote?.activeSoundEffect ?? null,
+      };
+      useHubStore.getState().setParticipants(nextParticipants);
+
       // Garante que estamos na DM do amigo e estabelece enlace direto 1:1
       if (this.localPeer && !this.localPeer.destroyed) {
-        this.connectToPeer(row.receiver_peer_id, row.receiver_id);
+        this.connectToPeer(row.receiver_peer_id, row.receiver_id, remoteNickname);
+        this.broadcastLocalState();
+        const directSession = this.sessions.get(row.receiver_peer_id);
+        if (directSession && !directSession.voiceCall) {
+          this.initiateVoiceCallWithPeer(directSession);
+        }
         if (withVideo && !useHubStore.getState().isWebcamActive) {
           void this.toggleWebcam().catch(() => {});
         }
@@ -2353,6 +2426,26 @@ class WebRTCEngine {
 
   private async ensureLocalPeer(userId: string): Promise<string> {
     if (this.localPeer && !this.localPeer.destroyed && this.localPeer.open) {
+      const state = useHubStore.getState();
+      const existing = state.participants[this.localPeer.id];
+      const nextParticipants = { ...state.participants };
+      nextParticipants[this.localPeer.id] = {
+        profile: existing?.profile ?? null,
+        peerId: this.localPeer.id,
+        clientId: userId,
+        nickname: state.nickname,
+        avatarColor: state.avatarColor,
+        isLocal: true,
+        inVoiceCall: state.inVoiceCall,
+        isMuted: state.isMuted,
+        isDeafened: state.isDeafened,
+        isSpeaking: existing?.isSpeaking ?? false,
+        isWebcamActive: state.isWebcamActive,
+        isScreenSharing: state.isScreenSharing,
+        screenQualityLabel: existing?.screenQualityLabel,
+        activeSoundEffect: existing?.activeSoundEffect ?? null,
+      };
+      state.setParticipants(nextParticipants);
       return this.localPeer.id;
     }
 
@@ -2502,6 +2595,41 @@ class WebRTCEngine {
 
       beginCallDiagnostics();
       useHubStore.getState().setInVoiceCall(true);
+      const latest = useHubStore.getState();
+      latest.setCallStageMode("grid");
+      const nextParticipants = { ...latest.participants };
+      const existingLocal = nextParticipants[callerPeerId];
+      nextParticipants[callerPeerId] = {
+        profile: existingLocal?.profile ?? null,
+        peerId: callerPeerId,
+        clientId: userId,
+        nickname: latest.nickname,
+        avatarColor: latest.avatarColor,
+        isLocal: true,
+        inVoiceCall: true,
+        isMuted: latest.isMuted,
+        isDeafened: latest.isDeafened,
+        isSpeaking: existingLocal?.isSpeaking ?? false,
+        isWebcamActive: latest.isWebcamActive,
+        isScreenSharing: latest.isScreenSharing,
+        activeSoundEffect: existingLocal?.activeSoundEffect ?? null,
+      };
+      nextParticipants[`calling:${friend.id}`] = {
+        profile: null,
+        peerId: `calling:${friend.id}`,
+        clientId: friend.id,
+        nickname: friend.nickname,
+        avatarColor: friend.avatarColor,
+        isLocal: false,
+        inVoiceCall: true,
+        isMuted: false,
+        isDeafened: false,
+        isSpeaking: false,
+        isWebcamActive: false,
+        isScreenSharing: false,
+        activeSoundEffect: null,
+      };
+      latest.setParticipants(nextParticipants);
       await this.trackPresence();
 
       const { data: callRow, error } = await supabase
@@ -2572,6 +2700,46 @@ class WebRTCEngine {
 
       beginCallDiagnostics();
       useHubStore.getState().setInVoiceCall(true);
+      const latest = useHubStore.getState();
+      latest.setCallStageMode("grid");
+      const nextParticipants = { ...latest.participants };
+      const existingLocal = nextParticipants[receiverPeerId];
+      nextParticipants[receiverPeerId] = {
+        profile: existingLocal?.profile ?? null,
+        peerId: receiverPeerId,
+        clientId: userId,
+        nickname: latest.nickname,
+        avatarColor: latest.avatarColor,
+        isLocal: true,
+        inVoiceCall: true,
+        isMuted: latest.isMuted,
+        isDeafened: latest.isDeafened,
+        isSpeaking: existingLocal?.isSpeaking ?? false,
+        isWebcamActive: latest.isWebcamActive,
+        isScreenSharing: latest.isScreenSharing,
+        activeSoundEffect: existingLocal?.activeSoundEffect ?? null,
+      };
+      if (call.caller_peer_id) {
+        delete nextParticipants[`calling:${call.caller_id}`];
+        delete nextParticipants[`presence:${call.caller_id}`];
+        nextParticipants[call.caller_peer_id] = {
+          profile: nextParticipants[call.caller_peer_id]?.profile ?? null,
+          peerId: call.caller_peer_id,
+          clientId: call.caller_id,
+          nickname: call.peerNickname || friend?.nickname || "Amigo",
+          avatarColor:
+            call.peerAvatarColor || friend?.avatarColor || "#6eddbd",
+          isLocal: false,
+          inVoiceCall: true,
+          isMuted: false,
+          isDeafened: false,
+          isSpeaking: false,
+          isWebcamActive: false,
+          isScreenSharing: false,
+          activeSoundEffect: null,
+        };
+      }
+      latest.setParticipants(nextParticipants);
       await this.trackPresence();
 
       const { error } = await supabase
@@ -2588,7 +2756,18 @@ class WebRTCEngine {
       sounds.playJoin();
 
       if (call.caller_peer_id) {
-        this.connectToPeer(call.caller_peer_id, call.caller_id);
+        const callerPeerId = call.caller_peer_id;
+        this.connectToPeer(callerPeerId, call.caller_id, call.peerNickname);
+        window.setTimeout(() => {
+          const currentSession = this.sessions.get(callerPeerId);
+          if (
+            currentSession &&
+            useHubStore.getState().inVoiceCall &&
+            !currentSession.voiceCall
+          ) {
+            this.initiateVoiceCallWithPeer(currentSession);
+          }
+        }, 450);
       }
     } catch (err) {
       this.cleanupDirectCallLocalState();
@@ -3224,7 +3403,14 @@ class WebRTCEngine {
         const { isLocal, profile: _profile, ...myState } = localParticipant;
         conn.send({
           type: "peer_state_sync",
-          state: myState,
+          state: {
+            ...myState,
+            inVoiceCall: state.inVoiceCall,
+            isMuted: state.isMuted,
+            isDeafened: state.isDeafened,
+            isWebcamActive: state.isWebcamActive,
+            isScreenSharing: state.isScreenSharing,
+          },
         } as SignalingPacket);
       }
 
@@ -3420,6 +3606,8 @@ class WebRTCEngine {
           remote.inVoiceCall &&
           !session.voiceCall
         ) {
+          const delayMs =
+            (this.localPeer?.id || "") < session.peerId ? 150 : 750;
           window.setTimeout(() => {
             const currentSession = this.sessions.get(session.peerId);
             const stillInVoice = useHubStore.getState().inVoiceCall;
@@ -3430,7 +3618,7 @@ class WebRTCEngine {
             ) {
               this.initiateVoiceCallWithPeer(currentSession);
             }
-          }, 250);
+          }, delayMs);
         }
 
         if (!remote.inVoiceCall) {
@@ -3525,6 +3713,61 @@ class WebRTCEngine {
   /* CHAMADAS DE MÍDIA ENTRANTES & SAÍDAS (1:1 DIRETO)                         */
   /* ========================================================================= */
 
+  private markPeerVoiceConnected(session: PeerMediaSession): void {
+    const store = useHubStore.getState();
+    const nextParticipants = { ...store.participants };
+    let prev = nextParticipants[session.peerId];
+
+    if (session.clientId) {
+      for (const [key, p] of Object.entries(nextParticipants)) {
+        if (
+          key !== session.peerId &&
+          (p.clientId === session.clientId ||
+            key === `presence:${session.clientId}` ||
+            key === `calling:${session.clientId}`)
+        ) {
+          if (!prev) prev = p;
+          delete nextParticipants[key];
+        }
+      }
+    }
+
+    nextParticipants[session.peerId] = {
+      profile: prev?.profile ?? null,
+      peerId: session.peerId,
+      clientId: session.clientId || prev?.clientId || "",
+      nickname: prev?.nickname || session.nickname || "Participante",
+      avatarColor: prev?.avatarColor || "#6eddbd",
+      isLocal: false,
+      inVoiceCall: true,
+      isMuted: prev?.isMuted ?? false,
+      isDeafened: prev?.isDeafened ?? false,
+      isSpeaking: prev?.isSpeaking ?? false,
+      isWebcamActive: prev?.isWebcamActive ?? false,
+      isScreenSharing: prev?.isScreenSharing ?? false,
+      screenQualityLabel: prev?.screenQualityLabel,
+      rttMs: prev?.rttMs,
+      activeSoundEffect: prev?.activeSoundEffect ?? null,
+    };
+    store.setParticipants(nextParticipants);
+
+    useMediaState.setState((s) => {
+      const existing = s.quality[session.peerId];
+      return {
+        quality: {
+          ...s.quality,
+          [session.peerId]: {
+            state: "connected",
+            rttMs: existing?.rttMs ?? null,
+            loss: existing?.loss ?? null,
+            jitterMs: existing?.jitterMs ?? null,
+            flowing: true,
+          },
+        },
+      };
+    });
+  }
+
   private handleIncomingMediaCall(call: MediaConnection): void {
     const channel = call.metadata?.channel || "voice";
     const remotePeerId = call.peer;
@@ -3571,12 +3814,14 @@ class WebRTCEngine {
         this.audioPipeline?.getProcessedStream() || this.rawMicStream;
       call.answer(localVoiceStream || undefined);
       session.voiceCall = call;
+      this.markPeerVoiceConnected(session);
 
       this.patchCallSdp(call, false);
       this.monitorVoiceCall(session, call);
 
       call.on("stream", (stream) => {
         if (session!.voiceCall !== call) return;
+        this.markPeerVoiceConnected(session!);
         this.setupPeerVoiceAudio(session!, stream);
         useHubStore.getState().setRemoteStream(remotePeerId, "voice", stream);
         useHubStore.getState().setRemoteVoiceStream(stream);
@@ -3678,6 +3923,7 @@ class WebRTCEngine {
 
     call.on("stream", (stream) => {
       if (session.voiceCall !== call) return;
+      this.markPeerVoiceConnected(session);
       this.setupPeerVoiceAudio(session, stream);
       useHubStore.getState().setRemoteStream(session.peerId, "voice", stream);
       useHubStore.getState().setRemoteVoiceStream(stream);
@@ -3739,34 +3985,40 @@ class WebRTCEngine {
           session.peerId,
         );
       }
-      if (pc.connectionState !== "connected") session.mediaFlowVerified = false;
+      const effectiveState: RTCPeerConnectionState =
+        pc.connectionState === "connected" ||
+        pc.iceConnectionState === "connected" ||
+        pc.iceConnectionState === "completed"
+          ? "connected"
+          : pc.connectionState;
+      if (effectiveState !== "connected") session.mediaFlowVerified = false;
       const previousQuality = useMediaState.getState().quality[session.peerId];
-      if (previousQuality && previousQuality.state !== pc.connectionState)
+      if (previousQuality && previousQuality.state !== effectiveState)
         useMediaState.setState((s) => ({
           quality: {
             ...s.quality,
             [session.peerId]: {
               ...previousQuality,
-              state: pc.connectionState,
+              state: effectiveState,
               flowing: false,
             },
           },
         }));
-      if (pc.connectionState === "connected" && session.mediaFlowVerified)
+      if (effectiveState === "connected" && session.mediaFlowVerified)
         session.voiceRetryAttempts = 0;
-      if (pc.connectionState === "disconnected") disconnectedAt ||= Date.now();
+      if (effectiveState === "disconnected") disconnectedAt ||= Date.now();
       else disconnectedAt = 0;
       if (
-        pc.connectionState === "failed" ||
+        effectiveState === "failed" ||
         (disconnectedAt && Date.now() - disconnectedAt > 8000) ||
-        (["new", "connecting"].includes(pc.connectionState) &&
+        (["new", "connecting"].includes(effectiveState) &&
           Date.now() - connectingAt > 30000)
       ) {
         callEvent(
           "media_closed",
           {
             reason:
-              pc.connectionState === "failed"
+              effectiveState === "failed"
                 ? "media_failed"
                 : "media_timeout",
           },
@@ -3826,18 +4078,18 @@ class WebRTCEngine {
           receivedAudio > 0 &&
           sentAudio > 0 &&
           !!session.voiceAudioEl?.srcObject &&
-          pc.connectionState === "connected"
+          effectiveState === "connected"
         ) {
           session.mediaFlowVerified = true;
         }
         const flowing =
-          pc.connectionState === "connected" &&
+          effectiveState === "connected" &&
           session.mediaFlowVerified === true;
         useMediaState.setState((s) => ({
           quality: {
             ...s.quality,
             [session.peerId]: {
-              state: pc.connectionState,
+              state: effectiveState,
               rttMs,
               loss,
               jitterMs,
@@ -3988,7 +4240,11 @@ class WebRTCEngine {
       void applySafeSinkId(
         audioEl as unknown as { setSinkId?: (id: string) => Promise<void> },
         outputId,
-      );
+      ).finally(() => {
+        if (audioEl && audioEl.paused && audioEl.srcObject) {
+          audioEl.play().catch(() => {});
+        }
+      });
 
       audioEl
         .play()
@@ -4085,6 +4341,18 @@ class WebRTCEngine {
           }
           ctx.close().catch(() => {});
           return;
+        }
+
+        if (ctx.state === "suspended") {
+          ctx.resume().catch(() => {});
+        }
+        if (
+          session.voiceAudioEl &&
+          session.voiceAudioEl.paused &&
+          session.voiceAudioEl.srcObject &&
+          useHubStore.getState().inVoiceCall
+        ) {
+          session.voiceAudioEl.play().catch(() => {});
         }
 
         analyser.getFloatTimeDomainData(buffer);
@@ -4582,26 +4850,37 @@ class WebRTCEngine {
         return;
       }
       const newTrack = processed.getAudioTracks()[0];
-      const senders = [...this.sessions.values()].flatMap(
-        (session) =>
-          session.voiceCall?.peerConnection
-            .getSenders()
-            .filter((sender) => sender.track?.kind === "audio") || [],
-      );
+      const senders = [...this.sessions.values()].flatMap((session) => {
+        const pc = session.voiceCall?.peerConnection;
+        if (
+          !pc ||
+          pc.connectionState === "closed" ||
+          pc.signalingState === "closed"
+        ) {
+          return [];
+        }
+        return pc
+          .getSenders()
+          .filter((sender) => sender.track?.kind === "audio");
+      });
       const oldTrack = this.audioPipeline
         ?.getProcessedStream()
         ?.getAudioTracks()[0];
       const replacements = await Promise.allSettled(
         senders.map((sender) => sender.replaceTrack(newTrack)),
       );
-      const failure = replacements.find(
-        (result) => result.status === "rejected",
-      );
-      if (failure?.status === "rejected") {
+      if (
+        senders.length > 0 &&
+        replacements.every((result) => result.status === "rejected")
+      ) {
+        const firstRejected = replacements.find(
+          (result): result is PromiseRejectedResult =>
+            result.status === "rejected",
+        );
         await Promise.allSettled(
           senders.map((sender) => sender.replaceTrack(oldTrack || null)),
         );
-        throw failure.reason;
+        throw firstRejected?.reason;
       }
       if (generation !== this.micGeneration) {
         pipeline.destroy();

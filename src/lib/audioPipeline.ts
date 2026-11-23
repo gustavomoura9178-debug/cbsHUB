@@ -27,14 +27,20 @@ class KrispLikeNoiseGateProcessor extends AudioWorkletProcessor {
   process(inputs, outputs) {
     const input = inputs[0];
     const output = outputs[0];
-    if (!input || input.length === 0) return true;
+    if (!input || input.length === 0 || !input[0] || input[0].length === 0) {
+      return true;
+    }
 
     const channelCount = Math.min(input.length, output.length);
     const frameLength = input[0].length;
+    if (!Number.isFinite(this.currentGain)) this.currentGain = 1.0;
 
     if (!this.enabled) {
       for (let ch = 0; ch < channelCount; ch++) {
-        for (let i = 0; i < frameLength; i++) output[ch][i] = Number.isFinite(input[ch][i]) ? input[ch][i] : 0;
+        for (let i = 0; i < frameLength; i++) {
+          const s = Number.isFinite(input[ch][i]) ? input[ch][i] : 0;
+          output[ch][i] = Math.max(-1.0, Math.min(1.0, s));
+        }
       }
       return true;
     }
@@ -42,7 +48,8 @@ class KrispLikeNoiseGateProcessor extends AudioWorkletProcessor {
     let sumSquares = 0;
     const primaryChannel = input[0];
     for (let i = 0; i < frameLength; i++) {
-      const sample = Number.isFinite(primaryChannel[i]) ? primaryChannel[i] : 0;
+      const raw = Number.isFinite(primaryChannel[i]) ? primaryChannel[i] : 0;
+      const sample = Math.max(-1.5, Math.min(1.5, raw));
       sumSquares += sample * sample;
     }
     const rms = Math.sqrt(sumSquares / frameLength);
@@ -66,7 +73,9 @@ class KrispLikeNoiseGateProcessor extends AudioWorkletProcessor {
       this.currentGain = targetGain + coef * (this.currentGain - targetGain);
 
       for (let ch = 0; ch < channelCount; ch++) {
-        output[ch][i] = (Number.isFinite(input[ch][i]) ? input[ch][i] : 0) * this.currentGain;
+        const raw = Number.isFinite(input[ch][i]) ? input[ch][i] : 0;
+        const scaled = raw * this.currentGain;
+        output[ch][i] = Math.max(-1.0, Math.min(1.0, scaled));
       }
     }
 
@@ -248,7 +257,7 @@ export class VoiceAudioPipeline {
     this.soundboardInputNode.connect(this.soundboardCompressorNode);
 
     // Encadeamento do Pipeline de Áudio:
-    // source -> highPass -> lowPass -> [worklet] -> compressor -> gain -> analyser -> micMuteNode -> outputPeakGuard -> destination
+    // source -> highPass -> lowPass -> [worklet] -> gain -> compressor -> analyser -> micMuteNode -> outputPeakGuard -> destination
     let lastNode: AudioNode = this.sourceNode;
     lastNode.connect(this.highPassFilter);
     lastNode = this.highPassFilter;
@@ -261,11 +270,11 @@ export class VoiceAudioPipeline {
       lastNode = this.workletNode;
     }
 
-    lastNode.connect(this.compressorNode);
-    lastNode = this.compressorNode;
-
     lastNode.connect(this.gainNode);
     lastNode = this.gainNode;
+
+    lastNode.connect(this.compressorNode);
+    lastNode = this.compressorNode;
 
     lastNode.connect(this.analyserNode);
 
@@ -285,8 +294,7 @@ export class VoiceAudioPipeline {
           gate.disconnect();
           gate.port.close();
           this.workletNode = null;
-          if (this.compressorNode)
-            this.lowPassFilter?.connect(this.compressorNode);
+          if (this.gainNode) this.lowPassFilter?.connect(this.gainNode);
         },
         { once: true },
       );
@@ -307,6 +315,9 @@ export class VoiceAudioPipeline {
 
     this.meterInterval = window.setInterval(() => {
       if (this.isDestroyed || !this.analyserNode) return;
+      if (this.audioCtx && this.audioCtx.state === "suspended") {
+        this.audioCtx.resume().catch(() => {});
+      }
 
       // Se estiver mutado no microfone, reporta sempre fala inativa e nível 0
       if (this.isMicMuted) {

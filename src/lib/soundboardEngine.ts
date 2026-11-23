@@ -120,6 +120,9 @@ class SoundboardEngine {
     });
   }
   private setOutput(ctx: AudioContext, id: string) {
+    if (this.pipelineContextGetter && this.pipelineContextGetter() === ctx) {
+      return;
+    }
     if ("setSinkId" in ctx) {
       void applySafeSinkId(
         ctx as AudioContext & { setSinkId?: (id: string) => Promise<void> },
@@ -131,8 +134,15 @@ class SoundboardEngine {
     let gain = this.monitorGains.get(ctx);
     if (!gain) {
       gain = ctx.createGain();
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-8, ctx.currentTime);
+      compressor.knee.setValueAtTime(6, ctx.currentTime);
+      compressor.ratio.setValueAtTime(8, ctx.currentTime);
+      compressor.attack.setValueAtTime(0.001, ctx.currentTime);
+      compressor.release.setValueAtTime(0.08, ctx.currentTime);
       const peakGuard = createAudioPeakGuard(ctx);
-      gain.connect(peakGuard);
+      gain.connect(compressor);
+      compressor.connect(peakGuard);
       peakGuard.connect(ctx.destination);
       gain.gain.value = useHubStore.getState().isDeafened ? 0 : 1;
       this.monitorGains.set(ctx, gain);

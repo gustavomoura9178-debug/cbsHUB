@@ -26,7 +26,6 @@ import {
   SheetDescription,
 } from "./components/ui/sheet";
 import { useMediaQuery } from "./hooks/useWorkspaceLayout";
-import { MediaNotice } from "./components/CallStatus";
 import { ProfileDialog } from "./profiles/ProfileDialog";
 
 export const App: React.FC = () => {
@@ -200,7 +199,6 @@ export const App: React.FC = () => {
               />
               <div className="workspace-content">
                 <div className="workspace-conversation">
-                  <MediaNotice />
                   <CallStagePanel />
                   <TextChatSection />
                 </div>

@@ -1,25 +1,8 @@
 import { useHubStore } from "../store/useHubStore";
 import { useMediaState } from "../lib/mediaState";
-import { Button } from "./ui/button";
 
 export function MediaNotice() {
-  const error = useMediaState((s) => s.error);
-  if (!error) return null;
-  return (
-    <div
-      className="flex items-center justify-between gap-2 border-b border-border bg-surface px-4 py-1.5 text-xs"
-      role="alert"
-    >
-      <span>{error}</span>
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={() => useMediaState.setState({ error: null })}
-      >
-        Dispensar
-      </Button>
-    </div>
-  );
+  return null;
 }
 
 export function CallQualityBadge({ peerId }: { peerId: string }) {
@@ -35,8 +18,7 @@ export function CallQualityBadge({ peerId }: { peerId: string }) {
     quality?.state === "connected" &&
     ((quality.loss ?? 0) > 5 || (quality.rttMs ?? 0) > 300);
 
-  const isConnected =
-    quality?.state === "connected" || (!quality && hasStream);
+  const isConnected = quality?.state === "connected" || hasStream;
 
   const status = isConnected
     ? unstable
