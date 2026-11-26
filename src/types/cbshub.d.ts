@@ -93,6 +93,8 @@ export interface FriendItem {
   id: string;
   nickname: string;
   avatarColor: string;
+  avatarUrl?: string | null;
+  bannerUrl?: string | null;
   onlineStatus: UserOnlineStatus;
   customStatus?: string | null;
   presence: FriendPresenceState;

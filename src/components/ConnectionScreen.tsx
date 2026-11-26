@@ -63,7 +63,9 @@ export async function hydrateAuthenticatedUser(user: {
 
   let { data: profile, error } = await supabase
     .from("profiles")
-    .select("id, nickname, avatar_color, online_status, custom_status")
+    .select(
+      "id, nickname, avatar_color, online_status, custom_status, custom_avatar_url, banner_url",
+    )
     .eq("id", user.id)
     .maybeSingle();
 
@@ -89,7 +91,9 @@ export async function hydrateAuthenticatedUser(user: {
         },
         { onConflict: "id" },
       )
-      .select("id, nickname, avatar_color, online_status, custom_status")
+      .select(
+        "id, nickname, avatar_color, online_status, custom_status, custom_avatar_url, banner_url",
+      )
       .maybeSingle();
 
     profile = created;
@@ -104,6 +108,10 @@ export async function hydrateAuthenticatedUser(user: {
     store.setAvatarColor(profile.avatar_color || "#6eddbd");
     store.setOnlineStatus(normalizedStatus);
     store.setCustomStatus(profile.custom_status);
+    store.setProfileMediaUrls(
+      profile.custom_avatar_url ?? null,
+      profile.banner_url ?? null,
+    );
   }
 }
 

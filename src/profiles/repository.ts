@@ -125,19 +125,18 @@ export function compressCanvasImage(
   const sizes: Array<[number, number]> =
     kind === "avatar"
       ? [
-          [192, 192],
-          [160, 160],
+          [512, 512],
+          [384, 384],
+          [256, 256],
         ]
       : [
-          [720, 240],
-          [600, 200],
+          [1280, 480],
+          [960, 360],
+          [720, 270],
         ];
-  const qualities =
-    kind === "avatar"
-      ? [0.82, 0.72, 0.62, 0.52, 0.42]
-      : [0.8, 0.7, 0.6, 0.5, 0.42];
-  const targetChars = kind === "avatar" ? 45_000 : 90_000;
-  const hardLimitChars = kind === "avatar" ? 100_000 : 240_000;
+  const qualities = [0.85, 0.78, 0.68, 0.55, 0.42];
+  const targetChars = kind === "avatar" ? 200_000 : 420_000;
+  const hardLimitChars = kind === "avatar" ? 350_000 : 650_000;
 
   let best = "";
   for (const [w, h] of sizes) {
@@ -169,6 +168,36 @@ export function compressCanvasImage(
     throw new Error("Imagem muito detalhada após compressão; ajuste o recorte.");
   }
   return best;
+}
+
+export async function encodeWebpBlobFromDataUrl(
+  dataUrl: string,
+  kind: "avatar" | "banner",
+): Promise<Blob> {
+  const res = await fetch(dataUrl);
+  const srcBlob = await res.blob();
+  const bitmap = await createImageBitmap(srcBlob);
+  try {
+    const maxW = kind === "avatar" ? 512 : 1280;
+    const maxH = kind === "avatar" ? 512 : 480;
+    const w = Math.min(maxW, Math.max(1, bitmap.width));
+    const h = Math.min(maxH, Math.max(1, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas 2D indisponível para conversão WebP.");
+    ctx.drawImage(bitmap, 0, 0, w, h);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob((out) => resolve(out), "image/webp", 0.85),
+    );
+    if (!blob || blob.size === 0) {
+      throw new Error("Falha ao converter imagem para WebP.");
+    }
+    return blob;
+  } finally {
+    bitmap.close();
+  }
 }
 
 export async function profileImage(

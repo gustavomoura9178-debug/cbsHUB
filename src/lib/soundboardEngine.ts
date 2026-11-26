@@ -1,10 +1,11 @@
 import { createAudioPeakGuard, safeAudioGain } from "./audioPeakGuard";
 import { applySafeSinkId } from "../hooks/useMediaOutput";
-import { decodeEditableAudio } from "./audioTrim";
+import { compressAudioToWebmOpus, decodeEditableAudio } from "./audioTrim";
 import type { SoundboardClip } from "../types/cbshub";
 import { useHubStore } from "../store/useHubStore";
 import { storageDb } from "./storageDb";
 import { mediaError } from "./mediaState";
+import { supabase } from "./supabase";
 
 export const BUILT_IN_SOUNDBOARD_CLIPS: SoundboardClip[] = [
   {
@@ -250,6 +251,167 @@ class SoundboardEngine {
       console.warn("[SoundboardEngine] Falha ao carregar clipes:", err);
       useHubStore.getState().setSoundboardClips(BUILT_IN_SOUNDBOARD_CLIPS);
       return BUILT_IN_SOUNDBOARD_CLIPS;
+    }
+  }
+
+  /**
+   * Comprime o clipe para WebM/Opus (64 kbps) e envia para cbs-sounds + public.user_sounds
+   */
+  public async saveCustomSoundToCloud(
+    clip: SoundboardClip,
+  ): Promise<SoundboardClip> {
+    if (!clip.audioBlob) return clip;
+    const compressed = await compressAudioToWebmOpus(clip.audioBlob);
+    const updatedClip: SoundboardClip = {
+      ...clip,
+      audioBlob: compressed,
+    };
+
+    await storageDb.saveSoundboardClip(updatedClip);
+    this.invalidateClip(updatedClip.id);
+
+    const userId = useHubStore.getState().authUserId;
+    if (userId) {
+      const storagePath = `${userId}/${updatedClip.id}.webm`;
+      const { error: uploadErr } = await supabase.storage
+        .from("cbs-sounds")
+        .upload(storagePath, compressed, {
+          upsert: true,
+          contentType: compressed.type || "audio/webm",
+        });
+
+      if (uploadErr) {
+        throw new Error(
+          `Erro ao enviar som para a nuvem (cbs-sounds): ${uploadErr.message}`,
+        );
+      }
+
+      const { error: dbErr } = await supabase.from("user_sounds").upsert(
+        {
+          id: updatedClip.id,
+          user_id: userId,
+          name: updatedClip.name,
+          emoji: updatedClip.emoji,
+          storage_path: storagePath,
+          volume: updatedClip.volume,
+          duration_sec: updatedClip.durationSec ?? null,
+          category: updatedClip.category ?? null,
+          is_favorite: updatedClip.isFavorite,
+        },
+        { onConflict: "id" },
+      );
+
+      if (dbErr) {
+        throw new Error(`Erro ao registrar som no banco: ${dbErr.message}`);
+      }
+    }
+
+    await this.loadAllClips();
+    return updatedClip;
+  }
+
+  public async updateCloudSoundMeta(clip: SoundboardClip): Promise<void> {
+    const userId = useHubStore.getState().authUserId;
+    if (!userId || clip.isBuiltIn) return;
+    const { error } = await supabase
+      .from("user_sounds")
+      .update({
+        name: clip.name,
+        emoji: clip.emoji,
+        volume: clip.volume,
+        category: clip.category ?? null,
+        is_favorite: clip.isFavorite,
+      })
+      .eq("id", clip.id)
+      .eq("user_id", userId);
+    if (error) {
+      console.warn("[SoundboardEngine] Erro ao atualizar user_sounds:", error.message);
+    }
+  }
+
+  public async deleteCustomSoundFromCloud(clipId: string): Promise<void> {
+    const userId = useHubStore.getState().authUserId;
+    if (!userId) return;
+
+    const { data: row } = await supabase
+      .from("user_sounds")
+      .select("storage_path")
+      .eq("id", clipId)
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    const storagePath = row?.storage_path || `${userId}/${clipId}.webm`;
+
+    const { error: storageErr } = await supabase.storage
+      .from("cbs-sounds")
+      .remove([storagePath]);
+    if (storageErr) {
+      throw new Error(
+        `Erro ao remover som do Storage (cbs-sounds): ${storageErr.message}`,
+      );
+    }
+
+    const { error: dbErr } = await supabase
+      .from("user_sounds")
+      .delete()
+      .eq("id", clipId)
+      .eq("user_id", userId);
+    if (dbErr) {
+      throw new Error(`Erro ao remover som do banco: ${dbErr.message}`);
+    }
+  }
+
+  /**
+   * Sincroniza public.user_sounds baixando em segundo plano apenas os sons
+   * ainda ausentes no IndexedDB local.
+   */
+  public async syncCloudSounds(userId: string): Promise<void> {
+    try {
+      const { data: rows, error } = await supabase
+        .from("user_sounds")
+        .select("*")
+        .eq("user_id", userId);
+
+      if (error || !rows || rows.length === 0) return;
+
+      const localClips = await storageDb.getSoundboardClips();
+      const localMap = new Map(localClips.map((c) => [c.id, c]));
+      let addedAny = false;
+
+      for (const row of rows) {
+        const existing = localMap.get(row.id);
+        if (existing?.audioBlob && existing.audioBlob.size > 0) {
+          continue;
+        }
+
+        const { data: blob, error: dlErr } = await supabase.storage
+          .from("cbs-sounds")
+          .download(row.storage_path);
+
+        if (dlErr || !blob || blob.size === 0) {
+          continue;
+        }
+
+        await storageDb.saveSoundboardClip({
+          id: row.id,
+          name: row.name,
+          emoji: row.emoji || "🔊",
+          isBuiltIn: false,
+          audioBlob: blob,
+          volume: Number.isFinite(row.volume) ? row.volume : 0.85,
+          durationSec: row.duration_sec ?? undefined,
+          category: row.category ?? undefined,
+          isFavorite: Boolean(row.is_favorite),
+          createdAt: new Date(row.created_at).getTime() || Date.now(),
+        });
+        addedAny = true;
+      }
+
+      if (addedAny) {
+        await this.loadAllClips();
+      }
+    } catch (err) {
+      console.warn("[SoundboardEngine] Falha ao sincronizar sons da nuvem:", err);
     }
   }
 

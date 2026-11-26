@@ -1,7 +1,7 @@
 {
   "name": "cbshub",
   "private": true,
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Ultra-quality P2P voice, webcam and screen sharing desktop hub",
   "type": "module",
   "main": "dist-electron/main.js",
@@ -62,7 +62,7 @@
       {
         "provider": "github",
         "owner": "willbiocloud",
-        "repo": "cbshub"
+        "repo": "cbshub-releases"
       }
     ],
     "directories": {

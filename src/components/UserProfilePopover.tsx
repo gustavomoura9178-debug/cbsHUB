@@ -69,6 +69,7 @@ export const UserProfilePopover: React.FC<UserProfilePopoverProps> = ({
   const resolvedPresence =
     acceptedFriend?.presence ?? presence ?? ("online" as FriendPresenceState);
   const resolvedAvatarColor = acceptedFriend?.avatarColor || avatarColor;
+  const resolvedAvatarUrl = avatarUrl || acceptedFriend?.avatarUrl || undefined;
 
   const handleAddFriend = async () => {
     if (busy) return;
@@ -109,9 +110,9 @@ export const UserProfilePopover: React.FC<UserProfilePopoverProps> = ({
               className="size-11 rounded-full overflow-hidden flex items-center justify-center text-sm font-bold text-white border border-border"
               style={{ backgroundColor: resolvedAvatarColor }}
             >
-              {avatarUrl ? (
+              {resolvedAvatarUrl ? (
                 <img
-                  src={avatarUrl}
+                  src={resolvedAvatarUrl}
                   alt={nickname}
                   className="size-full object-cover"
                 />

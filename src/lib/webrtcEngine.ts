@@ -227,7 +227,9 @@ class WebRTCEngine {
     await Promise.allSettled([
       this.refreshFriends(),
       loadCloudSettings(userId),
-      soundboardEngine.loadAllClips(),
+      soundboardEngine.loadAllClips().then(() => {
+        void soundboardEngine.syncCloudSounds(userId);
+      }),
     ]);
 
     this.subscribePresence(userId);
@@ -418,7 +420,9 @@ class WebRTCEngine {
 
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, nickname, avatar_color, online_status, custom_status")
+      .select(
+        "id, nickname, avatar_color, online_status, custom_status, custom_avatar_url, banner_url",
+      )
       .in("id", otherIds);
 
     const profileMap = new Map(
@@ -453,6 +457,8 @@ class WebRTCEngine {
         id: profile.id,
         nickname: profile.nickname,
         avatarColor: profile.avatar_color || "#6eddbd",
+        avatarUrl: profile.custom_avatar_url ?? null,
+        bannerUrl: profile.banner_url ?? null,
         onlineStatus: (profile.online_status as DbOnlineStatus) || "online",
         customStatus: profile.custom_status,
         presence: this.resolveFriendPresence(
@@ -588,6 +594,8 @@ class WebRTCEngine {
     online_status?: DbOnlineStatus;
     custom_status?: string | null;
     avatar_color?: string;
+    custom_avatar_url?: string | null;
+    banner_url?: string | null;
   }): Promise<void> {
     const state = useHubStore.getState();
     const userId = state.authUserId;
@@ -608,6 +616,19 @@ class WebRTCEngine {
     if (partial.online_status) state.setOnlineStatus(partial.online_status);
     if (partial.custom_status !== undefined) {
       state.setCustomStatus(partial.custom_status);
+    }
+    if (
+      partial.custom_avatar_url !== undefined ||
+      partial.banner_url !== undefined
+    ) {
+      state.setProfileMediaUrls(
+        partial.custom_avatar_url !== undefined
+          ? partial.custom_avatar_url
+          : state.customAvatarUrl,
+        partial.banner_url !== undefined
+          ? partial.banner_url
+          : state.bannerUrl,
+      );
     }
     await Promise.allSettled([
       this.trackPresence(),
@@ -1648,7 +1669,7 @@ class WebRTCEngine {
     const msgId = crypto.randomUUID();
     const safeName = file.name.replace(/[^\w.\-()+ ]/g, "_");
     const folderPrefix = isRoom ? `rooms/${targetId}` : `dm_channels/${targetId}`;
-    const storagePath = `${folderPrefix}/${crypto.randomUUID()}-${safeName}`;
+    const storagePath = `${userId}/${folderPrefix}/${crypto.randomUUID()}-${safeName}`;
 
     const optimistic: ChatMessage = {
       id: msgId,
@@ -1713,7 +1734,10 @@ class WebRTCEngine {
             .select()
             .single();
 
-          if (!error && data) {
+          if (error) {
+            throw new Error(`Erro ao registrar anexo na sala: ${error.message}`);
+          }
+          if (data) {
             const saved = this.mapDbMessageToChat(data, null);
             useHubStore.getState().updateMessageUploadProgress(msgId, undefined, {
               ...saved,
@@ -2022,16 +2046,16 @@ class WebRTCEngine {
     file: File,
     onProgress: (percent: number, bytesPerSecond: number) => void,
   ): Promise<void> {
-    const { data: sessionData } = await supabase.auth.getSession();
+    let { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData.session?.access_token) {
+      const { data: refreshed } = await supabase.auth.refreshSession();
+      sessionData = refreshed;
+    }
     const token = sessionData.session?.access_token;
-
     if (!token) {
-      const { error } = await supabase.storage
-        .from("cbs-attachments")
-        .upload(storagePath, file, { upsert: false });
-      if (error) throw new Error(error.message);
-      onProgress(100, file.size);
-      return;
+      throw new Error(
+        "Sessão de autenticação expirada. Faça login novamente para enviar arquivos.",
+      );
     }
 
     const encodedPath = storagePath
@@ -2047,9 +2071,10 @@ class WebRTCEngine {
       xhr.setRequestHeader("Authorization", `Bearer ${token}`);
       xhr.setRequestHeader("apikey", SUPABASE_ANON_KEY);
       xhr.setRequestHeader("x-upsert", "false");
-      if (file.type) {
-        xhr.setRequestHeader("Content-Type", file.type);
-      }
+      xhr.setRequestHeader(
+        "Content-Type",
+        file.type || "application/octet-stream",
+      );
 
       xhr.upload.onprogress = (ev) => {
         if (!ev.lengthComputable) return;
@@ -2065,14 +2090,16 @@ class WebRTCEngine {
           onProgress(100, Math.round(file.size / elapsedSec));
           resolve();
         } else {
-          let message = `Erro no upload (${xhr.status})`;
+          let message = `Erro no upload para cbs-attachments (${xhr.status})`;
           try {
             const parsed = JSON.parse(xhr.responseText);
             if (parsed?.message || parsed?.error) {
-              message = parsed.message || parsed.error;
+              message = `${parsed.message || parsed.error} (${xhr.status})`;
             }
           } catch {
-            /* ignore */
+            if (xhr.responseText) {
+              message = `${xhr.responseText.slice(0, 140)} (${xhr.status})`;
+            }
           }
           reject(new Error(message));
         }

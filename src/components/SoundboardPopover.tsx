@@ -58,6 +58,7 @@ export const SoundboardPopover: React.FC<Props> = ({
     deafened = useHubStore((s) => s.isDeafened);
   const mode = useSoundPreferences((s) => s.mode);
   const [trimPending, setTrimPending] = useState(false);
+  const [retrimmedBlob, setRetrimmedBlob] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [search, setSearch] = useState(""),
     [tab, setTab] = useState("all"),
@@ -103,6 +104,9 @@ export const SoundboardPopover: React.FC<Props> = ({
   const save = async (clip: SoundboardClip) => {
     await storageDb.saveSoundboardClip(clip);
     soundboardEngine.invalidateClip(clip.id);
+    if (!clip.isBuiltIn) {
+      await soundboardEngine.updateCloudSoundMeta(clip);
+    }
     await webrtcEngine.loadSoundboardClips();
     scheduleCloudSettingsSync();
   };
@@ -283,6 +287,7 @@ export const SoundboardPopover: React.FC<Props> = ({
                     onClick={() => {
                       setConfirmDelete(false);
                       setTrimPending(false);
+                      setRetrimmedBlob(false);
                       setEditing({ ...clip });
                     }}
                   >
@@ -425,6 +430,7 @@ export const SoundboardPopover: React.FC<Props> = ({
                   onPendingChange={() => setTrimPending(true)}
                   onApply={(blob, seconds, start, end) => {
                     setTrimPending(false);
+                    setRetrimmedBlob(true);
                     setEditing({
                       ...editing,
                       audioBlob: blob,
@@ -450,7 +456,11 @@ export const SoundboardPopover: React.FC<Props> = ({
                     onClick={() =>
                       confirmDelete
                         ? void run(async () => {
+                            await soundboardEngine.deleteCustomSoundFromCloud(
+                              editing.id,
+                            );
                             await storageDb.deleteSoundboardClip(editing.id);
+                            soundboardEngine.invalidateClip(editing.id);
                             await webrtcEngine.loadSoundboardClips();
                             setEditing(null);
                           })
@@ -474,12 +484,17 @@ export const SoundboardPopover: React.FC<Props> = ({
                   }
                   onClick={() =>
                     void run(async () => {
-                      await save({
+                      const updated: SoundboardClip = {
                         ...editing,
                         name: editing.name.trim(),
                         emoji: editing.emoji.trim(),
                         category: editing.category?.trim(),
-                      });
+                      };
+                      if (retrimmedBlob && !updated.isBuiltIn && updated.audioBlob) {
+                        await soundboardEngine.saveCustomSoundToCloud(updated);
+                      } else {
+                        await save(updated);
+                      }
                       setEditing(null);
                     })
                   }

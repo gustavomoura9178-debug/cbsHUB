@@ -110,3 +110,99 @@ export function waveform(buffer: AudioBuffer, bars = 160) {
     return peak;
   });
 }
+
+/**
+ * Comprime um Blob de áudio (ex: WAV recortado) para WebM/Opus 64 kbps via
+ * MediaRecorder no navegador. Faz fallback silencioso para o blob original
+ * caso o codec ou MediaRecorder não seja suportado no ambiente.
+ */
+export async function compressAudioToWebmOpus(blob: Blob): Promise<Blob> {
+  if (
+    typeof MediaRecorder === "undefined" ||
+    typeof AudioContext === "undefined"
+  ) {
+    return blob;
+  }
+
+  const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+    ? "audio/webm;codecs=opus"
+    : MediaRecorder.isTypeSupported("audio/webm")
+      ? "audio/webm"
+      : "";
+
+  if (!mimeType) {
+    return blob;
+  }
+
+  const ctx = new AudioContext();
+  try {
+    const buffer = await ctx.decodeAudioData(await blob.slice(0).arrayBuffer());
+    if (!Number.isFinite(buffer.duration) || buffer.duration <= 0) {
+      return blob;
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const destination = ctx.createMediaStreamDestination();
+    source.connect(destination);
+
+    const recorder = new MediaRecorder(destination.stream, {
+      mimeType,
+      audioBitsPerSecond: 64000,
+    });
+
+    const chunks: BlobPart[] = [];
+    const encoded = await new Promise<Blob>((resolve, reject) => {
+      const timeoutMs = Math.max(
+        5000,
+        Math.ceil(buffer.duration * 1000) + 4000,
+      );
+      const timer = window.setTimeout(() => {
+        try {
+          if (recorder.state !== "inactive") recorder.stop();
+        } catch {
+          /* ignore */
+        }
+        reject(new Error("Tempo limite excedido na compressão de áudio."));
+      }, timeoutMs);
+
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) {
+          chunks.push(ev.data);
+        }
+      };
+
+      recorder.onerror = () => {
+        window.clearTimeout(timer);
+        reject(new Error("Falha ao comprimir áudio para WebM/Opus."));
+      };
+
+      recorder.onstop = () => {
+        window.clearTimeout(timer);
+        resolve(new Blob(chunks, { type: mimeType }));
+      };
+
+      source.onended = () => {
+        if (recorder.state === "recording") {
+          try {
+            recorder.stop();
+          } catch {
+            /* ignore */
+          }
+        }
+      };
+
+      recorder.start();
+      source.start(0);
+    });
+
+    if (encoded.size > 0 && encoded.size < blob.size) {
+      return encoded;
+    }
+    return encoded.size > 0 && blob.type === mimeType ? encoded : blob;
+  } catch {
+    return blob;
+  } finally {
+    await ctx.close().catch(() => {});
+  }
+}

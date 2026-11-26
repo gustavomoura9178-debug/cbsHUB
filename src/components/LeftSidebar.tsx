@@ -483,9 +483,11 @@ export function LeftSidebar({ onNavigate }: { onNavigate?: () => void }) {
                   const isSelected =
                     activeContext?.type !== "room" &&
                     activeFriend?.id === friend.id;
-                  const friendAvatar = Object.values(participants).find(
-                    (p) => p.clientId === friend.id,
-                  )?.profile?.avatar;
+                  const friendAvatar =
+                    friend.avatarUrl ||
+                    Object.values(participants).find(
+                      (p) => p.clientId === friend.id,
+                    )?.profile?.avatar;
                   return (
                     <button
                       key={friend.id}

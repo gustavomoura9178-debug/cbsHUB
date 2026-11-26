@@ -11,8 +11,7 @@ import { Input } from "./ui/input";
 import { Slider } from "./ui/slider";
 import { EmojiPickerPopover } from "./EmojiPickerPopover";
 import { AudioTrimEditor } from "./AudioTrimEditor";
-import { storageDb } from "../lib/storageDb";
-import { webrtcEngine } from "../lib/webrtcEngine";
+import { soundboardEngine } from "../lib/soundboardEngine";
 
 function formatKb(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -63,8 +62,9 @@ export function AddSoundDialog({
   const save = async () => {
     if (!file || !edited || !name.trim() || busy) return;
     setBusy(true);
+    setError("");
     try {
-      await storageDb.saveSoundboardClip({
+      await soundboardEngine.saveCustomSoundToCloud({
         id: crypto.randomUUID(),
         name: name.trim(),
         emoji,
@@ -78,7 +78,6 @@ export function AddSoundDialog({
         trimStartSec: range.start,
         trimEndSec: range.end,
       });
-      await webrtcEngine.loadSoundboardClips();
       onOpenChange(false);
     } catch (e) {
       setError((e as Error).message);

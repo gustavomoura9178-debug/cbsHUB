@@ -265,14 +265,32 @@ export function ChatPanel() {
     const files = Array.from(fileList);
     if (files.length === 0) return;
 
-    for (const file of files) {
-      if (file.size > MAX_FILE_SIZE_BYTES) {
-        setError(
-          `Arquivo "${file.name}" excede o limite estrito de 50 MB (${(file.size / (1024 * 1024)).toFixed(1)} MB).`,
-        );
-        continue;
+    setBusy(true);
+    setError("");
+    const errors: string[] = [];
+    try {
+      for (const file of files) {
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          errors.push(
+            `Arquivo "${file.name}" excede o limite estrito de 50 MB (${(file.size / (1024 * 1024)).toFixed(1)} MB).`,
+          );
+          continue;
+        }
+        try {
+          await webrtcEngine.sendFileMessage(file);
+        } catch (err) {
+          errors.push(
+            err instanceof Error
+              ? err.message
+              : `Falha ao enviar "${file.name}".`,
+          );
+        }
       }
-      await action(() => webrtcEngine.sendFileMessage(file));
+      if (errors.length > 0) {
+        setError(errors.join(" | "));
+      }
+    } finally {
+      setBusy(false);
     }
   }
 

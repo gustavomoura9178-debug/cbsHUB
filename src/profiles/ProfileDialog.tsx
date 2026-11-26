@@ -51,7 +51,6 @@ import {
   type PublicProfile,
   type Presence,
 } from "./model";
-import { profileImage } from "./repository";
 
 function ProfileSelect({
   children,
@@ -287,22 +286,11 @@ export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
 
   async function upload(file: File | undefined, kind: "avatar" | "banner") {
     if (!file) return;
-    if (kind === "avatar") {
-      setError("");
-      setCropTask({ file, kind: "avatar" });
-      return;
-    }
-    setBannerSourceFile(file);
-    setBusy(true);
     setError("");
-    try {
-      const image = await profileImage(file, "banner");
-      setDraft((current) => ({ ...current, banner: image }));
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
+    if (kind === "banner") {
+      setBannerSourceFile(file);
     }
+    setCropTask({ file, kind });
   }
   const content = (
     <>
@@ -847,8 +835,19 @@ export function ProfileDialog({ embedded = false }: { embedded?: boolean }) {
             >
               Cancelar
             </Button>
-            <Button disabled={busy} onClick={() => profiles.save(draft)}>
-              Salvar perfil
+            <Button
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError("");
+                try {
+                  await profiles.save(draft);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {busy ? "Salvando…" : "Salvar perfil"}
             </Button>
           </footer>
         </>

@@ -122,10 +122,16 @@ function color(v: unknown) {
     throw new Error("Use uma cor HEX #RRGGBB.");
   return v;
 }
+const TRUSTED_PROFILE_IMAGE_URL_RE =
+  /^https:\/\/[a-z0-9-]+\.supabase\.co\/storage\/v1\/object\/(?:public|sign)\/cbs-profiles\/[^\s"'<>]+$/i;
+
 export function imageData(v: unknown, max: number): string {
   if (v === "") return "";
+  if (typeof v !== "string") throw new Error("Imagem de perfil inválida.");
+  if (TRUSTED_PROFILE_IMAGE_URL_RE.test(v) && v.length <= 2048) {
+    return v;
+  }
   if (
-    typeof v !== "string" ||
     v.length > max ||
     !/^data:image\/(png|jpeg|webp);base64,[a-zA-Z0-9+/]+={0,2}$/.test(v)
   )
@@ -194,8 +200,8 @@ export function validateProfile(value: unknown, ownerId: string): UserProfile {
     bio: text(p.bio, 500),
     status: text(p.status, 100),
     emoji: text(p.emoji, 16),
-    avatar: imageData(p.avatar, 100000),
-    banner: imageData(p.banner, 240000),
+    avatar: imageData(p.avatar, 350000),
+    banner: imageData(p.banner, 650000),
     links: links(p.links),
     createdAt: p.createdAt,
     presence: choice(p.presence, Object.keys(PRESENCES) as Presence[]),
@@ -243,14 +249,14 @@ export function migrateLegacyProfile(
 
   let safeAvatar = "";
   try {
-    safeAvatar = imageData(p.avatar ?? "", 100000);
+    safeAvatar = imageData(p.avatar ?? "", 350000);
   } catch {
     safeAvatar = "";
   }
 
   let safeBanner = "";
   try {
-    safeBanner = imageData(p.banner ?? "", 240000);
+    safeBanner = imageData(p.banner ?? "", 650000);
   } catch {
     safeBanner = "";
   }

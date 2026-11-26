@@ -13,8 +13,14 @@ import {
   validateProfile,
   type UserProfile,
 } from "./model";
-import { blockedIds, loadProfile, saveProfile, setBlocked } from "./repository";
-import type { DbOnlineStatus } from "../lib/supabase";
+import {
+  blockedIds,
+  encodeWebpBlobFromDataUrl,
+  loadProfile,
+  saveProfile,
+  setBlocked,
+} from "./repository";
+import { supabase, type DbOnlineStatus } from "../lib/supabase";
 
 interface Context {
   own: UserProfile;
@@ -27,7 +33,7 @@ interface Context {
   edit: () => void;
   close: () => void;
   expand: () => void;
-  save: (p: UserProfile) => boolean;
+  save: (p: UserProfile) => Promise<boolean>;
   block: (id: string, value: boolean) => void;
 }
 
@@ -51,6 +57,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const ownerId = useHubStore((s) => s.authUserId || s.clientId);
   const storeNickname = useHubStore((s) => s.nickname);
   const storeColor = useHubStore((s) => s.avatarColor);
+  const storeAvatarUrl = useHubStore((s) => s.customAvatarUrl);
+  const storeBannerUrl = useHubStore((s) => s.bannerUrl);
 
   const [initial] = useState(() => {
     const state = useHubStore.getState();
@@ -87,6 +95,18 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
           isAuthenticated && storeNickname && storeNickname !== "Usuário"
             ? storeNickname.slice(0, 40)
             : loaded.displayName,
+        avatar:
+          isAuthenticated && storeAvatarUrl
+            ? storeAvatarUrl
+            : isAuthenticated && storeAvatarUrl === null
+              ? ""
+              : loaded.avatar,
+        banner:
+          isAuthenticated && storeBannerUrl
+            ? storeBannerUrl
+            : isAuthenticated && storeBannerUrl === null
+              ? ""
+              : loaded.banner,
         appearance: {
           ...loaded.appearance,
           color:
@@ -101,7 +121,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [ownerId, storeNickname, storeColor]);
+  }, [ownerId, storeNickname, storeColor, storeAvatarUrl, storeBannerUrl]);
 
   useEffect(() => {
     const change = () => {
@@ -143,7 +163,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setSelected(null);
       setEditing(false);
     },
-    save: (draft) => {
+    save: async (draft) => {
       try {
         const state = useHubStore.getState();
         const currentOwner = state.authUserId || state.clientId;
@@ -161,27 +181,106 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         ) {
           throw new Error("Nome de usuário já utilizado nesta sala.");
         }
-        const saved = saveProfile(clean, currentOwner);
+
+        let finalAvatar = clean.avatar;
+        let finalBanner = clean.banner;
+
+        if (state.authUserId) {
+          const userId = state.authUserId;
+          let nextCloudAvatar: string | null | undefined;
+          let nextCloudBanner: string | null | undefined;
+
+          if (clean.avatar.startsWith("data:image/")) {
+            const blob = await encodeWebpBlobFromDataUrl(clean.avatar, "avatar");
+            const path = `${userId}/avatar.webp`;
+            const { error: uploadErr } = await supabase.storage
+              .from("cbs-profiles")
+              .upload(path, blob, {
+                upsert: true,
+                contentType: "image/webp",
+              });
+            if (uploadErr) {
+              throw new Error(`Erro ao enviar avatar: ${uploadErr.message}`);
+            }
+            const { data: pub } = supabase.storage
+              .from("cbs-profiles")
+              .getPublicUrl(path);
+            finalAvatar = `${pub.publicUrl}?t=${Date.now()}`;
+            nextCloudAvatar = finalAvatar;
+          } else if (clean.avatar === "" && own.avatar !== "") {
+            await supabase.storage
+              .from("cbs-profiles")
+              .remove([`${userId}/avatar.webp`])
+              .catch(() => {});
+            nextCloudAvatar = null;
+          } else if (clean.avatar) {
+            nextCloudAvatar = clean.avatar;
+          }
+
+          if (clean.banner.startsWith("data:image/")) {
+            const blob = await encodeWebpBlobFromDataUrl(clean.banner, "banner");
+            const path = `${userId}/banner.webp`;
+            const { error: uploadErr } = await supabase.storage
+              .from("cbs-profiles")
+              .upload(path, blob, {
+                upsert: true,
+                contentType: "image/webp",
+              });
+            if (uploadErr) {
+              throw new Error(`Erro ao enviar capa: ${uploadErr.message}`);
+            }
+            const { data: pub } = supabase.storage
+              .from("cbs-profiles")
+              .getPublicUrl(path);
+            finalBanner = `${pub.publicUrl}?t=${Date.now()}`;
+            nextCloudBanner = finalBanner;
+          } else if (clean.banner === "" && own.banner !== "") {
+            await supabase.storage
+              .from("cbs-profiles")
+              .remove([`${userId}/banner.webp`])
+              .catch(() => {});
+            nextCloudBanner = null;
+          } else if (clean.banner) {
+            nextCloudBanner = clean.banner;
+          }
+
+          const customText = [clean.emoji, clean.status]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+
+          await webrtcEngine.updateCloudProfile({
+            nickname: clean.displayName,
+            avatar_color: clean.appearance.color,
+            custom_status: customText || null,
+            online_status: mapPresenceToCloudStatus(clean.presence),
+            ...(nextCloudAvatar !== undefined
+              ? { custom_avatar_url: nextCloudAvatar }
+              : {}),
+            ...(nextCloudBanner !== undefined
+              ? { banner_url: nextCloudBanner }
+              : {}),
+          });
+
+          state.setProfileMediaUrls(
+            nextCloudAvatar !== undefined ? nextCloudAvatar : state.customAvatarUrl,
+            nextCloudBanner !== undefined ? nextCloudBanner : state.bannerUrl,
+          );
+        }
+
+        const saved = saveProfile(
+          {
+            ...clean,
+            avatar: finalAvatar,
+            banner: finalBanner,
+          },
+          currentOwner,
+        );
         setOwn(saved);
         setError("");
 
         state.setNickname(saved.displayName);
         state.setAvatarColor(saved.appearance.color);
-
-        if (state.authUserId) {
-          const customText = [saved.emoji, saved.status]
-            .filter(Boolean)
-            .join(" ")
-            .trim();
-          void webrtcEngine
-            .updateCloudProfile({
-              nickname: saved.displayName,
-              avatar_color: saved.appearance.color,
-              custom_status: customText || null,
-              online_status: mapPresenceToCloudStatus(saved.presence),
-            })
-            .catch(() => {});
-        }
 
         window.dispatchEvent(new Event("cbshub-profile-changed"));
         setEditing(false);

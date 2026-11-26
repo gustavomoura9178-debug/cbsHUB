@@ -25,6 +25,10 @@ export function ParticipantAvatar({
   const profiles = useProfiles();
   const authUserId = useHubStore((s) => s.authUserId);
   const storeClientId = useHubStore((s) => s.clientId);
+  const customAvatarUrl = useHubStore((s) => s.customAvatarUrl);
+  const friendAvatarUrl = useHubStore(
+    (s) => s.friends.find((f) => f.id === clientId)?.avatarUrl,
+  );
   const remote = useHubStore(
     (state) =>
       Object.values(state.participants).find((p) => p.clientId === clientId)
@@ -38,7 +42,11 @@ export function ParticipantAvatar({
         clientId === storeClientId));
   const profile = isOwn ? profiles.own : remote;
   const visible = isOwn || (clientId && !profiles.blocked.includes(clientId));
-  const avatar = visible ? profile?.avatar : undefined;
+  const avatar = visible
+    ? isOwn
+      ? profile?.avatar || customAvatarUrl
+      : profile?.avatar || friendAvatarUrl
+    : undefined;
   const targetViewId = isOwn ? profiles.own.ownerId : clientId;
 
   const initials =

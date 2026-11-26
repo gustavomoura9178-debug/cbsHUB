@@ -116,9 +116,9 @@ export function AvatarCrop({
     };
   }, [file, sourceDataUrl]);
 
-  const targetAspect = kind === "avatar" ? 1 : 3;
+  const targetAspect = kind === "avatar" ? 1 : 1280 / 480;
   const frameW = kind === "avatar" ? 256 : 384;
-  const frameH = kind === "avatar" ? 256 : 128;
+  const frameH = kind === "avatar" ? 256 : 144;
 
   const computeCrop = () => {
     if (!bitmap) return { sx: 0, sy: 0, sw: 1, sh: 1 };
@@ -200,8 +200,8 @@ export function AvatarCrop({
     kind === "avatar" ? "Editor de Foto de Perfil" : "Editor de Banner de Capa";
   const subtitle =
     kind === "avatar"
-      ? "Arraste para enquadrar ou use o scroll para ampliar. Exportado e comprimido em 192×192 WebP."
-      : "Arraste para enquadrar (proporção 3:1). Exportado e comprimido em 720×240 WebP.";
+      ? "Arraste para enquadrar ou use o scroll para ampliar. Exportado e comprimido em até 512×512 WebP."
+      : "Arraste para enquadrar (1280×480). Exportado e comprimido em até 1280×480 WebP.";
 
   return (
     <Dialog
@@ -218,7 +218,7 @@ export function AvatarCrop({
           </div>
           <span className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-0.5 text-micro font-mono text-primary shrink-0">
             <Sparkles className="size-3" />
-            {kind === "avatar" ? "192×192" : "720×240"} WebP
+            {kind === "avatar" ? "512×512" : "1280×480"} WebP
           </span>
         </div>
 

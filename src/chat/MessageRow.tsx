@@ -196,9 +196,12 @@ export function MessageRow({
             </span>
           )}
           {own && (
-            <span aria-label="Estado de envio">
+            <span
+              aria-label="Estado de envio"
+              className={m.delivery === "error" ? "text-destructive font-medium" : undefined}
+            >
               {m.delivery === "error"
-                ? "Erro ao enviar"
+                ? "Falha ao enviar"
                 : m.delivery === "queued"
                   ? "Enviando..."
                   : "Enviada"}

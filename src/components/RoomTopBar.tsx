@@ -99,7 +99,8 @@ export function RoomTopBar({ onOpenMobileSidebar }: Props) {
     : activeChannelId || "global";
   const view = useChatView((state) => state.views[key] ?? EMPTY_CHAT_VIEW);
   const friendAvatar = activeFriend
-    ? Object.values(participants).find((p) => p.clientId === activeFriend.id)
+    ? activeFriend.avatarUrl ||
+      Object.values(participants).find((p) => p.clientId === activeFriend.id)
         ?.profile?.avatar
     : undefined;
 

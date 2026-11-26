@@ -121,6 +121,8 @@ export interface HubState {
   userEmail: string | null;
   onlineStatus: UserOnlineStatus;
   customStatus: string | null;
+  customAvatarUrl: string | null;
+  bannerUrl: string | null;
   friends: FriendItem[];
   pendingRequests: FriendItem[];
   activeFriend: FriendItem | null;
@@ -215,6 +217,7 @@ export interface HubState {
   setAuthUser: (userId: string | null, email: string | null) => void;
   setOnlineStatus: (status: UserOnlineStatus) => void;
   setCustomStatus: (status: string | null) => void;
+  setProfileMediaUrls: (avatarUrl: string | null, bannerUrl: string | null) => void;
   setFriends: (friends: FriendItem[]) => void;
   setPendingRequests: (requests: FriendItem[]) => void;
   setActiveFriend: (friend: FriendItem | null) => void;
@@ -255,6 +258,9 @@ export interface HubState {
   // Streams remotos Mesh
   setRemoteStream: (peerId: string, type: 'voice' | 'webcam' | 'screen', stream: MediaStream | null) => void;
   removeRemoteStreams: (peerId: string) => void;
+  watchingScreenIds: string[];
+  watchScreen: (participantId: string) => void;
+  stopWatchingScreen: (participantId: string) => void;
 
   // Chat P2P
   setMessages: (messages: ChatMessage[]) => void;
@@ -302,6 +308,8 @@ export const useHubStore = create<HubState>()(
       userEmail: null,
       onlineStatus: 'online',
       customStatus: null,
+      customAvatarUrl: null,
+      bannerUrl: null,
       friends: [],
       pendingRequests: [],
       activeFriend: null,
@@ -356,6 +364,7 @@ export const useHubStore = create<HubState>()(
       participants: {},
       peerVolumes: {},
       remoteStreams: {},
+      watchingScreenIds: [],
 
       // Chat
       messages: [],
@@ -428,6 +437,8 @@ export const useHubStore = create<HubState>()(
               : 'online',
         }),
       setCustomStatus: (customStatus) => set({ customStatus }),
+      setProfileMediaUrls: (customAvatarUrl, bannerUrl) =>
+        set({ customAvatarUrl, bannerUrl }),
       setFriends: (friends) => set({ friends }),
       setPendingRequests: (pendingRequests) => set({ pendingRequests }),
       setActiveFriend: (activeFriend) => set({ activeFriend }),
@@ -516,6 +527,8 @@ export const useHubStore = create<HubState>()(
           avatarColor: '#6eddbd',
           onlineStatus: 'online',
           customStatus: null,
+          customAvatarUrl: null,
+          bannerUrl: null,
           friends: [],
           pendingRequests: [],
           activeFriend: null,
@@ -533,6 +546,7 @@ export const useHubStore = create<HubState>()(
           callStageMode: 'hidden',
           participants: {},
           remoteStreams: {},
+          watchingScreenIds: [],
         });
       },
 
@@ -587,18 +601,31 @@ export const useHubStore = create<HubState>()(
         set((state) => {
           const current = state.participants[peerId];
           if (!current) return state;
+          const nextWatching =
+            partial.isScreenSharing === false
+              ? state.watchingScreenIds.filter(
+                  (id) => id !== peerId && id !== current.clientId,
+                )
+              : state.watchingScreenIds;
           return {
             participants: {
               ...state.participants,
               [peerId]: { ...current, ...partial },
             },
+            watchingScreenIds: nextWatching,
           };
         }),
       removeParticipant: (peerId) =>
         set((state) => {
+          const removed = state.participants[peerId];
           const next = { ...state.participants };
           delete next[peerId];
-          return { participants: next };
+          return {
+            participants: next,
+            watchingScreenIds: state.watchingScreenIds.filter(
+              (id) => id !== peerId && id !== removed?.clientId,
+            ),
+          };
         }),
       setPeerVolume: (clientId, volume) =>
         set((state) => ({
@@ -617,19 +644,45 @@ export const useHubStore = create<HubState>()(
           } else {
             current[type] = stream;
           }
+          const participant = state.participants[peerId];
+          const nextWatching =
+            type === 'screen' && stream === null
+              ? state.watchingScreenIds.filter(
+                  (id) => id !== peerId && id !== participant?.clientId,
+                )
+              : state.watchingScreenIds;
           return {
             remoteStreams: {
               ...state.remoteStreams,
               [peerId]: { ...current },
             },
+            watchingScreenIds: nextWatching,
           };
         }),
       removeRemoteStreams: (peerId) =>
         set((state) => {
           const next = { ...state.remoteStreams };
           delete next[peerId];
-          return { remoteStreams: next };
+          const participant = state.participants[peerId];
+          return {
+            remoteStreams: next,
+            watchingScreenIds: state.watchingScreenIds.filter(
+              (id) => id !== peerId && id !== participant?.clientId,
+            ),
+          };
         }),
+      watchScreen: (participantId) =>
+        set((state) =>
+          state.watchingScreenIds.includes(participantId)
+            ? state
+            : { watchingScreenIds: [...state.watchingScreenIds, participantId] },
+        ),
+      stopWatchingScreen: (participantId) =>
+        set((state) => ({
+          watchingScreenIds: state.watchingScreenIds.filter(
+            (id) => id !== participantId,
+          ),
+        })),
 
       // Chat P2P
       setMessages: (messages) => set({ messages: [...messages].sort(compareMessages) }),
@@ -797,6 +850,7 @@ export const useHubStore = create<HubState>()(
           focusedPeerStreamKey: null,
           participants: {},
           remoteStreams: {},
+          watchingScreenIds: [],
           typingUsers: {},
           isScreenSharing: false,
           isWebcamActive: false,

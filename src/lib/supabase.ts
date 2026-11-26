@@ -8,8 +8,23 @@ export type DbProfileRow = {
   avatar_color: string;
   online_status: DbOnlineStatus;
   custom_status: string | null;
+  custom_avatar_url: string | null;
+  banner_url: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type DbUserSoundRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  emoji: string;
+  storage_path: string;
+  volume: number;
+  duration_sec: number | null;
+  category: string | null;
+  is_favorite: boolean;
+  created_at: string;
 };
 
 export type DbFriendshipStatus =
@@ -97,13 +112,42 @@ export type Database = {
           avatar_color?: string;
           online_status?: DbOnlineStatus;
           custom_status?: string | null;
+          custom_avatar_url?: string | null;
+          banner_url?: string | null;
         };
         Update: {
           nickname?: string;
           avatar_color?: string;
           online_status?: DbOnlineStatus;
           custom_status?: string | null;
+          custom_avatar_url?: string | null;
+          banner_url?: string | null;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      user_sounds: {
+        Row: DbUserSoundRow;
+        Insert: {
+          id?: string;
+          user_id: string;
+          name: string;
+          emoji?: string;
+          storage_path: string;
+          volume?: number;
+          duration_sec?: number | null;
+          category?: string | null;
+          is_favorite?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          name?: string;
+          emoji?: string;
+          storage_path?: string;
+          volume?: number;
+          duration_sec?: number | null;
+          category?: string | null;
+          is_favorite?: boolean;
         };
         Relationships: [];
       };

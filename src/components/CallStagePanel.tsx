@@ -18,6 +18,8 @@ import {
   MicOff,
   Headphones,
   Tv,
+  Play,
+  Square,
 } from "lucide-react";
 import { useHubStore } from "../store/useHubStore";
 import { webrtcEngine } from "../lib/webrtcEngine";
@@ -42,6 +44,9 @@ export const CallStagePanel: React.FC = () => {
     telemetry,
     isMuted,
     isDeafened,
+    watchingScreenIds,
+    watchScreen,
+    stopWatchingScreen,
     setCallStageMode,
     setCallStageHeight,
     setFocusedPeerStreamKey,
@@ -57,6 +62,9 @@ export const CallStagePanel: React.FC = () => {
       telemetry: state.telemetry,
       isMuted: state.isMuted,
       isDeafened: state.isDeafened,
+      watchingScreenIds: state.watchingScreenIds,
+      watchScreen: state.watchScreen,
+      stopWatchingScreen: state.stopWatchingScreen,
       setCallStageMode: state.setCallStageMode,
       setCallStageHeight: state.setCallStageHeight,
       setFocusedPeerStreamKey: state.setFocusedPeerStreamKey,
@@ -115,10 +123,17 @@ export const CallStagePanel: React.FC = () => {
     focusedItem = { participant: found.participant, stream: found.stream };
   }
 
+  const isWatchingFocused = focusedItem
+    ? focusedItem.participant.isLocal ||
+      watchingScreenIds.includes(focusedItem.participant.peerId)
+    : false;
+
   useMediaOutput(
     spotlightVideoRef,
     focusedItem?.participant.clientId || "",
-    callStageMode === "spotlight" ? focusedItem?.stream : null,
+    callStageMode === "spotlight" && isWatchingFocused
+      ? focusedItem?.stream
+      : null,
   );
   useEffect(() => {
     const listener = () => setIsFullscreen(Boolean(document.fullscreenElement));
@@ -126,11 +141,24 @@ export const CallStagePanel: React.FC = () => {
     return () => document.removeEventListener("fullscreenchange", listener);
   }, []);
   useEffect(() => {
-    if (spotlightVideoRef.current && focusedItem?.stream) {
-      spotlightVideoRef.current.srcObject = focusedItem.stream;
-      spotlightVideoRef.current.play().catch(() => {});
+    const el = spotlightVideoRef.current;
+    if (!el) return;
+    if (
+      callStageMode === "spotlight" &&
+      isWatchingFocused &&
+      focusedItem?.stream
+    ) {
+      el.srcObject = focusedItem.stream;
+      el.play().catch(() => {});
+    } else {
+      el.pause();
+      el.srcObject = null;
     }
-  }, [focusedItem?.stream, callStageMode]);
+    return () => {
+      el.pause();
+      el.srcObject = null;
+    };
+  }, [focusedItem?.stream, callStageMode, isWatchingFocused]);
 
   useEffect(() => {
     const state = useHubStore.getState();
@@ -337,13 +365,38 @@ export const CallStagePanel: React.FC = () => {
       >
         {/* Vídeo Focado 4K */}
         <div className="relative flex-1 min-h-0 w-full flex items-center justify-center bg-black overflow-hidden">
-          <video
-            ref={spotlightVideoRef}
-            autoPlay
-            playsInline
-            muted={isLocal || isMutedStream || isDeafened}
-            className="w-full h-full object-contain cursor-pointer"
-          />
+          {isWatchingFocused ? (
+            <video
+              ref={spotlightVideoRef}
+              autoPlay
+              playsInline
+              muted={isLocal || isMutedStream || isDeafened}
+              className="w-full h-full object-contain cursor-pointer"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-3 p-6 text-center bg-zinc-950 w-full h-full">
+              <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[#12C9BD]">
+                <Tv className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-zinc-100">
+                  {focusedItem.participant.nickname} está transmitindo a tela
+                </p>
+                <p className="text-xs text-zinc-400">
+                  Clique abaixo para assistir sem sobrecarregar sua GPU/CPU
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => watchScreen(focusedItem.participant.peerId)}
+                className="gap-1.5"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                <span>Assistir live</span>
+              </Button>
+            </div>
+          )}
 
           {/* HUD de Telemetria no Topo Esquerdo */}
           {showHud &&
@@ -465,6 +518,22 @@ export const CallStagePanel: React.FC = () => {
               </TooltipTrigger>
               <TooltipContent side="bottom">Tela Cheia</TooltipContent>
             </Tooltip>
+
+            {!isLocal && isWatchingFocused && (
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => {
+                  stopWatchingScreen(focusedItem.participant.peerId);
+                  setCallStageMode("grid");
+                }}
+                className="h-8 text-xs px-2.5 flex items-center gap-1.5 shadow-md"
+              >
+                <Square className="w-3 h-3 fill-current" />
+                <span>Parar de assistir</span>
+              </Button>
+            )}
 
             <Button
               variant="secondary"
