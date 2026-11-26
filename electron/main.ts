@@ -118,7 +118,9 @@ function refreshTrayMenu() {
   );
 }
 app.setAppUserModelId("com.will.cbshub");
-const primaryInstance = app.requestSingleInstanceLock();
+const primaryInstance = process.env.VITE_DEV_SERVER_URL
+  ? true
+  : app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 function restoreWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) {

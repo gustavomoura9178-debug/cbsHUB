@@ -79,6 +79,10 @@ const appVersion: string = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
 ).version;
 
+// Terminals integrados baseados em Electron (VS Code / Antigravity) herdam ELECTRON_RUN_AS_NODE=1,
+// o que faz o Electron iniciar como Node puro e encerrar o `npm run dev` imediatamente.
+delete process.env.ELECTRON_RUN_AS_NODE;
+
 // https://vitejs.dev/config/
 export default defineConfig({
   define: {
