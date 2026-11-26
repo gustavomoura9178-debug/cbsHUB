@@ -1,90 +1,92 @@
+import { NoiseSuppressorWorklet_Name } from "@timephy/rnnoise-wasm";
+import rnnoiseWasmBase64 from "../../node_modules/@timephy/rnnoise-wasm/dist/generated/rnnoise-sync.js?rnnoise-wasm-base64";
+import rnnoiseWorkletSource from "./rnnoiseWorklet.js?audioworklet-source";
 import { createAudioPeakGuard, safeAudioGain } from "./audioPeakGuard";
 import { callEvent } from "./callDiagnostics";
 import type { AudioProcessingConfig } from "../types/cbshub";
 
-const NOISE_GATE_WORKLET_CODE = `
-class KrispLikeNoiseGateProcessor extends AudioWorkletProcessor {
-  constructor() {
-    super();
-    this.enabled = true;
-    this.currentGain = 1.0;
-    this.sampleRate = sampleRate;
-    this.openThresholdDb = -36.0;
-    this.closeThresholdDb = -42.0;
-    this.isOpen = false;
-    this.holdSamples = 0;
-    this.maxHoldSamples = Math.floor(0.08 * this.sampleRate); // 80ms hold
-    this.attackCoef = Math.exp(-1.0 / (0.002 * this.sampleRate));
-    this.releaseCoef = Math.exp(-1.0 / (0.070 * this.sampleRate));
+// Stock NoiseSuppressorWorklet emits its first denoised quantum after four
+// 128-sample inputs. Delaying the clean route equally prevents phase/latency
+// jumps during a live crossfade.
+const RNNOISE_LATENCY_SAMPLES = 384;
+const RNNOISE_CROSSFADE_SECONDS = 0.02;
 
-    this.port.onmessage = (event) => {
-      if (event.data && typeof event.data.enabled === 'boolean') {
-        this.enabled = event.data.enabled;
+let cachedRnnoiseWasmBinary: ArrayBuffer | null = null;
+let rnnoiseWasmBinaryPromise: Promise<ArrayBuffer> | null = null;
+let rnnoiseWorkletBlobUrl: string | null = null;
+
+async function getRnnoiseWasmBinary(): Promise<ArrayBuffer> {
+  if (cachedRnnoiseWasmBinary) return cachedRnnoiseWasmBinary;
+  if (!rnnoiseWasmBinaryPromise) {
+    rnnoiseWasmBinaryPromise = Promise.resolve().then(() => {
+      const decoded = atob(rnnoiseWasmBase64);
+      const buffer = new ArrayBuffer(decoded.length);
+      const bytes = new Uint8Array(buffer);
+      for (let i = 0; i < decoded.length; i++) {
+        bytes[i] = decoded.charCodeAt(i);
       }
-    };
+      if (!WebAssembly.validate(buffer)) {
+        throw new Error("Invalid embedded RNNoise WebAssembly binary");
+      }
+      cachedRnnoiseWasmBinary = buffer;
+      return buffer;
+    });
   }
 
-  process(inputs, outputs) {
-    const input = inputs[0];
-    const output = outputs[0];
-    if (!input || input.length === 0 || !input[0] || input[0].length === 0) {
-      return true;
-    }
-
-    const channelCount = Math.min(input.length, output.length);
-    const frameLength = input[0].length;
-    if (!Number.isFinite(this.currentGain)) this.currentGain = 1.0;
-
-    if (!this.enabled) {
-      for (let ch = 0; ch < channelCount; ch++) {
-        for (let i = 0; i < frameLength; i++) {
-          const s = Number.isFinite(input[ch][i]) ? input[ch][i] : 0;
-          output[ch][i] = Math.max(-1.0, Math.min(1.0, s));
-        }
-      }
-      return true;
-    }
-
-    let sumSquares = 0;
-    const primaryChannel = input[0];
-    for (let i = 0; i < frameLength; i++) {
-      const raw = Number.isFinite(primaryChannel[i]) ? primaryChannel[i] : 0;
-      const sample = Math.max(-1.5, Math.min(1.5, raw));
-      sumSquares += sample * sample;
-    }
-    const rms = Math.sqrt(sumSquares / frameLength);
-    const rmsDb = rms > 0.000001 ? 20 * Math.log10(rms) : -120;
-
-    if (rmsDb > this.openThresholdDb) {
-      this.isOpen = true;
-      this.holdSamples = this.maxHoldSamples;
-    } else if (this.isOpen) {
-      if (this.holdSamples > 0) {
-        this.holdSamples -= frameLength;
-      } else if (rmsDb < this.closeThresholdDb) {
-        this.isOpen = false;
-      }
-    }
-
-    const targetGain = this.isOpen ? 1.0 : 0.002;
-
-    for (let i = 0; i < frameLength; i++) {
-      const coef = targetGain > this.currentGain ? this.attackCoef : this.releaseCoef;
-      this.currentGain = targetGain + coef * (this.currentGain - targetGain);
-
-      for (let ch = 0; ch < channelCount; ch++) {
-        const raw = Number.isFinite(input[ch][i]) ? input[ch][i] : 0;
-        const scaled = raw * this.currentGain;
-        output[ch][i] = Math.max(-1.0, Math.min(1.0, scaled));
-      }
-    }
-
-    return true;
+  try {
+    return await rnnoiseWasmBinaryPromise;
+  } catch (error) {
+    rnnoiseWasmBinaryPromise = null;
+    throw error;
   }
 }
 
-registerProcessor('krisp-like-noise-gate', KrispLikeNoiseGateProcessor);
-`;
+function getRnnoiseWorkletBlobUrl(): string {
+  if (!rnnoiseWorkletBlobUrl) {
+    rnnoiseWorkletBlobUrl = URL.createObjectURL(
+      new Blob([rnnoiseWorkletSource], { type: "application/javascript" }),
+    );
+  }
+  return rnnoiseWorkletBlobUrl;
+}
+
+function rampAudioParam(
+  param: AudioParam,
+  target: number,
+  context: AudioContext,
+  immediate: boolean,
+): void {
+  const now = context.currentTime;
+  if (immediate) {
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(target, now);
+    return;
+  }
+
+  // cancelAndHold avoids jumps even if the user toggles during another ramp.
+  if (typeof param.cancelAndHoldAtTime === "function") {
+    param.cancelAndHoldAtTime(now);
+  } else {
+    const current = param.value;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(current, now);
+  }
+  param.linearRampToValueAtTime(target, now + RNNOISE_CROSSFADE_SECONDS);
+}
+
+class RnnoiseWorkletNode extends AudioWorkletNode {
+  constructor(context: AudioContext, wasmBinary: ArrayBuffer) {
+    super(context, NoiseSuppressorWorklet_Name, {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+      channelCount: 1,
+      channelCountMode: "explicit",
+      channelInterpretation: "speakers",
+      processorOptions: { maxChannels: 1, wasmBinary },
+    });
+  }
+}
 
 export type SpeakingCallback = (isSpeaking: boolean, level: number) => void;
 
@@ -95,7 +97,12 @@ export class VoiceAudioPipeline {
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private highPassFilter: BiquadFilterNode | null = null;
   private lowPassFilter: BiquadFilterNode | null = null;
-  private workletNode: AudioWorkletNode | null = null;
+  private workletNode: RnnoiseWorkletNode | null = null;
+  private cleanBypassDelay: DelayNode | null = null;
+  private cleanBypassGain: GainNode | null = null;
+  private denoisedGain: GainNode | null = null;
+  private nativeNoiseFallbackActive = false;
+  private nativeNoiseFallbackRevision = 0;
   private outputPeakGuard: WaveShaperNode | null = null;
   private compressorNode: DynamicsCompressorNode | null = null;
   private gainNode: GainNode | null = null;
@@ -176,30 +183,33 @@ export class VoiceAudioPipeline {
       this.audioCtx.currentTime,
     );
 
-    // Injeção do AudioWorkletProcessor KrispLikeNoiseGate via Blob URL
+    // O código já chega empacotado e o WASM já vem em memória: nenhum fetch,
+    // caminho absoluto ou acesso file:// é necessário, inclusive no .exe.
     try {
-      const blob = new Blob([NOISE_GATE_WORKLET_CODE], {
-        type: "application/javascript",
-      });
-      const blobUrl = URL.createObjectURL(blob);
-      try {
-        await this.audioCtx.audioWorklet.addModule(blobUrl);
-      } finally {
-        URL.revokeObjectURL(blobUrl);
-      }
+      const wasmBinary = await getRnnoiseWasmBinary();
+      await this.audioCtx.audioWorklet.addModule(getRnnoiseWorkletBlobUrl());
+      if (this.isDestroyed) throw new Error("Audio pipeline destroyed");
 
-      this.workletNode = new AudioWorkletNode(
-        this.audioCtx,
-        "krisp-like-noise-gate",
+      this.workletNode = new RnnoiseWorkletNode(this.audioCtx, wasmBinary);
+      this.cleanBypassDelay = this.audioCtx.createDelay(1);
+      this.cleanBypassDelay.delayTime.setValueAtTime(
+        RNNOISE_LATENCY_SAMPLES / this.audioCtx.sampleRate,
+        this.audioCtx.currentTime,
       );
-      this.workletNode.port.postMessage({
-        enabled: this.config.neuralNoiseGate,
-      });
+      this.cleanBypassGain = this.audioCtx.createGain();
+      this.denoisedGain = this.audioCtx.createGain();
+      this.setRnnoiseEnabled(this.config.neuralNoiseGate, true);
     } catch (error) {
-      // Fallback sem falhar o stream caso Worklet não seja suportado
+      // Nunca derruba o microfone: rota limpa + supressão nativa de contingência.
       callEvent("audio_processor_error");
-      console.warn("[Audio] Noise gate unavailable", error);
+      console.warn("[Audio] RNNoise unavailable; using native fallback", error);
+      this.workletNode?.port.close();
+      this.workletNode?.disconnect();
       this.workletNode = null;
+      this.cleanBypassDelay = null;
+      this.cleanBypassGain = null;
+      this.denoisedGain = null;
+      this.syncNativeNoiseFallback();
     }
 
     // Compressor vocal dinâmico
@@ -256,45 +266,49 @@ export class VoiceAudioPipeline {
     );
     this.soundboardInputNode.connect(this.soundboardCompressorNode);
 
-    // Encadeamento do Pipeline de Áudio:
-    // source -> highPass -> lowPass -> [worklet] -> gain -> compressor -> analyser -> micMuteNode -> outputPeakGuard -> destination
-    let lastNode: AudioNode = this.sourceNode;
-    lastNode.connect(this.highPassFilter);
-    lastNode = this.highPassFilter;
+    // source -> highPass -> lowPass -> [RNNoise/bypass] -> compressor -> gain
+    // -> analyser -> micMuteNode -> outputPeakGuard -> destination.
+    // O soundboard entra separadamente, depois de todo o processamento do mic.
+    this.sourceNode.connect(this.highPassFilter);
+    this.highPassFilter.connect(this.lowPassFilter);
 
-    lastNode.connect(this.lowPassFilter);
-    lastNode = this.lowPassFilter;
+    if (
+      this.workletNode &&
+      this.cleanBypassDelay &&
+      this.cleanBypassGain &&
+      this.denoisedGain
+    ) {
+      this.lowPassFilter.connect(this.workletNode);
+      this.workletNode.connect(this.denoisedGain);
+      this.denoisedGain.connect(this.compressorNode);
 
-    if (this.workletNode) {
-      lastNode.connect(this.workletNode);
-      lastNode = this.workletNode;
+      this.lowPassFilter.connect(this.cleanBypassDelay);
+      this.cleanBypassDelay.connect(this.cleanBypassGain);
+      this.cleanBypassGain.connect(this.compressorNode);
+    } else {
+      this.lowPassFilter.connect(this.compressorNode);
     }
 
-    lastNode.connect(this.gainNode);
-    lastNode = this.gainNode;
-
-    lastNode.connect(this.compressorNode);
-    lastNode = this.compressorNode;
-
-    lastNode.connect(this.analyserNode);
-
+    this.compressorNode.connect(this.gainNode);
+    this.gainNode.connect(this.analyserNode);
     this.analyserNode.connect(this.micMuteNode);
     this.micMuteNode.connect(this.outputPeakGuard);
 
-    // A crashed processor otherwise emits silence forever. Bypass only the gate,
-    // retaining filters, gain, mute, peak guard and the same outgoing track.
+    // Em falha do processor, a rota limpa já conectada assume sem trocar a
+    // trilha WebRTC e sem afetar VAD, mute, limiter ou soundboard.
     if (this.workletNode) {
-      const gate = this.workletNode;
-      gate.addEventListener(
+      const rnnoise = this.workletNode;
+      rnnoise.addEventListener(
         "processorerror",
         () => {
-          if (this.isDestroyed || this.workletNode !== gate) return;
+          if (this.isDestroyed || this.workletNode !== rnnoise) return;
           callEvent("audio_processor_error");
-          this.lowPassFilter?.disconnect(gate);
-          gate.disconnect();
-          gate.port.close();
+          this.lowPassFilter?.disconnect(rnnoise);
+          rnnoise.disconnect();
+          rnnoise.port.close();
           this.workletNode = null;
-          if (this.gainNode) this.lowPassFilter?.connect(this.gainNode);
+          this.setRnnoiseEnabled(false);
+          this.syncNativeNoiseFallback();
         },
         { once: true },
       );
@@ -385,6 +399,47 @@ export class VoiceAudioPipeline {
     return this.soundboardInputNode;
   }
 
+  private setRnnoiseEnabled(enabled: boolean, immediate = false): void {
+    if (!this.audioCtx || !this.cleanBypassGain || !this.denoisedGain) return;
+    const denoisedTarget = enabled && this.workletNode ? 1 : 0;
+    rampAudioParam(
+      this.denoisedGain.gain,
+      denoisedTarget,
+      this.audioCtx,
+      immediate,
+    );
+    rampAudioParam(
+      this.cleanBypassGain.gain,
+      1 - denoisedTarget,
+      this.audioCtx,
+      immediate,
+    );
+  }
+
+  private syncNativeNoiseFallback(): void {
+    const shouldEnable = this.config.neuralNoiseGate && !this.workletNode;
+    if (
+      this.isDestroyed ||
+      shouldEnable === this.nativeNoiseFallbackActive
+    ) {
+      return;
+    }
+
+    const track = this.rawStream.getAudioTracks()[0];
+    if (!track || typeof track.applyConstraints !== "function") return;
+
+    const revision = ++this.nativeNoiseFallbackRevision;
+    this.nativeNoiseFallbackActive = shouldEnable;
+    track
+      .applyConstraints({ noiseSuppression: shouldEnable })
+      .catch((error) => {
+        if (revision === this.nativeNoiseFallbackRevision) {
+          this.nativeNoiseFallbackActive = !shouldEnable;
+        }
+        console.warn("[Audio] Native noise-suppression fallback failed", error);
+      });
+  }
+
   public updateConfig(newConfig: Partial<AudioProcessingConfig>): void {
     this.config = { ...this.config, ...newConfig };
 
@@ -397,10 +452,9 @@ export class VoiceAudioPipeline {
       );
     }
 
-    if (this.workletNode) {
-      this.workletNode.port.postMessage({
-        enabled: this.config.neuralNoiseGate,
-      });
+    if (typeof newConfig.neuralNoiseGate === "boolean") {
+      this.setRnnoiseEnabled(newConfig.neuralNoiseGate);
+      this.syncNativeNoiseFallback();
     }
 
     if (
@@ -422,6 +476,7 @@ export class VoiceAudioPipeline {
 
   public destroy(): void {
     this.isDestroyed = true;
+    this.nativeNoiseFallbackRevision++;
     this.onInterrupted = null;
     this.clearSuspendTimer();
     if (this.audioCtx) this.audioCtx.onstatechange = null;
@@ -453,6 +508,11 @@ export class VoiceAudioPipeline {
       }
     }
     if (this.workletNode) {
+      try {
+        this.workletNode.port.postMessage({ type: "destroy" });
+      } catch {
+        /* ignore */
+      }
       this.workletNode.port.close();
       try {
         this.workletNode.disconnect();
@@ -460,6 +520,20 @@ export class VoiceAudioPipeline {
         /* ignore */
       }
     }
+    for (const node of [
+      this.cleanBypassDelay,
+      this.cleanBypassGain,
+      this.denoisedGain,
+    ]) {
+      try {
+        node?.disconnect();
+      } catch {
+        /* ignore */
+      }
+    }
+    this.cleanBypassDelay = null;
+    this.cleanBypassGain = null;
+    this.denoisedGain = null;
     if (this.compressorNode) {
       try {
         this.compressorNode.disconnect();

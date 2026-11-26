@@ -4779,7 +4779,6 @@ class WebRTCEngine {
     useMediaState.setState({ microphoneBusy: true, error: null });
     try {
       const audioConfig = useHubStore.getState().audioConfig;
-      const useSuppression = Boolean(audioConfig.neuralNoiseGate);
       const audioConstraints: MediaTrackConstraints = {
         deviceId:
           audioConfig.inputDeviceId !== "default"
@@ -4787,7 +4786,8 @@ class WebRTCEngine {
             : undefined,
         echoCancellation: audioConfig.echoCancellation,
         autoGainControl: audioConfig.autoGainControl,
-        noiseSuppression: useSuppression,
+        // RNNoise é o único supressor; o fallback nativo é controlado pelo pipeline.
+        noiseSuppression: false,
         sampleRate: 48000,
         channelCount: 1,
       };
@@ -5086,17 +5086,20 @@ class WebRTCEngine {
 
   public updateAudioSettings(partial: Partial<AudioProcessingConfig>): void {
     useHubStore.getState().updateAudioConfig(partial);
-    if (this.audioPipeline) {
-      this.audioPipeline.updateConfig(partial);
-    }
 
     if (typeof partial.neuralNoiseGate === "boolean" && this.rawMicStream) {
       const audioTrack = this.rawMicStream.getAudioTracks()[0];
       if (audioTrack && typeof audioTrack.applyConstraints === "function") {
+        // Desliga o nativo antes do crossfade. Se o WASM estiver indisponível,
+        // updateConfig() reativa o nativo imediatamente como fallback.
         audioTrack
-          .applyConstraints({ noiseSuppression: partial.neuralNoiseGate })
+          .applyConstraints({ noiseSuppression: false })
           .catch(() => {});
       }
+    }
+
+    if (this.audioPipeline) {
+      this.audioPipeline.updateConfig(partial);
     }
 
     const state = useHubStore.getState();

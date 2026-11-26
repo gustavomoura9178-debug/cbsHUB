@@ -1,5 +1,15 @@
 /// <reference types="vite/client" />
 
+declare module "*?audioworklet-source" {
+  const source: string;
+  export default source;
+}
+
+declare module "*?rnnoise-wasm-base64" {
+  const base64: string;
+  export default base64;
+}
+
 interface ImportMetaEnv {
   readonly VITE_METERED_TURN_URL?: string;
   readonly VITE_METERED_TURNS_URL?: string;

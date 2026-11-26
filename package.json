@@ -1,7 +1,7 @@
 {
   "name": "cbshub",
   "private": true,
-  "version": "2.1.1",
+  "version": "2.2.0",
   "description": "Ultra-quality P2P voice, webcam and screen sharing desktop hub",
   "type": "module",
   "main": "dist-electron/main.js",
@@ -27,6 +27,7 @@
     "@radix-ui/react-tabs": "^1.2.1",
     "@radix-ui/react-tooltip": "^1.4.1",
     "@supabase/supabase-js": "^2.119.2",
+    "@timephy/rnnoise-wasm": "^1.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "electron-updater": "^6.8.11",
@@ -79,6 +80,7 @@
       "icon": "public/brand/app.ico"
     },
     "nsis": {
+      "artifactName": "cbsHUB-Setup-${version}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

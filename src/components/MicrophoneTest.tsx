@@ -1,104 +1,105 @@
 import { useEffect, useRef, useState } from "react";
+import { VoiceAudioPipeline } from "../lib/audioPipeline";
 import { useHubStore } from "../store/useHubStore";
 import { Button } from "./ui/button";
+
 export function MicrophoneTest() {
   const inVoice = useHubStore((s) => s.inVoiceCall),
-    input = useHubStore((s) => s.audioConfig.inputDeviceId);
+    audioConfig = useHubStore((s) => s.audioConfig),
+    input = audioConfig.inputDeviceId;
   const [running, setRunning] = useState(false),
     [busy, setBusy] = useState(false),
     [level, setLevel] = useState(0),
     [error, setError] = useState("");
   const active = useRef<{
       stream: MediaStream;
-      ctx: AudioContext;
-      frame: number;
+      pipeline: VoiceAudioPipeline;
     } | null>(null),
     generation = useRef(0);
+
   const stop = () => {
     generation.current++;
     const current = active.current;
     active.current = null;
     if (current) {
-      cancelAnimationFrame(current.frame);
-      current.stream.getTracks().forEach((t) => t.stop());
-      void current.ctx.close().catch(() => {});
+      current.pipeline.destroy();
+      current.stream.getTracks().forEach((track) => track.stop());
     }
     setRunning(false);
     setBusy(false);
     setLevel(0);
   };
+
   useEffect(() => {
     stop();
     return stop;
   }, [inVoice, input]);
+
+  // Permite comparar o bypass/RNNoise sem reabrir o dispositivo ou o WebRTC.
+  useEffect(() => {
+    active.current?.pipeline.updateConfig(audioConfig);
+  }, [audioConfig]);
+
   const start = async () => {
     const attempt = ++generation.current;
     setBusy(true);
     setError("");
     let stream: MediaStream | null = null,
-      ctx: AudioContext | null = null;
+      pipeline: VoiceAudioPipeline | null = null;
     try {
+      const config = useHubStore.getState().audioConfig;
       stream = await navigator.mediaDevices.getUserMedia({
-        audio: { deviceId: input === "default" ? undefined : { exact: input } },
+        audio: {
+          deviceId: input === "default" ? undefined : { exact: input },
+          echoCancellation: config.echoCancellation,
+          autoGainControl: config.autoGainControl,
+          // O pipeline usa RNNoise; o nativo só entra se o WASM falhar.
+          noiseSuppression: false,
+          sampleRate: 48000,
+          channelCount: 1,
+        },
         video: false,
       });
       if (attempt !== generation.current) {
-        stream.getTracks().forEach((t) => t.stop());
+        stream.getTracks().forEach((track) => track.stop());
         return;
       }
-      ctx = new AudioContext();
-      await ctx.resume();
+
+      pipeline = new VoiceAudioPipeline(stream, config, (_, nextLevel) => {
+        if (attempt === generation.current) setLevel(nextLevel);
+      });
+      await pipeline.initialize();
       if (attempt !== generation.current) {
-        stream.getTracks().forEach((t) => t.stop());
-        void ctx.close();
+        pipeline.destroy();
+        stream.getTracks().forEach((track) => track.stop());
         return;
       }
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 1024;
-      ctx.createMediaStreamSource(stream).connect(analyser);
-      const data = new Float32Array(analyser.fftSize);
-      const capture = { stream, ctx, frame: 0 };
-      active.current = capture;
+
+      // Aplica qualquer alteração feita enquanto o worklet era carregado.
+      pipeline.updateConfig(useHubStore.getState().audioConfig);
+      active.current = { stream, pipeline };
       setRunning(true);
-      let previous = 0;
-      const tick = (time: number) => {
-        if (active.current !== capture) return;
-        if (time - previous > 80) {
-          analyser.getFloatTimeDomainData(data);
-          setLevel(
-            Math.min(
-              100,
-              Math.round(
-                Math.sqrt(
-                  data.reduce((sum, x) => sum + x * x, 0) / data.length,
-                ) * 350,
-              ),
-            ),
-          );
-          previous = time;
-        }
-        capture.frame = requestAnimationFrame(tick);
-      };
-      capture.frame = requestAnimationFrame(tick);
       stream.getTracks().forEach((track) => {
         track.onended = stop;
       });
     } catch {
-      stream?.getTracks().forEach((t) => t.stop());
-      if (ctx) void ctx.close().catch(() => {});
-      if (attempt === generation.current)
+      pipeline?.destroy();
+      stream?.getTracks().forEach((track) => track.stop());
+      if (attempt === generation.current) {
         setError(
           "Não foi possível testar o microfone. Verifique o dispositivo e a permissão.",
         );
+      }
     } finally {
       if (attempt === generation.current) setBusy(false);
     }
   };
+
   return (
     <section className="space-y-2" aria-label="Teste de microfone">
       <p className="text-xs text-muted-foreground">
-        Teste local de nível, sem reprodução ou envio para a sala. Durante uma
-        chamada, use o medidor existente.
+        Teste local de nível com o mesmo RNNoise da chamada, sem reprodução ou
+        envio para a sala. Durante uma chamada, use o medidor existente.
       </p>
       <Button
         size="sm"

@@ -20,7 +20,7 @@ export interface AudioProcessingConfig {
   echoCancellation: boolean;
   autoGainControl: boolean;
   highPassFilter80Hz: boolean;
-  neuralNoiseGate: boolean; // Supressão de ruído Krisp-like via Worklet
+  neuralNoiseGate: boolean; // Supressão neural RNNoise 0.2 via WebAssembly/AudioWorklet
   micGain: number; // 0.0 a 2.0 (1.0 = 100%)
   remoteStreamVolume: number; // 0.0 a 1.0
 }
