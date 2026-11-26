@@ -47,6 +47,7 @@ const rendererUrl =
   process.env.VITE_DEV_SERVER_URL ||
   pathToFileURL(path.join(__dirname, "../dist/index.html")).href;
 let mainWindow: BrowserWindow | null = null;
+let updaterWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
 let trayCallState = { inVoiceCall: false, reconnecting: false };
@@ -158,6 +159,10 @@ app.on("second-instance", () => {
 });
 app.on("before-quit", () => {
   quitting = true;
+  if (updaterWindow && !updaterWindow.isDestroyed()) {
+    updaterWindow.destroy();
+    updaterWindow = null;
+  }
   tray?.destroy();
   tray = null;
 });
@@ -166,10 +171,29 @@ function allowedSender(
 ): boolean {
   return (
     !!mainWindow &&
+    !mainWindow.isDestroyed() &&
     event.sender === mainWindow.webContents &&
     event.senderFrame === mainWindow.webContents.mainFrame &&
     trustedRenderer(event.senderFrame.url, rendererUrl)
   );
+}
+function allowedUpdaterSender(
+  event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent,
+): boolean {
+  if (!event.senderFrame || !trustedRenderer(event.senderFrame.url, rendererUrl)) {
+    return false;
+  }
+  const fromMain =
+    !!mainWindow &&
+    !mainWindow.isDestroyed() &&
+    event.sender === mainWindow.webContents &&
+    event.senderFrame === mainWindow.webContents.mainFrame;
+  const fromUpdater =
+    !!updaterWindow &&
+    !updaterWindow.isDestroyed() &&
+    event.sender === updaterWindow.webContents &&
+    event.senderFrame === updaterWindow.webContents.mainFrame;
+  return fromMain || fromUpdater;
 }
 let pendingSourceId: string | null = null;
 let pendingSystemAudio = true;
@@ -197,7 +221,7 @@ function getPreloadPath(): string {
   return fallback;
 }
 
-function createWindow(): void {
+function createWindow(startHidden = false): void {
   const preloadPath = getPreloadPath();
 
   mainWindow = new BrowserWindow({
@@ -211,6 +235,7 @@ function createWindow(): void {
     height: 800,
     minWidth: 1100,
     minHeight: 700,
+    show: !startHidden,
     frame: false,
     backgroundColor: "#09090b",
     titleBarStyle: process.platform === "darwin" ? "hiddenInset" : undefined,
@@ -362,10 +387,139 @@ ipcMain.handle("cbs:notify", (event, input: unknown) => {
   return true;
 });
 
+let currentUpdateState: AppUpdateState = { status: "idle" };
+let updateFlowActive = false;
+let installScheduled = false;
+
+function extractReleaseNotes(raw: unknown): string | undefined {
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    return trimmed || undefined;
+  }
+  if (Array.isArray(raw)) {
+    const joined = raw
+      .map((entry) =>
+        entry && typeof entry === "object" && "note" in entry
+          ? String((entry as { note?: unknown }).note || "")
+          : "",
+      )
+      .filter(Boolean)
+      .join("\n")
+      .trim();
+    return joined || undefined;
+  }
+  return undefined;
+}
+
 function sendUpdateStatus(state: AppUpdateState): void {
+  currentUpdateState = state;
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send("cbs:update-status", state);
   }
+  if (updaterWindow && !updaterWindow.isDestroyed()) {
+    updaterWindow.webContents.send("cbs:update-status", state);
+  }
+}
+
+function createUpdaterWindow(): BrowserWindow {
+  if (updaterWindow && !updaterWindow.isDestroyed()) {
+    if (updaterWindow.isMinimized()) updaterWindow.restore();
+    updaterWindow.show();
+    updaterWindow.focus();
+    return updaterWindow;
+  }
+
+  const preloadPath = getPreloadPath();
+
+  updaterWindow = new BrowserWindow({
+    icon: path.join(
+      app.getAppPath(),
+      process.env.VITE_DEV_SERVER_URL
+        ? "public/brand/logo-256.png"
+        : "dist/brand/logo-256.png",
+    ),
+    width: 340,
+    height: 390,
+    frame: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    center: true,
+    alwaysOnTop: true,
+    backgroundColor: "#09090b",
+    webPreferences: {
+      preload: preloadPath,
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+
+  updaterWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (externalLink(url)) void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  updaterWindow.webContents.on("will-navigate", (event, url) => {
+    if (!trustedRenderer(url, rendererUrl)) event.preventDefault();
+  });
+  updaterWindow.webContents.on("preload-error", (_event, failedPath, error) => {
+    console.error(
+      "[cbsHUB Updater] Falha no script de Preload:",
+      failedPath,
+      error,
+    );
+  });
+
+  updaterWindow.webContents.once("did-finish-load", () => {
+    if (updaterWindow && !updaterWindow.isDestroyed()) {
+      updaterWindow.webContents.send("cbs:update-status", currentUpdateState);
+    }
+  });
+
+  if (process.env.VITE_DEV_SERVER_URL) {
+    const devUrl = new URL(process.env.VITE_DEV_SERVER_URL);
+    devUrl.searchParams.set("window", "updater");
+    void updaterWindow.loadURL(devUrl.toString());
+  } else {
+    void updaterWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
+      query: { window: "updater" },
+    });
+  }
+
+  updaterWindow.on("closed", () => {
+    updaterWindow = null;
+    if (!quitting && updateFlowActive) {
+      updateFlowActive = false;
+      restoreWindow();
+    }
+  });
+
+  return updaterWindow;
+}
+
+function triggerSilentInstall(targetVersion?: string): void {
+  if (installScheduled) return;
+  installScheduled = true;
+  sendUpdateStatus({
+    status: "installing",
+    version: targetVersion || currentUpdateState.version,
+    releaseNotes: currentUpdateState.releaseNotes,
+    percent: 100,
+    transferred: currentUpdateState.total || currentUpdateState.transferred,
+    total: currentUpdateState.total,
+  });
+
+  setTimeout(() => {
+    quitting = true;
+    tray?.destroy();
+    tray = null;
+    if (updaterWindow && !updaterWindow.isDestroyed()) {
+      updaterWindow.destroy();
+      updaterWindow = null;
+    }
+    autoUpdater?.quitAndInstall(true, true);
+  }, 700);
 }
 
 let updaterInitialized = false;
@@ -383,8 +537,7 @@ function setupAutoUpdater(): void {
     sendUpdateStatus({
       status: "available",
       version: info.version,
-      releaseNotes:
-        typeof info.releaseNotes === "string" ? info.releaseNotes : undefined,
+      releaseNotes: extractReleaseNotes(info.releaseNotes),
     });
   });
   autoUpdater.on("update-not-available", (info) => {
@@ -393,15 +546,36 @@ function setupAutoUpdater(): void {
   autoUpdater.on("download-progress", (progress) => {
     sendUpdateStatus({
       status: "downloading",
-      percent: Math.round(progress.percent || 0),
+      version: currentUpdateState.version,
+      releaseNotes: currentUpdateState.releaseNotes,
+      percent: Math.min(100, Math.max(0, Math.round(progress.percent || 0))),
+      bytesPerSecond: Number.isFinite(progress.bytesPerSecond)
+        ? progress.bytesPerSecond
+        : 0,
+      transferred: Number.isFinite(progress.transferred)
+        ? progress.transferred
+        : 0,
+      total: Number.isFinite(progress.total) ? progress.total : 0,
     });
   });
   autoUpdater.on("update-downloaded", (info) => {
-    sendUpdateStatus({ status: "downloaded", version: info.version });
+    const targetVersion = info?.version || currentUpdateState.version;
+    if (updateFlowActive || (updaterWindow && !updaterWindow.isDestroyed())) {
+      triggerSilentInstall(targetVersion);
+      return;
+    }
+    sendUpdateStatus({
+      status: "downloaded",
+      version: targetVersion,
+      releaseNotes: currentUpdateState.releaseNotes,
+      percent: 100,
+    });
   });
   autoUpdater.on("error", (err) => {
     sendUpdateStatus({
       status: "error",
+      version: currentUpdateState.version,
+      releaseNotes: currentUpdateState.releaseNotes,
       message:
         err instanceof Error
           ? err.message
@@ -410,8 +584,13 @@ function setupAutoUpdater(): void {
   });
 }
 
+ipcMain.handle("cbs:get-update-state", (event) => {
+  if (!allowedUpdaterSender(event)) return { status: "idle" } as AppUpdateState;
+  return currentUpdateState;
+});
+
 ipcMain.handle("cbs:check-updates", async (event) => {
-  if (!allowedSender(event)) return;
+  if (!allowedUpdaterSender(event)) return;
   if (!app.isPackaged || !autoUpdater) {
     sendUpdateStatus({ status: "not-available" });
     return;
@@ -429,7 +608,7 @@ ipcMain.handle("cbs:check-updates", async (event) => {
 });
 
 ipcMain.handle("cbs:download-update", async (event) => {
-  if (!allowedSender(event)) return;
+  if (!allowedUpdaterSender(event)) return;
   if (!app.isPackaged || !autoUpdater) return;
   setupAutoUpdater();
   try {
@@ -437,17 +616,124 @@ ipcMain.handle("cbs:download-update", async (event) => {
   } catch (err) {
     sendUpdateStatus({
       status: "error",
+      version: currentUpdateState.version,
       message:
         err instanceof Error ? err.message : "Erro ao baixar atualização.",
     });
   }
 });
 
+ipcMain.handle("cbs:start-update-flow", async (event) => {
+  if (!allowedUpdaterSender(event)) return;
+  updateFlowActive = true;
+  installScheduled = false;
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.hide();
+  }
+  createUpdaterWindow();
+
+  if (currentUpdateState.status === "downloaded") {
+    triggerSilentInstall(currentUpdateState.version);
+    return;
+  }
+
+  if (!app.isPackaged || !autoUpdater) {
+    sendUpdateStatus({
+      status: "error",
+      version: currentUpdateState.version,
+      message:
+        "A atualização automática está disponível apenas no aplicativo desktop instalado.",
+    });
+    return;
+  }
+
+  setupAutoUpdater();
+  sendUpdateStatus({
+    status: "downloading",
+    version: currentUpdateState.version,
+    releaseNotes: currentUpdateState.releaseNotes,
+    percent: 0,
+    bytesPerSecond: 0,
+    transferred: 0,
+    total: 0,
+  });
+
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (err) {
+    sendUpdateStatus({
+      status: "error",
+      version: currentUpdateState.version,
+      releaseNotes: currentUpdateState.releaseNotes,
+      message:
+        err instanceof Error ? err.message : "Erro ao baixar atualização.",
+    });
+  }
+});
+
+ipcMain.on("cbs:cancel-update-window", (event) => {
+  if (!allowedUpdaterSender(event)) return;
+  updateFlowActive = false;
+  installScheduled = false;
+  if (updaterWindow && !updaterWindow.isDestroyed()) {
+    updaterWindow.close();
+  }
+  updaterWindow = null;
+  restoreWindow();
+});
+
 ipcMain.on("cbs:install-update", (event) => {
-  if (!allowedSender(event)) return;
+  if (!allowedUpdaterSender(event)) return;
   if (!app.isPackaged || !autoUpdater) return;
   quitting = true;
-  autoUpdater.quitAndInstall();
+  tray?.destroy();
+  tray = null;
+  if (updaterWindow && !updaterWindow.isDestroyed()) {
+    updaterWindow.destroy();
+    updaterWindow = null;
+  }
+  autoUpdater.quitAndInstall(true, true);
+});
+
+function readAutoLaunchState(): { enabled: boolean; supported: boolean } {
+  if (!app.isPackaged) {
+    return { enabled: false, supported: false };
+  }
+  try {
+    const settings = app.getLoginItemSettings({
+      path: process.execPath,
+      args: ["--autostart"],
+    });
+    return { enabled: Boolean(settings.openAtLogin), supported: true };
+  } catch {
+    return { enabled: false, supported: false };
+  }
+}
+
+ipcMain.handle("cbs:get-auto-launch", (event) => {
+  if (!allowedSender(event)) throw new Error("Origem IPC não autorizada.");
+  return readAutoLaunchState();
+});
+
+ipcMain.handle("cbs:set-auto-launch", (event, enabled: unknown) => {
+  if (!allowedSender(event)) throw new Error("Origem IPC não autorizada.");
+  if (typeof enabled !== "boolean") {
+    return readAutoLaunchState();
+  }
+  if (!app.isPackaged) {
+    return { enabled: false, supported: false };
+  }
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: enabled,
+      path: process.execPath,
+      args: ["--autostart"],
+    });
+  } catch (err) {
+    console.warn("[Desktop] Erro ao configurar inicialização automática:", err);
+  }
+  return readAutoLaunchState();
 });
 
 ipcMain.on("cbs:tray-state", (event, state: unknown) => {
@@ -610,8 +896,12 @@ if (primaryInstance)
       },
     );
 
-    createWindow();
+    const startedViaAutostart = process.argv.includes("--autostart");
     createTray();
+    const shouldStartHidden =
+      startedViaAutostart && Boolean(tray && !tray.isDestroyed());
+    createWindow(shouldStartHidden);
+    refreshTrayMenu();
     setupAutoUpdater();
     if (app.isPackaged && autoUpdater) {
       setTimeout(() => {

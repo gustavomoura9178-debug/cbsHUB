@@ -61,6 +61,13 @@ const api: CbsHubElectronAPI = {
   installUpdate: (): void => {
     ipcRenderer.send("cbs:install-update");
   },
+  startUpdateFlow: (): Promise<void> =>
+    ipcRenderer.invoke("cbs:start-update-flow"),
+  cancelUpdateWindow: (): void => {
+    ipcRenderer.send("cbs:cancel-update-window");
+  },
+  getUpdateState: (): Promise<AppUpdateState> =>
+    ipcRenderer.invoke("cbs:get-update-state"),
   onUpdateStatus: (listener: (state: AppUpdateState) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, state: unknown) => {
       if (state && typeof state === "object" && "status" in state) {
@@ -72,6 +79,9 @@ const api: CbsHubElectronAPI = {
       ipcRenderer.removeListener("cbs:update-status", handler);
     };
   },
+  getAutoLaunch: () => ipcRenderer.invoke("cbs:get-auto-launch"),
+  setAutoLaunch: (enabled: boolean) =>
+    ipcRenderer.invoke("cbs:set-auto-launch", enabled),
 };
 
 try {

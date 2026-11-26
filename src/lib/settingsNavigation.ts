@@ -1,6 +1,11 @@
 import { create } from "zustand";
 import { useHubStore } from "../store/useHubStore";
-export type SettingsTab = "audio" | "profile" | "appearance" | "diagnostics";
+export type SettingsTab =
+  | "audio"
+  | "profile"
+  | "appearance"
+  | "diagnostics"
+  | "system";
 export const useSettingsNavigation = create<{ tab: SettingsTab }>(() => ({
   tab: "audio",
 }));

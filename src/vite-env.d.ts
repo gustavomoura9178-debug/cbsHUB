@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __APP_VERSION__: string;
+
 declare module "*?audioworklet-source" {
   const source: string;
   export default source;

@@ -18,10 +18,22 @@ assert(
   ),
 );
 assert(
+  trustedRenderer(
+    "file:///app/dist/index.html?window=updater",
+    "file:///app/dist/index.html",
+  ),
+);
+assert(
   !trustedRenderer("file:///tmp/page.html", "file:///app/dist/index.html"),
 );
 assert(!trustedRenderer("https://evil.test", "http://localhost:5173"));
 assert(trustedRenderer("http://localhost:5173/", "http://localhost:5173"));
+assert(
+  trustedRenderer(
+    "http://localhost:5173/?window=updater",
+    "http://localhost:5173",
+  ),
+);
 assert(!externalLink("javascript:alert(1)"));
 assert(!externalLink("https://user:pass@example.com"));
 assert(externalLink("https://example.com/path"));
@@ -50,7 +62,7 @@ vm.runInNewContext(preload, {
   },
   console,
 });
-assert.equal(Object.keys(api).length, 16);
+assert.equal(Object.keys(api).length, 21);
 assert(!/^\s*(import|export) /m.test(preload));
 console.log(
   "PASS desktop origins, links, capture arguments and executable CJS preload",

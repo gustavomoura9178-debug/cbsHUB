@@ -13,6 +13,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import { useHubStore } from "../store/useHubStore";
 import { webrtcEngine } from "../lib/webrtcEngine";
+import { sanitizeReleaseNotes } from "../lib/appUpdaterUi";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { Button } from "./ui/button";
 import { ScrollArea } from "./ui/scroll-area";
@@ -37,7 +38,8 @@ export const NotificationCenterPopover: React.FC = () => {
   const hasUpdateNotice =
     appUpdate.status === "available" ||
     appUpdate.status === "downloading" ||
-    appUpdate.status === "downloaded";
+    appUpdate.status === "downloaded" ||
+    appUpdate.status === "installing";
 
   const totalBadgeCount =
     incomingFriends.length + roomInvites.length + (hasUpdateNotice ? 1 : 0);
@@ -108,7 +110,7 @@ export const NotificationCenterPopover: React.FC = () => {
 
                 {appUpdate.releaseNotes && (
                   <p className="text-2xs text-muted-foreground line-clamp-2">
-                    {appUpdate.releaseNotes.replace(/<[^>]+>/g, "")}
+                    {sanitizeReleaseNotes(appUpdate.releaseNotes)}
                   </p>
                 )}
 
@@ -129,11 +131,14 @@ export const NotificationCenterPopover: React.FC = () => {
                   <Button
                     type="button"
                     size="sm"
-                    onClick={() => void window.cbsHubAPI?.downloadUpdate?.()}
+                    onClick={() => {
+                      setOpen(false);
+                      void window.cbsHubAPI?.startUpdateFlow?.();
+                    }}
                     className="w-full h-7 text-xs gap-1.5"
                   >
                     <Download className="size-3.5" />
-                    <span>Baixar e Instalar</span>
+                    <span>Atualizar agora</span>
                   </Button>
                 )}
 
@@ -141,7 +146,10 @@ export const NotificationCenterPopover: React.FC = () => {
                   <Button
                     type="button"
                     size="sm"
-                    onClick={() => window.cbsHubAPI?.installUpdate?.()}
+                    onClick={() => {
+                      setOpen(false);
+                      void window.cbsHubAPI?.startUpdateFlow?.();
+                    }}
                     className="w-full h-7 text-xs gap-1.5 bg-success hover:bg-success/90 text-success-foreground"
                   >
                     <RotateCw className="size-3.5" />

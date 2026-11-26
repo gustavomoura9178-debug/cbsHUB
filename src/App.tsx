@@ -7,7 +7,7 @@ import {
 import { IncomingCallModal } from "./components/IncomingCallModal";
 import { usePushToTalk } from "./hooks/usePushToTalk";
 import { useShallow } from "zustand/react/shallow";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { TitleBar } from "./components/TitleBar";
 import { LeftSidebar } from "./components/LeftSidebar";
 import { RoomTopBar } from "./components/RoomTopBar";
@@ -15,6 +15,7 @@ import { CallStagePanel } from "./components/CallStagePanel";
 import { TextChatSection } from "./components/TextChatSection";
 import { ScreenPickerModal } from "./components/ScreenPickerModal";
 import { SettingsModal } from "./components/SettingsModal";
+import { UpdateAvailableModal } from "./components/UpdateAvailableModal";
 import { TooltipProvider } from "./components/ui/tooltip";
 import { useHubStore } from "./store/useHubStore";
 import { webrtcEngine } from "./lib/webrtcEngine";
@@ -42,6 +43,8 @@ export const App: React.FC = () => {
   }, [trayInVoice, trayReconnecting]);
 
   const [booting, setBooting] = useState(true);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const promptedUpdateVersionsRef = useRef<Set<string>>(new Set());
   const [isOffline, setIsOffline] = useState(
     () => typeof navigator !== "undefined" && !navigator.onLine,
   );
@@ -107,8 +110,29 @@ export const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    const handleUpdateState = (state: { status: string; version?: string }) => {
+      if (state.status === "available") {
+        const versionKey = state.version || "latest";
+        if (!promptedUpdateVersionsRef.current.has(versionKey)) {
+          promptedUpdateVersionsRef.current.add(versionKey);
+          setUpdateModalOpen(true);
+        }
+      }
+    };
+
+    void window.cbsHubAPI
+      ?.getUpdateState?.()
+      .then((initial) => {
+        if (initial) {
+          useHubStore.getState().setAppUpdate(initial);
+          handleUpdateState(initial);
+        }
+      })
+      .catch(() => {});
+
     const unsub = window.cbsHubAPI?.onUpdateStatus?.((state) => {
       useHubStore.getState().setAppUpdate(state);
+      handleUpdateState(state);
     });
     return () => {
       unsub?.();
@@ -224,6 +248,10 @@ export const App: React.FC = () => {
         <ScreenPickerModal />
         <SettingsModal />
         <ProfileDialog />
+        <UpdateAvailableModal
+          open={updateModalOpen}
+          onOpenChange={setUpdateModalOpen}
+        />
       </div>
     </TooltipProvider>
   );

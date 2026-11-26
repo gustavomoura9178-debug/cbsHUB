@@ -1,6 +1,7 @@
 import {productionCsp} from './electron/security.ts';
 import { defineConfig } from 'vite';
 import {fileURLToPath} from 'node:url';
+import {readFileSync} from 'node:fs';
 import {readFile} from 'node:fs/promises';
 import {build as bundleWithEsbuild} from 'esbuild';
 import electron from 'vite-plugin-electron';
@@ -74,8 +75,15 @@ function rnnoiseAssetsPlugin() {
   };
 }
 
+const appVersion: string = JSON.parse(
+  readFileSync(new URL('./package.json', import.meta.url), 'utf8'),
+).version;
+
 // https://vitejs.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   envPrefix: ['VITE_', 'SUPABASE_'],
   plugins: [
     rnnoiseAssetsPlugin(),

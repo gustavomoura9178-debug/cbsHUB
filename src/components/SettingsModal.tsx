@@ -34,6 +34,9 @@ import {
   User,
   Sparkles,
   Volume2,
+  Laptop,
+  RefreshCw,
+  Download,
 } from "lucide-react";
 import {
   Dialog,
@@ -51,6 +54,7 @@ import { Switch } from "./ui/switch";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useHubStore } from "../store/useHubStore";
 import { webrtcEngine } from "../lib/webrtcEngine";
+import { APP_VERSION } from "../lib/appUpdaterUi";
 
 export const SettingsModal: React.FC = () => {
   const settingsTab = useSettingsNavigation((s) => s.tab);
@@ -80,13 +84,21 @@ export const SettingsModal: React.FC = () => {
   const compact = useChatView((state) => state.compact);
   const [appearanceError, setAppearanceError] = useState("");
   const studio = useStudio();
-  const { isSettingsOpen, setIsSettingsOpen, audioConfig } = useHubStore(
-    useShallow((s) => ({
-      isSettingsOpen: s.isSettingsOpen,
-      setIsSettingsOpen: s.setIsSettingsOpen,
-      audioConfig: s.audioConfig,
-    })),
-  );
+  const { isSettingsOpen, setIsSettingsOpen, audioConfig, appUpdate } =
+    useHubStore(
+      useShallow((s) => ({
+        isSettingsOpen: s.isSettingsOpen,
+        setIsSettingsOpen: s.setIsSettingsOpen,
+        audioConfig: s.audioConfig,
+        appUpdate: s.appUpdate,
+      })),
+    );
+
+  const [autoLaunch, setAutoLaunch] = useState<{
+    enabled: boolean;
+    supported: boolean;
+    loading: boolean;
+  }>({ enabled: false, supported: false, loading: false });
 
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
@@ -107,8 +119,38 @@ export const SettingsModal: React.FC = () => {
   useEffect(() => {
     if (isSettingsOpen) {
       loadDevices();
+      if (window.cbsHubAPI?.getAutoLaunch) {
+        setAutoLaunch((prev) => ({ ...prev, loading: true }));
+        void window.cbsHubAPI
+          .getAutoLaunch()
+          .then((res) => {
+            setAutoLaunch({
+              enabled: Boolean(res?.enabled),
+              supported: Boolean(res?.supported),
+              loading: false,
+            });
+          })
+          .catch(() => {
+            setAutoLaunch({ enabled: false, supported: false, loading: false });
+          });
+      }
     }
   }, [isSettingsOpen]);
+
+  const handleToggleAutoLaunch = async (checked: boolean) => {
+    if (!window.cbsHubAPI?.setAutoLaunch) return;
+    setAutoLaunch((prev) => ({ ...prev, enabled: checked, loading: true }));
+    try {
+      const updated = await window.cbsHubAPI.setAutoLaunch(checked);
+      setAutoLaunch({
+        enabled: Boolean(updated?.enabled),
+        supported: Boolean(updated?.supported),
+        loading: false,
+      });
+    } catch {
+      setAutoLaunch((prev) => ({ ...prev, loading: false }));
+    }
+  };
 
   const handleDeviceChange = (
     key: "inputDeviceId" | "outputDeviceId" | "videoDeviceId",
@@ -210,10 +252,140 @@ export const SettingsModal: React.FC = () => {
               </TabsTrigger>
               <TabsTrigger value="appearance">Aparência</TabsTrigger>
               <TabsTrigger value="diagnostics">Diagnóstico</TabsTrigger>
+              <TabsTrigger
+                value="system"
+                className="text-xs h-7 px-3 flex items-center gap-1.5"
+              >
+                <Laptop className="w-3.5 h-3.5" />
+                <span>Sistema</span>
+              </TabsTrigger>
             </TabsList>
           </div>
 
           <div className="flex-1 overflow-y-auto p-5 min-h-0">
+            <TabsContent value="system" className="m-0 space-y-5">
+              <section
+                aria-labelledby="system-desktop-heading"
+                className="space-y-3 rounded-xl border border-border bg-secondary/20 p-4"
+              >
+                <h3
+                  id="system-desktop-heading"
+                  className="text-xs font-bold text-muted-foreground uppercase tracking-wider"
+                >
+                  Sistema / Desktop
+                </h3>
+
+                <div className="flex items-center justify-between gap-4 rounded-lg border border-border/60 bg-card/50 p-3.5">
+                  <div className="space-y-0.5">
+                    <label
+                      htmlFor="auto-launch-windows"
+                      className="text-sm font-medium text-foreground block cursor-pointer"
+                    >
+                      Iniciar com o Windows
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      Abre o cbsHUB automaticamente quando você liga o computador
+                    </p>
+                    {!autoLaunch.supported && (
+                      <p className="text-2xs text-muted-foreground/80 pt-0.5">
+                        Disponível na versão desktop instalada (.exe).
+                      </p>
+                    )}
+                  </div>
+                  <Switch
+                    id="auto-launch-windows"
+                    aria-label="Iniciar com o Windows"
+                    checked={autoLaunch.enabled}
+                    disabled={!autoLaunch.supported || autoLaunch.loading}
+                    onCheckedChange={(checked) =>
+                      void handleToggleAutoLaunch(checked)
+                    }
+                  />
+                </div>
+              </section>
+
+              <section
+                aria-labelledby="system-updates-heading"
+                className="space-y-3 rounded-xl border border-border bg-secondary/20 p-4"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <h3
+                      id="system-updates-heading"
+                      className="text-xs font-bold text-muted-foreground uppercase tracking-wider"
+                    >
+                      Atualizações do cbsHUB
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Versão instalada:{" "}
+                      <span className="font-mono font-semibold text-foreground">
+                        v{APP_VERSION}
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {window.cbsHubAPI?.checkForUpdates && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={
+                          appUpdate.status === "checking" ||
+                          appUpdate.status === "downloading" ||
+                          appUpdate.status === "installing"
+                        }
+                        onClick={() => void window.cbsHubAPI?.checkForUpdates?.()}
+                        className="gap-1.5"
+                      >
+                        <RefreshCw
+                          className={`w-3.5 h-3.5 ${
+                            appUpdate.status === "checking" ? "animate-spin" : ""
+                          }`}
+                        />
+                        <span>Verificar atualizações</span>
+                      </Button>
+                    )}
+
+                    {(appUpdate.status === "available" ||
+                      appUpdate.status === "downloaded") &&
+                      window.cbsHubAPI?.startUpdateFlow && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            setIsSettingsOpen(false);
+                            void window.cbsHubAPI?.startUpdateFlow?.();
+                          }}
+                          className="gap-1.5"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          <span>Atualizar agora</span>
+                        </Button>
+                      )}
+                  </div>
+                </div>
+
+                {appUpdate.status !== "idle" && (
+                  <p className="text-xs text-muted-foreground">
+                    {appUpdate.status === "checking"
+                      ? "Verificando atualizações..."
+                      : appUpdate.status === "available"
+                        ? `Nova versão v${appUpdate.version || ""} disponível para instalação.`
+                        : appUpdate.status === "downloaded"
+                          ? `Atualização v${appUpdate.version || ""} pronta para instalar.`
+                          : appUpdate.status === "not-available"
+                            ? "Você já está na versão mais recente."
+                            : appUpdate.status === "error"
+                              ? appUpdate.message ||
+                                "Não foi possível verificar atualizações."
+                              : appUpdate.status === "downloading"
+                                ? `Baixando atualização (${appUpdate.percent ?? 0}%)...`
+                                : "Instalando atualização..."}
+                  </p>
+                )}
+              </section>
+            </TabsContent>
             <TabsContent value="diagnostics" className="m-0">
               <CallDiagnosticsPanel />
             </TabsContent>

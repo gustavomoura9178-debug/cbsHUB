@@ -243,6 +243,7 @@ export type AppUpdateStatus =
   | "not-available"
   | "downloading"
   | "downloaded"
+  | "installing"
   | "error";
 
 export interface AppUpdateState {
@@ -250,7 +251,15 @@ export interface AppUpdateState {
   version?: string;
   releaseNotes?: string;
   percent?: number;
+  bytesPerSecond?: number;
+  transferred?: number;
+  total?: number;
   message?: string;
+}
+
+export interface AutoLaunchState {
+  enabled: boolean;
+  supported: boolean;
 }
 
 export interface NativeNotice {
@@ -283,7 +292,12 @@ export interface CbsHubElectronAPI {
   checkForUpdates: () => Promise<void>;
   downloadUpdate: () => Promise<void>;
   installUpdate: () => void;
+  startUpdateFlow: () => Promise<void>;
+  cancelUpdateWindow: () => void;
+  getUpdateState: () => Promise<AppUpdateState>;
   onUpdateStatus: (listener: (state: AppUpdateState) => void) => () => void;
+  getAutoLaunch: () => Promise<AutoLaunchState>;
+  setAutoLaunch: (enabled: boolean) => Promise<AutoLaunchState>;
 }
 
 declare global {
