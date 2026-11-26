@@ -103,5 +103,8 @@ assert(
     "script-src 'self' blob: 'wasm-unsafe-eval';",
   ),
 );
+assert(
+  moduleData.exports.productionCsp.includes("connect-src 'self' blob: data:"),
+);
 assert(!moduleData.exports.productionCsp.includes("script-src 'self' blob: 'unsafe-eval'"));
 console.log("PASS capability allowlist and production CSP (scoped WASM eval)");

@@ -8,7 +8,7 @@ import {
 } from "../components/ui/dialog";
 import { Button } from "../components/ui/button";
 import { Slider } from "../components/ui/slider";
-import { compressCanvasImage } from "./repository";
+import { compressCanvasImage, dataUrlToBlob } from "./repository";
 
 function formatKb(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -80,8 +80,14 @@ export function AvatarCrop({
         }
         sourceBlob = file;
         setOriginalBytes(file.size);
+      } else if (sourceDataUrl!.startsWith("data:")) {
+        sourceBlob = dataUrlToBlob(sourceDataUrl!);
+        setOriginalBytes(sourceBlob.size);
       } else {
         const res = await fetch(sourceDataUrl!);
+        if (!res.ok) {
+          throw Error(`Não foi possível carregar a imagem (${res.status}).`);
+        }
         sourceBlob = await res.blob();
         setOriginalBytes(sourceBlob.size);
       }

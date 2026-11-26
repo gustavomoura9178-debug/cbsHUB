@@ -170,12 +170,28 @@ export function compressCanvasImage(
   return best;
 }
 
+export function dataUrlToBlob(dataUrl: string): Blob {
+  const commaIdx = dataUrl.indexOf(",");
+  if (commaIdx === -1) {
+    throw new Error("Data URL de imagem inválida.");
+  }
+  const header = dataUrl.slice(0, commaIdx);
+  const base64 = dataUrl.slice(commaIdx + 1);
+  const mimeMatch = /^data:([^;,]+)/i.exec(header);
+  const mimeType = mimeMatch?.[1] || "image/webp";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: mimeType });
+}
+
 export async function encodeWebpBlobFromDataUrl(
   dataUrl: string,
   kind: "avatar" | "banner",
 ): Promise<Blob> {
-  const res = await fetch(dataUrl);
-  const srcBlob = await res.blob();
+  const srcBlob = dataUrlToBlob(dataUrl);
   const bitmap = await createImageBitmap(srcBlob);
   try {
     const maxW = kind === "avatar" ? 512 : 1280;

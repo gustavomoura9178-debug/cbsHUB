@@ -287,7 +287,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         setSelected(null);
         return true;
       } catch (e) {
-        setError((e as Error).message);
+        const message =
+          e instanceof Error
+            ? e.message
+            : typeof e === "object" && e !== null && "message" in e
+              ? String((e as { message: unknown }).message)
+              : String(e || "Falha ao salvar perfil.");
+        setError(message);
         return false;
       }
     },
